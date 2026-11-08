@@ -149,10 +149,27 @@ class ScraperWorker:
                         args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
                     )
                 except Exception as launch_err:
-                    err_msg = str(launch_err).strip() or type(launch_err).__name__
-                    job_manager.log(f"❌ Chromium launch error: {err_msg}. Run 'playwright install chromium' in terminal.")
-                    job_manager.finish(f"Scraper halted: {err_msg}")
-                    return
+                    err_msg = str(launch_err)
+                    if "Executable doesn't exist" in err_msg or "playwright install" in err_msg:
+                        try:
+                            job_manager.log("📥 Chromium not found. Automatically downloading Playwright Chromium...")
+                            import subprocess
+                            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                            job_manager.log("✅ Chromium downloaded successfully. Launching browser...")
+                            browser = await p.chromium.launch(
+                                headless=True,
+                                args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-blink-features=AutomationControlled"]
+                            )
+                        except Exception as auto_install_err:
+                            err_msg = str(auto_install_err).strip() or type(auto_install_err).__name__
+                            job_manager.log(f"❌ Chromium launch error: {err_msg}. Add 'playwright install chromium' to Render Build Command.")
+                            job_manager.finish(f"Scraper halted: {err_msg}")
+                            return
+                    else:
+                        err_msg = str(launch_err).strip() or type(launch_err).__name__
+                        job_manager.log(f"❌ Chromium launch error: {err_msg}. Run 'playwright install chromium' in terminal.")
+                        job_manager.finish(f"Scraper halted: {err_msg}")
+                        return
 
                 context: BrowserContext = await browser.new_context(
                     user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
