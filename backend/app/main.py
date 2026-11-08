@@ -43,6 +43,16 @@ app.add_middleware(
 )
 
 
+@app.get("/")
+async def root():
+    return {
+        "service": "VTU WhatNow API",
+        "status": "online",
+        "docs": "/docs",
+        "health": "/api/health"
+    }
+
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "vtuwhatnow"}
