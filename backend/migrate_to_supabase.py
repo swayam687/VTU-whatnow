@@ -30,6 +30,16 @@ def migrate(target_url: str):
     if target_url.startswith("postgres://"):
         target_url = target_url.replace("postgres://", "postgresql://", 1)
 
+    if target_url.startswith("postgresql://") and not target_url.startswith("postgresql+"):
+        try:
+            import psycopg  # noqa: F401
+        except ImportError:
+            try:
+                import psycopg2  # noqa: F401
+                target_url = target_url.replace("postgresql://", "postgresql+psycopg2://", 1)
+            except ImportError:
+                pass
+
     sqlite_path = backend_dir / "vtuwhatnow.db"
     if not sqlite_path.exists():
         print(f"❌ Error: Local database file not found at {sqlite_path}")
@@ -119,3 +129,4 @@ if __name__ == "__main__":
         print("Usage: python migrate_to_supabase.py \"<SUPABASE_DATABASE_URL>\"")
         sys.exit(1)
     migrate(sys.argv[1])
+
