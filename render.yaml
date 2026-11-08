@@ -28,3 +28,17 @@ services:
 
       # Admin panel protection password
       ADMIN_PASSWORD: admin123
+
+  # ---------- Frontend ----------
+  - type: web
+    name: vtu-frontend
+    env: node
+    repo: .
+    region: oregon
+    buildCommand: |
+      cd frontend && npm ci && npm run build
+    startCommand: |
+      cd frontend && npm start   # uses `next start` from package.json
+    envVars:
+      # URL that the UI uses to talk to the backend service
+      NEXT_PUBLIC_API_URL: https://vtu-backend.onrender.com
