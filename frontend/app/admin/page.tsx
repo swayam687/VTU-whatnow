@@ -23,6 +23,8 @@ import {
   IconGitHub,
   IconLinkedIn,
 } from "../../components/Icons";
+import CryptographicAvatar from "../../components/CryptographicAvatar";
+import { sfx } from "../../lib/sfx";
 
 const PRESET_SEMESTERS = [
   { id: "1", label: "Semester 1", url: "https://results.vtu.ac.in/D25J26Ecbcs/index.php" },
@@ -142,6 +144,12 @@ export default function AdminPanel() {
       try {
         const data = await fetchScrapeStatus();
         if (alive) {
+          if (data.is_running) {
+            sfx.playTick();
+          }
+          if (data.captcha_base64 && !status.captcha_base64) {
+            sfx.playSonar();
+          }
           setStatus(data);
           if (data.captcha_base64 && captchaInputRef.current) {
             captchaInputRef.current.focus();
@@ -822,13 +830,15 @@ export default function AdminPanel() {
                 key={s.usn}
                 className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
-                    <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.2 rounded bg-slate-100 uppercase">
-                      {s.branch}
-                    </span>
-                  </div>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <CryptographicAvatar usn={s.usn} size={34} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
+                      <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.2 rounded bg-slate-100 uppercase">
+                        {s.branch}
+                      </span>
+                    </div>
                   <div className="flex items-center gap-2 mt-0.5">
                     <span className="font-mono text-xs text-slate-400">{s.usn}</span>
                     {s.github_url && (
@@ -843,6 +853,7 @@ export default function AdminPanel() {
                     )}
                   </div>
                 </div>
+              </div>
 
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                   <div className="text-right hidden sm:block">
