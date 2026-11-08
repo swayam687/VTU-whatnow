@@ -13,6 +13,7 @@ services:
     envVars:
       # SQLite default for immediate local running without any setup
       DATABASE_URL: sqlite:///./vtuwhatnow.db
+      PYTHONPATH: backend
 
       # VTU Semester Result Portal URLs (index.php is the form entry)
       VTU_URL_SEM1: https://results.vtu.ac.in/D25J26Ecbcs/index.php
