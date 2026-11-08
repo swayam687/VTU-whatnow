@@ -30,123 +30,157 @@ export default function Navbar({
 
   return (
     <header
-      className={`border-b sticky top-0 z-40 backdrop-blur-md transition-colors duration-300 ${
+      className={`sticky top-0 z-40 backdrop-blur-md border-b transition-colors ${
         isObsidian
           ? "bg-[#08090a]/90 border-slate-800/80 text-white"
-          : "bg-white/95 border-slate-200 text-slate-900 shadow-sm"
+          : "bg-white/90 border-slate-200/80 text-slate-900 shadow-sm"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
         {/* Brand Logo */}
         <Link
           href="/"
           onClick={() => sfx.playMechanicalClick()}
-          className="flex items-center gap-2.5 font-mono"
+          className="flex items-center gap-2.5 group"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 font-black text-sm flex items-center justify-center shadow-lg shadow-cyan-500/20">
-            1R
+          <div
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105 ${
+              isObsidian
+                ? "bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 shadow-cyan-500/20"
+                : "bg-blue-600 text-white"
+            }`}
+          >
+            <svg
+              className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2.2}
+                d="M12 14l9-5-9-5-9 5 9 5zm0 0l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14zm-4 6v-7.5"
+              />
+            </svg>
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <span className="font-black text-base sm:text-lg tracking-tight">
-                VTU <span className="text-cyan-400">WhatNow</span>
+              <span className="font-extrabold text-base sm:text-lg tracking-tight">
+                VTU <span className={isObsidian ? "text-cyan-400" : "text-blue-600"}>WhatNow</span>
               </span>
               <span
-                className={`hidden md:inline-block text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded border ${
+                className={`hidden sm:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                   isObsidian
-                    ? "bg-slate-900 text-cyan-400 border-cyan-800/60"
+                    ? "bg-slate-900 text-slate-300 border-slate-800"
                     : "bg-slate-100 text-slate-600 border-slate-200"
                 }`}
               >
-                GOD::VIEW v2.0
+                Results Explorer
               </span>
             </div>
-            <p className="hidden sm:block text-[10px] font-mono opacity-50 -mt-0.5">
-              Campus Intelligence &amp; Topology Matrix
+            <p className="hidden md:block text-[11px] opacity-60 -mt-0.5">
+              Semester marks, leaderboards &amp; subject analytics
             </p>
           </div>
         </Link>
 
-        {/* View Switcher Tabs (If on homepage) */}
+        {/* View Switcher Tabs (Desktop) */}
         {onSelectView && (
-          <nav className="hidden lg:flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/60 border border-slate-800 text-xs font-mono">
+          <nav
+            className={`hidden lg:flex items-center gap-1 p-1 rounded-2xl border text-xs font-medium ${
+              isObsidian
+                ? "bg-slate-900/70 border-slate-800"
+                : "bg-slate-100/80 border-slate-200/80"
+            }`}
+          >
             <button
               onClick={() => {
                 sfx.playMechanicalClick();
                 onSelectView("dashboard");
               }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl transition-all ${
                 currentView === "dashboard"
-                  ? "bg-cyan-500 text-slate-950 font-bold shadow-sm shadow-cyan-500/30"
-                  : "opacity-60 hover:opacity-100"
+                  ? isObsidian
+                    ? "bg-cyan-500 text-slate-950 font-bold shadow-sm"
+                    : "bg-white text-slate-900 font-bold shadow-sm"
+                  : isObsidian
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              📊 Results Table
+              Results
             </button>
             <button
               onClick={() => {
                 sfx.playSonarChime();
                 onSelectView("topology");
               }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl transition-all ${
                 currentView === "topology"
-                  ? "bg-cyan-500 text-slate-950 font-bold shadow-sm shadow-cyan-500/30"
-                  : "opacity-60 hover:opacity-100"
+                  ? isObsidian
+                    ? "bg-cyan-500 text-slate-950 font-bold shadow-sm"
+                    : "bg-white text-slate-900 font-bold shadow-sm"
+                  : isObsidian
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              🕸️ Network Topology
+              Campus Graph
             </button>
             <button
               onClick={() => {
                 sfx.playMechanicalClick();
                 onSelectView("backlogs");
               }}
-              className={`px-3 py-1.5 rounded-xl transition-all ${
+              className={`px-3.5 py-1.5 rounded-xl transition-all ${
                 currentView === "backlogs"
-                  ? "bg-rose-500 text-white font-bold shadow-sm shadow-rose-500/30"
-                  : "opacity-60 hover:opacity-100"
+                  ? "bg-rose-500 text-white font-bold shadow-sm"
+                  : isObsidian
+                  ? "text-slate-400 hover:text-white"
+                  : "text-slate-600 hover:text-slate-900"
               }`}
             >
-              💀 Backlog Graveyard
+              Subject Analytics
             </button>
           </nav>
         )}
 
         {/* Right Actions: Theme Toggle + SFX Mute + Admin Link */}
-        <div className="flex items-center gap-2 font-mono text-xs">
-          {/* SFX Haptic Audio Switch */}
+        <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
+          {/* SFX Audio Switch */}
           <button
             onClick={handleToggleMute}
-            title={muted ? "Unmute Tactical SFX" : "Mute Tactical SFX"}
-            className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
+            title={muted ? "Unmute Audio" : "Mute Audio"}
+            className={`p-2 rounded-xl border transition-all flex items-center gap-1 ${
               isObsidian
                 ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white"
-                : "bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200"
+                : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
             }`}
           >
             <span>{muted ? "🔇" : "🔊"}</span>
-            <span className="hidden sm:inline text-[10px] uppercase font-bold">
-              {muted ? "Mute" : "SFX"}
+            <span className="hidden md:inline text-[11px] font-medium">
+              {muted ? "Muted" : "Sound"}
             </span>
           </button>
 
-          {/* Theme Mode Toggle: Obsidian vs White Paper */}
+          {/* Theme Mode Toggle: Light vs Dark */}
           {onToggleTheme && (
             <button
               onClick={() => {
                 sfx.playMechanicalClick();
                 onToggleTheme();
               }}
-              title="Toggle Obsidian Terminal / White Paper Mode"
-              className={`px-2.5 py-1.5 rounded-xl border transition-all flex items-center gap-1.5 ${
+              title="Toggle Light / Dark theme"
+              className={`px-2.5 py-2 rounded-xl border transition-all flex items-center gap-1.5 ${
                 isObsidian
-                  ? "bg-slate-900 border-cyan-800/80 text-cyan-400 hover:border-cyan-600 shadow-sm shadow-cyan-500/10"
-                  : "bg-slate-100 border-slate-300 text-slate-800 hover:bg-slate-200"
+                  ? "bg-slate-900 border-slate-800 text-slate-200 hover:text-white"
+                  : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
               }`}
             >
-              <span>{isObsidian ? "⬡" : "📄"}</span>
-              <span className="text-[10px] uppercase font-black tracking-wider">
-                {isObsidian ? "Obsidian" : "Paper"}
+              <span>{isObsidian ? "🌙" : "☀️"}</span>
+              <span className="hidden sm:inline text-[11px] font-medium">
+                {isObsidian ? "Dark" : "Light"}
               </span>
             </button>
           )}
@@ -155,10 +189,13 @@ export default function Navbar({
           <Link
             href="/admin"
             onClick={() => sfx.playMechanicalClick()}
-            className="flex items-center gap-1.5 px-3 py-1.5 font-bold rounded-xl bg-gradient-to-r from-slate-900 to-slate-800 text-white hover:from-cyan-600 hover:to-blue-600 transition-all border border-slate-700 shadow-sm"
+            className={`flex items-center gap-1 px-3 py-2 font-semibold text-xs rounded-xl transition-all shadow-sm ${
+              isObsidian
+                ? "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
+                : "bg-slate-900 hover:bg-slate-800 text-white"
+            }`}
           >
-            <span>⚡</span>
-            <span className="text-xs">Admin</span>
+            <span>Admin</span>
           </Link>
         </div>
       </div>

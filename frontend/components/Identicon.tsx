@@ -95,7 +95,7 @@ export default function Identicon({
           borderColor: `${colorPrimary}40`,
           boxShadow: `0 0 10px ${colorPrimary}20`,
         }}
-        title={`Dossier Crypto-Fingerprint: ${usn} [${hexFingerprint}]`}
+        title={`Student: ${usn}`}
       >
         <svg
           width={size}
@@ -144,3 +144,4 @@ export default function Identicon({
     </div>
   );
 }
+
