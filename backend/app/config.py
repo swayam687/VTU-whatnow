@@ -11,8 +11,8 @@ class Settings(BaseSettings):
     DELAY_MIN: int = 5
     DELAY_MAX: int = 10
     
-    # CORS
-    ALLOWED_ORIGINS: str = "http://localhost:3000,http://127.0.0.1:3000"
+    # CORS - allow all origins by default for seamless Vercel / Render hosting
+    ALLOWED_ORIGINS: str = "*"
 
     # Admin Panel Protection
     ADMIN_PASSWORD: str = "admin123"
