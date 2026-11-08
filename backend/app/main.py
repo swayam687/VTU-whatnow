@@ -3,10 +3,10 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
-from app.config import settings
-from app.database import engine, get_db
-from app import models
-from app.models import Student, Subject, Mark
+from .config import settings
+from .database import engine, get_db
+from . import models
+from .models import Student, Subject, Mark
 from app.schemas import (
     ScrapeRequest,
     CaptchaSubmit,
