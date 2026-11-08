@@ -1,10 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import CyberNavbar from "../components/CyberNavbar";
 
 export const metadata: Metadata = {
-  title: "VTU WhatNow // GOD VIEW Terminal",
-  description: "Cyberpunk intelligence dossier, live branch leaderboards, and network topology for VTU engineering students.",
+  title: "VTU WhatNow - Surveillance & Academic Topology Matrix",
+  description: "Live results, branch leaderboards, interactive campus topology graph, and backlog mortality matrix for VTU engineering students.",
   icons: {
     icon: "/icon.svg",
   },
@@ -17,25 +16,20 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body className="cyber-grid-bg min-h-screen text-slate-100 flex flex-col font-mono selection:bg-cyan-500/30 selection:text-cyan-200">
-        {/* Navigation Header with Cyber Controls */}
-        <CyberNavbar />
-
+      <body className="bg-[#08090a] theme-obsidian min-h-screen text-slate-100 flex flex-col font-mono selection:bg-cyan-500 selection:text-slate-950">
         {/* Main Content Area */}
-        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <main className="flex-1 w-full flex flex-col">
           {children}
         </main>
 
-        {/* Tactical Obsidian Footer */}
-        <footer className="border-t border-cyan-500/10 bg-[#08090a]/90 py-6 text-center text-xs text-slate-500 font-mono">
+        {/* Global Footer */}
+        <footer className="border-t border-slate-900 bg-[#060709] py-6 text-center text-xs text-slate-500 font-mono">
           <div className="max-w-7xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
-              <span>VTU WHATNOW // OBSIDIAN TERMINAL • ALL DOSSIERS SYNCED</span>
-            </div>
-            <p className="text-slate-500 text-[11px]">
-              CRITERIA: F (FAIL) • A (ABSENT) • W (WITHHELD) // TOPOLOGY: 60FPS
+            <p className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-cyan-500" />
+              <span>VTU WHATNOW · GOD::VIEW ACADEMIC SURVEILLANCE &amp; TOPOLOGY</span>
             </p>
+            <p className="text-slate-600">Backlog Criteria: F (Fail), A (Absent), W (Withheld)</p>
           </div>
         </footer>
       </body>

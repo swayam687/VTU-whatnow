@@ -44,7 +44,29 @@ class BranchStats(BaseModel):
     avg_percentage: float
     total_backlogs: int
     pass_count: int
-    students_with_backlogs: int = 0
+
+class SubjectBacklogStat(BaseModel):
+    subject_code: str
+    subject_name: str
+    branch: Optional[str] = "ALL"
+    total_students: int
+    fail_count: int
+    pass_count: int
+    fail_rate: float
+
+class BranchBacklogSummary(BaseModel):
+    branch: str
+    total_students: int
+    total_backlogs: int
+    avg_backlogs_per_student: float
+    students_with_backlogs: int
+    clean_pass_students: int
+    top_failed_subjects: List[SubjectBacklogStat] = []
+
+class BacklogAnalytics(BaseModel):
+    total_failed_papers: int
+    overall_deadliest_subjects: List[SubjectBacklogStat]
+    branches: List[BranchBacklogSummary]
 
 class ScrapeRequest(BaseModel):
     start_usn: str

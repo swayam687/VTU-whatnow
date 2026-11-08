@@ -31,9 +31,8 @@ export interface BranchStat {
   branch: string;
   total_students: number;
   avg_percentage: number;
-  total_backlogs: number; // total count of backlog papers
-  pass_count: number;     // all-clear students
-  students_with_backlogs?: number; // count of distinct students who have >= 1 backlog
+  total_backlogs: number;
+  pass_count: number;
 }
 
 export interface ScrapeStatus {
@@ -208,4 +207,36 @@ export async function submitScraperCaptcha(text: string, adminKey?: string): Pro
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || "Failed to submit captcha");
   return data;
+}
+
+export interface SubjectBacklogStat {
+  subject_code: string;
+  subject_name: string;
+  branch?: string;
+  total_students: number;
+  fail_count: number;
+  pass_count: number;
+  fail_rate: number;
+}
+
+export interface BranchBacklogSummary {
+  branch: string;
+  total_students: number;
+  total_backlogs: number;
+  avg_backlogs_per_student: number;
+  students_with_backlogs: number;
+  clean_pass_students: number;
+  top_failed_subjects: SubjectBacklogStat[];
+}
+
+export interface BacklogAnalytics {
+  total_failed_papers: number;
+  overall_deadliest_subjects: SubjectBacklogStat[];
+  branches: BranchBacklogSummary[];
+}
+
+export async function fetchBacklogAnalytics(): Promise<BacklogAnalytics> {
+  const res = await fetch(`${API_BASE}/api/analytics/backlogs`, { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to load backlog analytics");
+  return res.json();
 }

@@ -23,8 +23,8 @@ import {
   IconGitHub,
   IconLinkedIn,
 } from "../../components/Icons";
-import CryptographicAvatar from "../../components/CryptographicAvatar";
 import { sfx } from "../../lib/sfx";
+import Identicon from "../../components/Identicon";
 
 const PRESET_SEMESTERS = [
   { id: "1", label: "Semester 1", url: "https://results.vtu.ac.in/D25J26Ecbcs/index.php" },
@@ -145,10 +145,7 @@ export default function AdminPanel() {
         const data = await fetchScrapeStatus();
         if (alive) {
           if (data.is_running) {
-            sfx.playTick();
-          }
-          if (data.captcha_base64 && !status.captcha_base64) {
-            sfx.playSonar();
+            sfx.playGeigerTick();
           }
           setStatus(data);
           if (data.captcha_base64 && captchaInputRef.current) {
@@ -831,7 +828,12 @@ export default function AdminPanel() {
                 className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <CryptographicAvatar usn={s.usn} size={34} />
+                  <Identicon
+                    usn={s.usn}
+                    percentage={s.percentage}
+                    totalBacklogs={s.total_backlogs}
+                    size={36}
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
@@ -839,21 +841,21 @@ export default function AdminPanel() {
                         {s.branch}
                       </span>
                     </div>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <span className="font-mono text-xs text-slate-400">{s.usn}</span>
-                    {s.github_url && (
-                      <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded font-mono">
-                        GitHub
-                      </span>
-                    )}
-                    {s.linkedin_url && (
-                      <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded font-mono">
-                        LinkedIn
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="font-mono text-xs text-slate-400">{s.usn}</span>
+                      {s.github_url && (
+                        <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded font-mono">
+                          GitHub
+                        </span>
+                      )}
+                      {s.linkedin_url && (
+                        <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded font-mono">
+                          LinkedIn
+                        </span>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
 
                 <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                   <div className="text-right hidden sm:block">

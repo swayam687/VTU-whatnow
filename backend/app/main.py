@@ -23,6 +23,9 @@ from .schemas import (
     StudentOut,
     StudentUpdate,
     BranchStats,
+    SubjectBacklogStat,
+    BranchBacklogSummary,
+    BacklogAnalytics,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -228,15 +231,13 @@ def get_branches(db: Session = Depends(get_db)):
         avg_pct = round(sum(s.percentage for s in students) / total_students, 2) if total_students else 0.0
         total_backlogs = sum(s.total_backlogs for s in students)
         pass_count = sum(1 for s in students if s.total_backlogs == 0)
-        students_with_backlogs = sum(1 for s in students if s.total_backlogs > 0)
 
         results.append(BranchStats(
             branch=b,
             total_students=total_students,
             avg_percentage=avg_pct,
             total_backlogs=total_backlogs,
-            pass_count=pass_count,
-            students_with_backlogs=students_with_backlogs
+            pass_count=pass_count
         ))
 
     return results
@@ -254,3 +255,110 @@ def get_leaderboard(
     
     toppers = query.order_by(Student.percentage.desc(), Student.total_marks.desc()).limit(limit).all()
     return toppers
+
+
+@app.get("/api/analytics/backlogs", response_model=BacklogAnalytics)
+def get_backlog_analytics(db: Session = Depends(get_db)):
+    """Computes branch-wise and subject-wise backlog mortality analytics."""
+    students = db.query(Student).all()
+    marks = db.query(Mark).all()
+    subjects = {s.code: s.name for s in db.query(Subject).all()}
+    student_branch_map = {s.usn: s.branch for s in students}
+
+    total_failed_papers = sum(1 for m in marks if m.status in ("F", "A"))
+
+    # 1. Overall subject statistics
+    overall_subj_counts: dict = {}
+    for m in marks:
+        code = m.subject_code
+        if code not in overall_subj_counts:
+            overall_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
+        overall_subj_counts[code]["total"] += 1
+        if m.status in ("F", "A"):
+            overall_subj_counts[code]["fail"] += 1
+        elif m.status == "P":
+            overall_subj_counts[code]["pass"] += 1
+
+    overall_deadliest: List[SubjectBacklogStat] = []
+    for code, stats in overall_subj_counts.items():
+        if stats["fail"] > 0:
+            rate = round((stats["fail"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
+            overall_deadliest.append(SubjectBacklogStat(
+                subject_code=code,
+                subject_name=subjects.get(code, code),
+                branch="ALL",
+                total_students=stats["total"],
+                fail_count=stats["fail"],
+                pass_count=stats["pass"],
+                fail_rate=rate,
+            ))
+    overall_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
+
+    # 2. Branch-wise statistics
+    branch_students_map: dict = {}
+    for s in students:
+        b = s.branch or "OTHER"
+        if b not in branch_students_map:
+            branch_students_map[b] = []
+        branch_students_map[b].append(s)
+
+    branch_marks_map: dict = {}
+    for m in marks:
+        b = student_branch_map.get(m.usn, "OTHER")
+        if b not in branch_marks_map:
+            branch_marks_map[b] = []
+        branch_marks_map[b].append(m)
+
+    branch_summaries: List[BranchBacklogSummary] = []
+    for branch_name, b_students in branch_students_map.items():
+        b_marks = branch_marks_map.get(branch_name, [])
+        total_students = len(b_students)
+        total_backlogs = sum(s.total_backlogs for s in b_students)
+        avg_backlogs = round(total_backlogs / total_students, 2) if total_students > 0 else 0.0
+        students_with_backlogs = sum(1 for s in b_students if s.total_backlogs > 0)
+        clean_pass = sum(1 for s in b_students if s.total_backlogs == 0)
+
+        # Branch subject stats
+        b_subj_counts: dict = {}
+        for m in b_marks:
+            code = m.subject_code
+            if code not in b_subj_counts:
+                b_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
+            b_subj_counts[code]["total"] += 1
+            if m.status in ("F", "A"):
+                b_subj_counts[code]["fail"] += 1
+            elif m.status == "P":
+                b_subj_counts[code]["pass"] += 1
+
+        b_deadliest: List[SubjectBacklogStat] = []
+        for code, stats in b_subj_counts.items():
+            if stats["fail"] > 0:
+                rate = round((stats["fail"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
+                b_deadliest.append(SubjectBacklogStat(
+                    subject_code=code,
+                    subject_name=subjects.get(code, code),
+                    branch=branch_name,
+                    total_students=stats["total"],
+                    fail_count=stats["fail"],
+                    pass_count=stats["pass"],
+                    fail_rate=rate,
+                ))
+        b_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
+
+        branch_summaries.append(BranchBacklogSummary(
+            branch=branch_name,
+            total_students=total_students,
+            total_backlogs=total_backlogs,
+            avg_backlogs_per_student=avg_backlogs,
+            students_with_backlogs=students_with_backlogs,
+            clean_pass_students=clean_pass,
+            top_failed_subjects=b_deadliest[:5],
+        ))
+
+    branch_summaries.sort(key=lambda b: b.total_backlogs, reverse=True)
+
+    return BacklogAnalytics(
+        total_failed_papers=total_failed_papers,
+        overall_deadliest_subjects=overall_deadliest[:15],
+        branches=branch_summaries,
+    )

@@ -1,22 +1,22 @@
-/**
- * Cybernetic Web Audio Synthesizer (Zero External Dependencies)
- * Generates tactile mechanical clicks, geiger ticks, and sonar chimes on the fly.
- */
+"use client";
 
-class SoundSynthesizer {
+/**
+ * Cybernetic Tactile Haptic Audio Engine
+ * Zero external audio files — synthesized live via the Web Audio API.
+ */
+class SoundEngine {
   private ctx: AudioContext | null = null;
-  private enabled: boolean = true;
+  public isMuted: boolean = false;
 
   constructor() {
     if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("vtu_cyber_sfx");
-      this.enabled = stored !== null ? stored === "true" : true;
+      const saved = localStorage.getItem("vtu_sfx_muted");
+      this.isMuted = saved === "true";
     }
   }
 
-  private getContext(): AudioContext | null {
-    if (typeof window === "undefined") return null;
-    if (!this.ctx) {
+  private initCtx() {
+    if (!this.ctx && typeof window !== "undefined") {
       const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (AudioCtx) {
         this.ctx = new AudioCtx();
@@ -25,127 +25,126 @@ class SoundSynthesizer {
     if (this.ctx && this.ctx.state === "suspended") {
       this.ctx.resume();
     }
-    return this.ctx;
   }
 
-  public isEnabled(): boolean {
-    return this.enabled;
-  }
-
-  public toggle(): boolean {
-    this.enabled = !this.enabled;
+  public toggleMute(): boolean {
+    this.isMuted = !this.isMuted;
     if (typeof window !== "undefined") {
-      localStorage.setItem("vtu_cyber_sfx", String(this.enabled));
+      localStorage.setItem("vtu_sfx_muted", String(this.isMuted));
     }
-    if (this.enabled) {
-      this.playClick();
+    if (!this.isMuted) {
+      this.playMechanicalClick();
     }
-    return this.enabled;
+    return this.isMuted;
   }
 
   /**
-   * Tactile mechanical click for buttons and tabs
+   * Minimalist tactile mechanical click (12ms transient pulse).
+   * Emulates a high-precision Cherry MX mechanical switch or Leica shutter.
    */
-  public playClick() {
-    if (!this.enabled) return;
+  public playMechanicalClick() {
+    if (this.isMuted) return;
     try {
-      const ctx = this.getContext();
-      if (!ctx) return;
+      this.initCtx();
+      if (!this.ctx) return;
 
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      const filter = this.ctx.createBiquadFilter();
+
+      filter.type = "bandpass";
+      filter.frequency.setValueAtTime(1900, this.ctx.currentTime);
+      filter.Q.setValueAtTime(3.5, this.ctx.currentTime);
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(1400, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.018);
+      osc.frequency.setValueAtTime(1400, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(300, this.ctx.currentTime + 0.014);
 
-      gain.gain.setValueAtTime(0.08, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.018);
+      gain.gain.setValueAtTime(0.08, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, this.ctx.currentTime + 0.014);
 
-      osc.connect(gain);
-      gain.connect(ctx.destination);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.ctx.destination);
 
-      osc.start(ctx.currentTime);
-      osc.stop(ctx.currentTime + 0.02);
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.015);
     } catch {
-      // AudioContext policy suppression fallback
+      // AudioContext policy suppression gracefully handled
     }
   }
 
   /**
-   * Subtle Geiger-counter tick for telemetry / scraper streaming
+   * Quiet Geiger-counter tick for scraping updates or telemetry scanning.
    */
-  public playTick() {
-    if (!this.enabled) return;
+  public playGeigerTick() {
+    if (this.isMuted) return;
     try {
-      const ctx = this.getContext();
-      if (!ctx) return;
+      this.initCtx();
+      if (!this.ctx) return;
 
-      const bufferSize = ctx.sampleRate * 0.004; // 4ms burst
-      const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const bufferSize = this.ctx.sampleRate * 0.005; // 5ms burst
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
       const output = buffer.getChannelData(0);
       for (let i = 0; i < bufferSize; i++) {
-        output[i] = Math.random() * 2 - 1;
+        output[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.2));
       }
 
-      const whiteNoise = ctx.createBufferSource();
+      const whiteNoise = this.ctx.createBufferSource();
       whiteNoise.buffer = buffer;
 
-      const filter = ctx.createBiquadFilter();
+      const filter = this.ctx.createBiquadFilter();
       filter.type = "highpass";
-      filter.frequency.setValueAtTime(2500, ctx.currentTime);
+      filter.frequency.setValueAtTime(2400 + Math.random() * 800, this.ctx.currentTime);
 
-      const gain = ctx.createGain();
-      gain.gain.setValueAtTime(0.04, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.006);
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.06, this.ctx.currentTime);
 
       whiteNoise.connect(filter);
       filter.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(this.ctx.destination);
 
-      whiteNoise.start(ctx.currentTime);
+      whiteNoise.start();
     } catch {
-      // Silent catch
+      // AudioContext policy suppression
     }
   }
 
   /**
-   * Deep cybernetic sonar chime when inspecting toppers or opening top dossiers
+   * Low ethereal harmonic Sonar Chime (for toppers, ranks, or compare launch).
    */
-  public playSonar() {
-    if (!this.enabled) return;
+  public playSonarChime() {
+    if (this.isMuted) return;
     try {
-      const ctx = this.getContext();
-      if (!ctx) return;
+      this.initCtx();
+      if (!this.ctx) return;
 
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const subOsc = ctx.createOscillator();
-      const gain = ctx.createGain();
+      const now = this.ctx.currentTime;
+      const freqs = [880, 1320, 1760]; // A5 harmonic triad
 
-      osc.type = "sine";
-      osc.frequency.setValueAtTime(587.33, now); // D5 chime
-      osc.frequency.exponentialRampToValueAtTime(440, now + 0.6); // Fall to A4
+      freqs.forEach((freq, idx) => {
+        if (!this.ctx) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
 
-      subOsc.type = "sine";
-      subOsc.frequency.setValueAtTime(293.66, now); // D4 sub-harmonic
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(freq, now + idx * 0.04);
 
-      gain.gain.setValueAtTime(0.12, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+        const initialVol = 0.06 / (idx + 1);
+        gain.gain.setValueAtTime(0.0001, now);
+        gain.gain.exponentialRampToValueAtTime(initialVol, now + idx * 0.04 + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
 
-      osc.connect(gain);
-      subOsc.connect(gain);
-      gain.connect(ctx.destination);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
 
-      osc.start(now);
-      subOsc.start(now);
-      osc.stop(now + 0.9);
-      subOsc.stop(now + 0.9);
+        osc.start(now + idx * 0.04);
+        osc.stop(now + 0.5);
+      });
     } catch {
-      // Silent catch
+      // AudioContext suppression
     }
   }
 }
 
-export const sfx = new SoundSynthesizer();
-
+export const sfx = new SoundEngine();

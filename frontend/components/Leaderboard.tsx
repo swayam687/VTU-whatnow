@@ -3,102 +3,116 @@
 import React from "react";
 import { Student } from "../lib/api";
 import { IconTrophy } from "./Icons";
-import CryptographicAvatar from "./CryptographicAvatar";
+import Identicon from "./Identicon";
 import { sfx } from "../lib/sfx";
 
 interface LeaderboardProps {
   toppers: Student[];
   branch: string;
   onSelectStudent: (student: Student) => void;
+  isObsidian?: boolean;
 }
 
-export default function Leaderboard({ toppers, branch, onSelectStudent }: LeaderboardProps) {
+export default function Leaderboard({
+  toppers,
+  branch,
+  onSelectStudent,
+  isObsidian = false,
+}: LeaderboardProps) {
   if (!toppers.length) return null;
 
   const topThree = toppers.slice(0, 3);
 
-  const handleSelect = (s: Student) => {
-    sfx.playSonar();
-    onSelectStudent(s);
-  };
-
   return (
-    <div className="bg-[#0c1015]/90 backdrop-blur-sm rounded-3xl border border-amber-500/30 p-5 sm:p-6 shadow-[0_0_30px_rgba(245,158,11,0.06)] mb-6">
+    <div
+      className={`rounded-3xl border p-5 sm:p-6 mb-6 font-mono transition-all duration-300 ${
+        isObsidian
+          ? "bg-[#090b0e] border-slate-800 text-white shadow-lg shadow-black/40"
+          : "bg-white border-slate-200/90 text-slate-900 shadow-sm"
+      }`}
+    >
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-amber-500/10 text-amber-400 flex items-center justify-center border border-amber-500/30 shadow-[0_0_12px_rgba(245,158,11,0.25)]">
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-400 flex items-center justify-center border border-amber-500/30">
             <IconTrophy className="w-4 h-4" />
           </div>
           <div>
-            <h2 className="font-mono font-bold text-slate-100 text-sm sm:text-base flex items-center gap-2">
-              <span>{branch === "ALL" ? "CAMPUS APEX DOSSIERS" : `${branch} APEX TOPPERS`}</span>
-              <span className="text-[9px] px-1.5 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800/60 uppercase">
-                RANK 1-3
-              </span>
+            <h2 className="font-bold text-sm sm:text-base">
+              {branch === "ALL" ? "Campus Top Performers" : `${branch} Branch Toppers`}
             </h2>
-            <p className="font-mono text-[11px] text-slate-400">
-              Ranked by aggregate raw score &amp; precision percentage
+            <p className="text-[11px] opacity-60">
+              Ranked by aggregate marks &amp; percentage score
             </p>
           </div>
         </div>
-        <span className="hidden sm:inline-block font-mono text-[11px] font-bold text-amber-400 bg-amber-950/60 border border-amber-800/60 px-2.5 py-1 rounded-full animate-pulse">
-          TOP FLIGHT
+        <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          Podium #1-3
         </span>
       </div>
 
       {/* Podium Cards for Top 3 */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {topThree.map((s, idx) => {
-          const rankMeta = [
+          const rankColors = [
             {
-              label: "RANK 1 // GOLD",
-              badgeBg: "bg-amber-950/80 text-amber-300 border-amber-500/60",
-              cardBorder: "border-amber-500/40 hover:border-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.15)]",
-              glow: "bg-amber-950/20",
+              border: "border-amber-500/50 hover:border-amber-400",
+              bg: isObsidian ? "bg-amber-950/20" : "bg-amber-50/50",
+              badge: "bg-amber-500 text-slate-950 font-black",
+              glow: "shadow-amber-500/10",
             },
             {
-              label: "RANK 2 // SILVER",
-              badgeBg: "bg-cyan-950/80 text-cyan-300 border-cyan-500/60",
-              cardBorder: "border-cyan-500/30 hover:border-cyan-400 shadow-[0_0_15px_rgba(0,240,255,0.1)]",
-              glow: "bg-cyan-950/15",
+              border: "border-cyan-500/40 hover:border-cyan-400",
+              bg: isObsidian ? "bg-cyan-950/20" : "bg-cyan-50/50",
+              badge: "bg-cyan-500 text-slate-950 font-black",
+              glow: "shadow-cyan-500/10",
             },
             {
-              label: "RANK 3 // BRONZE",
-              badgeBg: "bg-purple-950/80 text-purple-300 border-purple-500/60",
-              cardBorder: "border-purple-500/30 hover:border-purple-400 shadow-[0_0_15px_rgba(168,85,247,0.1)]",
-              glow: "bg-purple-950/15",
+              border: "border-orange-500/40 hover:border-orange-400",
+              bg: isObsidian ? "bg-orange-950/20" : "bg-orange-50/50",
+              badge: "bg-orange-500 text-slate-950 font-black",
+              glow: "shadow-orange-500/10",
             },
           ];
-          const meta = rankMeta[idx] || rankMeta[1];
+          const meta = rankColors[idx] || rankColors[0];
 
           return (
             <div
               key={s.usn}
-              onClick={() => handleSelect(s)}
-              className={`p-4 rounded-2xl border ${meta.cardBorder} ${meta.glow} flex items-center justify-between gap-3 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.99] font-mono`}
+              onClick={() => {
+                sfx.playSonarChime();
+                onSelectStudent(s);
+              }}
+              className={`p-3.5 sm:p-4 rounded-2xl border ${meta.border} ${meta.bg} flex items-center justify-between gap-3 cursor-pointer transition-all duration-200 hover:scale-[1.01] hover:shadow-lg ${meta.glow}`}
             >
               <div className="flex items-center gap-3 min-w-0 flex-1">
-                <CryptographicAvatar usn={s.usn} size={38} />
+                <Identicon
+                  usn={s.usn}
+                  percentage={s.percentage}
+                  totalBacklogs={s.total_backlogs}
+                  size={38}
+                />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${meta.badgeBg}`}>
-                      {meta.label}
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <span className={`text-[9px] uppercase px-1.5 py-0.2 rounded ${meta.badge}`}>
+                      RANK #{idx + 1}
                     </span>
-                    <span className="text-[10px] font-bold text-slate-400 uppercase">
+                    <span className="text-[10px] font-bold opacity-60 uppercase">
                       {s.branch}
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-100 text-sm truncate">{s.name}</h3>
-                  <p className="text-[10px] text-cyan-400/80 mt-0.5">{s.usn}</p>
+                  <h3 className="font-bold text-xs sm:text-sm truncate">
+                    {s.name || "Anonymous"}
+                  </h3>
+                  <p className="text-[10px] opacity-60 tracking-wider">{s.usn}</p>
                 </div>
               </div>
 
               <div className="text-right shrink-0">
-                <span className="text-base sm:text-lg font-black text-cyan-400 block drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">
+                <span className="text-sm sm:text-base font-black text-amber-400 block">
                   {s.percentage.toFixed(1)}%
                 </span>
-                <span className="text-[10px] text-slate-400 font-medium block">
-                  {s.total_marks} PTS
+                <span className="text-[10px] opacity-60 block">
+                  {s.total_marks} pts
                 </span>
               </div>
             </div>
