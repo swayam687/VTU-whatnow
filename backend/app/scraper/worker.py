@@ -8,11 +8,11 @@ import traceback
 from typing import List, Optional
 from playwright.async_api import async_playwright
 
-from app.config import settings
-from app.database import SessionLocal
-from app.models import Student, Subject, Mark
-from app.scraper.parser import parse_vtu_html
-from app.services.job_manager import job_manager
+from ..config import settings
+from ..database import SessionLocal
+from ..models import Student, Subject, Mark
+from .parser import parse_vtu_html
+from ..services.job_manager import job_manager
 
 BRANCH_MAP = {
     "CS": "CSE",

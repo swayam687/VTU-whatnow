@@ -1,3 +1,11 @@
+import sys
+from pathlib import Path
+
+# Add backend directory to sys.path so 'app' can be imported anywhere
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from typing import List, Optional
 from fastapi import FastAPI, Depends, HTTPException, Query, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,7 +15,7 @@ from .config import settings
 from .database import engine, get_db
 from . import models
 from .models import Student, Subject, Mark
-from app.schemas import (
+from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
     AdminVerifyRequest,
@@ -16,8 +24,8 @@ from app.schemas import (
     StudentUpdate,
     BranchStats,
 )
-from app.services.job_manager import job_manager
-from app.scraper.worker import scraper_worker
+from .services.job_manager import job_manager
+from .scraper.worker import scraper_worker
 
 # Create DB tables on startup
 models.Base.metadata.create_all(bind=engine)
