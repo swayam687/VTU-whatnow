@@ -30,8 +30,11 @@ from .schemas import (
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
 
-# Create DB tables on startup
-models.Base.metadata.create_all(bind=engine)
+# Create DB tables on startup safely (tables are already seeded in Supabase)
+try:
+    models.Base.metadata.create_all(bind=engine)
+except Exception as e:
+    print(f"⚠️ Warning: metadata.create_all did not run on import ({e}). Will proceed.")
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0")
 
