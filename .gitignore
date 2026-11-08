@@ -18,9 +18,10 @@ venv.bak/
 .env.production.local
 
 # Databases & Local SQLite files
-*.db
 *.sqlite
 *.sqlite3
+# Allow pre-seeded database to be deployed to Render
+!backend/vtuwhatnow.db
 
 # Node & Next.js
 node_modules/
