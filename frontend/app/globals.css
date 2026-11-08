@@ -4,9 +4,7 @@
 
 :root {
   --background: #08090a;
-  --foreground: #e2e8f0;
-  --cyber-cyan: #00f0ff;
-  --cyber-amber: #f59e0b;
+  --foreground: #f1f5f9;
 }
 
 body {
@@ -16,58 +14,94 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* Obsidian Sub-pixel Grid Matrix */
-.cyber-grid-bg {
+/* Dark Theme (Default) */
+body.theme-dark {
+  --background: #08090a;
+  --foreground: #f1f5f9;
+  background-color: #08090a;
+  color: #f1f5f9;
+}
+
+/* Clean White / Light Theme (Original White Mode) */
+body.theme-light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* Dark mode grid */
+body.theme-dark .cyber-grid-bg {
   background-color: #08090a;
   background-image: radial-gradient(rgba(0, 240, 255, 0.08) 1px, transparent 1px);
   background-size: 24px 24px;
 }
 
-/* Vintage CRT Scanline & Phosphor Bloom Effect */
-.crt-overlay {
-  position: relative;
+/* Light mode overrides */
+body.theme-light .cyber-grid-bg {
+  background-color: #f8fafc !important;
+  background-image: radial-gradient(#cbd5e1 1px, transparent 1px) !important;
+  background-size: 20px 20px !important;
 }
 
-.crt-overlay::before {
-  content: " ";
-  display: block;
-  position: fixed;
-  top: 0; left: 0; bottom: 0; right: 0;
-  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%),
-              linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-  z-index: 999;
-  background-size: 100% 3px, 6px 100%;
-  pointer-events: none;
-  opacity: 0.85;
+body.theme-light header {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+  border-bottom-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
-.crt-bloom {
-  filter: contrast(1.05) brightness(1.02) drop-shadow(0 0 1px rgba(0, 240, 255, 0.35));
+body.theme-light footer {
+  background-color: #ffffff !important;
+  border-top-color: #e2e8f0 !important;
+  color: #64748b !important;
 }
 
-/* Glowing Cyber Accents */
-.glow-cyan {
-  box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+body.theme-light .bg-\[\#0c1015\]\/95,
+body.theme-light .bg-\[\#0c1015\]\/90,
+body.theme-light .bg-\[\#0c1015\] {
+  background-color: #ffffff !important;
+  border-color: #e2e8f0 !important;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08) !important;
 }
 
-.glow-amber {
-  box-shadow: 0 0 15px rgba(245, 158, 11, 0.25);
+body.theme-light .bg-\[\#08090a\],
+body.theme-light .bg-slate-950,
+body.theme-light .bg-slate-950\/80,
+body.theme-light .bg-slate-950\/70,
+body.theme-light .bg-slate-950\/60 {
+  background-color: #f8fafc !important;
+  border-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
-/* Custom Cyber Obsidian scrollbar */
+body.theme-light .text-slate-100,
+body.theme-light .text-slate-200,
+body.theme-light .text-slate-300 {
+  color: #0f172a !important;
+}
+
+body.theme-light .text-slate-400 {
+  color: #64748b !important;
+}
+
+body.theme-light .border-slate-800,
+body.theme-light .border-slate-800\/80,
+body.theme-light .border-slate-800\/90 {
+  border-color: #e2e8f0 !important;
+}
+
+/* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #08090a;
+  background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 9999px;
-  border: 1px solid rgba(0, 240, 255, 0.15);
-}
-::-webkit-scrollbar-thumb:hover {
   background: #334155;
-  border-color: rgba(0, 240, 255, 0.4);
+  border-radius: 9999px;
+}
+body.theme-light ::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
 }

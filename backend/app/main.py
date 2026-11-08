@@ -228,13 +228,15 @@ def get_branches(db: Session = Depends(get_db)):
         avg_pct = round(sum(s.percentage for s in students) / total_students, 2) if total_students else 0.0
         total_backlogs = sum(s.total_backlogs for s in students)
         pass_count = sum(1 for s in students if s.total_backlogs == 0)
+        students_with_backlogs = sum(1 for s in students if s.total_backlogs > 0)
 
         results.append(BranchStats(
             branch=b,
             total_students=total_students,
             avg_percentage=avg_pct,
             total_backlogs=total_backlogs,
-            pass_count=pass_count
+            pass_count=pass_count,
+            students_with_backlogs=students_with_backlogs
         ))
 
     return results

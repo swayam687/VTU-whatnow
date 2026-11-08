@@ -31,8 +31,9 @@ export interface BranchStat {
   branch: string;
   total_students: number;
   avg_percentage: number;
-  total_backlogs: number;
-  pass_count: number;
+  total_backlogs: number; // total count of backlog papers
+  pass_count: number;     // all-clear students
+  students_with_backlogs?: number; // count of distinct students who have >= 1 backlog
 }
 
 export interface ScrapeStatus {

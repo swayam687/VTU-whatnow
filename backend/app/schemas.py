@@ -44,6 +44,7 @@ class BranchStats(BaseModel):
     avg_percentage: float
     total_backlogs: int
     pass_count: int
+    students_with_backlogs: int = 0
 
 class ScrapeRequest(BaseModel):
     start_usn: str

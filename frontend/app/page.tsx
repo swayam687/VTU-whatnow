@@ -183,56 +183,41 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Cyber Obsidian Header Banner */}
-      <div className="relative overflow-hidden bg-[#0c1015]/95 border border-cyan-500/30 rounded-3xl p-5 sm:p-7 shadow-[0_0_35px_rgba(0,240,255,0.06)]">
-        {/* Subtle holographic line overlay */}
-        <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/5 via-transparent to-amber-500/5 pointer-events-none" />
+      {/* Compact Mobile-Friendly Telemetry Bar (No huge title taking space) */}
+      <div className="bg-[#0c1015]/90 border border-cyan-500/30 rounded-2xl p-3 sm:p-4 shadow-sm flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="font-bold text-slate-200 uppercase tracking-wider text-[11px]">
+            CAMPUS TELEMETRY
+          </span>
+          <span className="text-[10px] text-cyan-400/80 bg-cyan-950 px-2 py-0.5 rounded border border-cyan-900/60 hidden sm:inline-block">
+            {activeBranch === "ALL" ? "ALL BRANCHES" : `${activeBranch} ONLY`}
+          </span>
+        </div>
 
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-400 bg-cyan-950/80 border border-cyan-800/80 px-2.5 py-0.5 rounded">
-                OBSIDIAN SURVEILLANCE // TERMINAL
-              </span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-[10px] text-emerald-400 font-bold tracking-wider">FEED ACTIVE</span>
-            </div>
-            <h1 className="text-xl sm:text-3xl font-black tracking-tight text-white">
-              Campus Intelligence &amp; Performance Matrix
-            </h1>
-            <p className="text-slate-400 text-xs sm:text-sm mt-1 max-w-xl">
-              Inspect student dossiers, cryptographically verified marks breakdowns, branch node graphs, and head-to-head performance differentials.
-            </p>
+        {/* Quick Compact Stats: Enrolled, Clear, Students with Backlog, Total Backlog Papers */}
+        <div className="flex items-center gap-2 sm:gap-4 flex-wrap text-center font-mono text-[11px]">
+          <div className="px-2 py-1 rounded-xl bg-slate-900/80 border border-slate-800">
+            <span className="text-slate-400 block text-[9px]">ENROLLED</span>
+            <strong className="text-cyan-400 text-xs sm:text-sm">{students.length}</strong>
           </div>
-
-          {/* Quick Metrics Bar */}
-          <div className="flex items-center gap-3 sm:gap-6 bg-[#08090a]/90 rounded-2xl p-3 sm:p-4 border border-cyan-500/25 self-start md:self-auto shadow-inner">
-            <div className="text-center px-2">
-              <p className="text-xl sm:text-2xl font-black text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.4)]">
-                {students.length}
-              </p>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                DOSSIERS
-              </p>
-            </div>
-            <div className="w-px h-8 bg-slate-800" />
-            <div className="text-center px-2">
-              <p className="text-xl sm:text-2xl font-black text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]">
-                {students.filter((s) => s.total_backlogs === 0).length}
-              </p>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                ALL CLEAR
-              </p>
-            </div>
-            <div className="w-px h-8 bg-slate-800" />
-            <div className="text-center px-2">
-              <p className="text-xl sm:text-2xl font-black text-rose-400 drop-shadow-[0_0_8px_rgba(244,63,94,0.4)]">
-                {students.reduce((sum, s) => sum + s.total_backlogs, 0)}
-              </p>
-              <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mt-0.5">
-                BACKLOGS
-              </p>
-            </div>
+          <div className="px-2 py-1 rounded-xl bg-emerald-950/40 border border-emerald-800/40">
+            <span className="text-emerald-400 block text-[9px]">ALL CLEAR</span>
+            <strong className="text-emerald-300 text-xs sm:text-sm">
+              {students.filter((s) => s.total_backlogs === 0).length}
+            </strong>
+          </div>
+          <div className="px-2 py-1 rounded-xl bg-amber-950/40 border border-amber-800/40">
+            <span className="text-amber-400 block text-[9px]">STD W/ BACKLOG</span>
+            <strong className="text-amber-300 text-xs sm:text-sm">
+              {students.filter((s) => s.total_backlogs > 0).length}
+            </strong>
+          </div>
+          <div className="px-2 py-1 rounded-xl bg-rose-950/40 border border-rose-800/40">
+            <span className="text-rose-400 block text-[9px]">TOTAL BACKLOGS</span>
+            <strong className="text-rose-300 text-xs sm:text-sm">
+              {students.reduce((sum, s) => sum + s.total_backlogs, 0)}
+            </strong>
           </div>
         </div>
       </div>
