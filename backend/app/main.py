@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark
+from .models import Student, Subject, Mark, SemesterLink
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -26,6 +26,8 @@ from .schemas import (
     SubjectBacklogStat,
     BranchBacklogSummary,
     BacklogAnalytics,
+    SemesterLinkCreate,
+    SemesterLinkOut,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -88,28 +90,152 @@ def verify_admin(req: AdminVerifyRequest):
 # -------------------------------------------------------------
 
 @app.post("/api/scrape/start", dependencies=[Depends(require_admin)])
-async def start_scraping(req: ScrapeRequest):
+async def start_scraping(req: ScrapeRequest, db: Session = Depends(get_db)):
     if scraper_worker.is_active():
         raise HTTPException(status_code=400, detail="A scraping job is already running.")
     
     clean_start = req.start_usn.strip().upper()
     clean_end = req.end_usn.strip().upper() if req.end_usn else clean_start
 
+    target_custom_url = req.custom_url
+    target_sem = req.semester
+
+    if req.semester_link_id:
+        link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
+        if link:
+            target_custom_url = link.url
+            if link.semester:
+                target_sem = link.semester
+
     started = scraper_worker.start(
         start_usn=clean_start,
         end_usn=clean_end,
-        semester=req.semester,
-        custom_url=req.custom_url
+        semester=target_sem,
+        custom_url=target_custom_url
     )
     if not started:
         raise HTTPException(status_code=400, detail="Failed to start scraping job.")
-    return {"message": "Scraping started.", "start_usn": clean_start, "end_usn": clean_end}
+    return {
+        "message": "Scraping started.",
+        "start_usn": clean_start,
+        "end_usn": clean_end,
+        "portal_url": target_custom_url or "default"
+    }
 
 
 @app.post("/api/scrape/stop", dependencies=[Depends(require_admin)])
 async def stop_scraping():
     scraper_worker.stop()
     return {"message": "Scraping stopped."}
+
+
+# -------------------------------------------------------------
+# Semester Links CRUD Endpoints
+# -------------------------------------------------------------
+
+@app.get("/api/semester-links", response_model=List[SemesterLinkOut])
+def get_semester_links(db: Session = Depends(get_db)):
+    try:
+        links = db.query(SemesterLink).order_by(SemesterLink.id.asc()).all()
+        if not links:
+            # Auto-seed default semester links if table is empty
+            default_1 = SemesterLink(
+                title="Semester 1 & 2 (2022 Scheme - Jan/Feb 2026)",
+                url=settings.VTU_URL_SEM1,
+                semester="1",
+                is_default=True
+            )
+            default_2 = SemesterLink(
+                title="Semester 2 (2022 Scheme - June/July 2026)",
+                url=settings.VTU_URL_SEM2,
+                semester="2",
+                is_default=False
+            )
+            db.add(default_1)
+            db.add(default_2)
+            db.commit()
+            links = [default_1, default_2]
+        return links
+    except Exception as e:
+        print(f"Error fetching semester links: {e}")
+        return []
+
+
+@app.post("/api/semester-links", response_model=SemesterLinkOut, dependencies=[Depends(require_admin)])
+def create_semester_link(data: SemesterLinkCreate, db: Session = Depends(get_db)):
+    clean_title = data.title.strip()
+    clean_url = data.url.strip()
+    if not clean_title or not clean_url:
+        raise HTTPException(status_code=400, detail="Title and URL are required.")
+    
+    # VTU form entry is always index.php
+    if "resultpage.php" in clean_url:
+        clean_url = clean_url.replace("resultpage.php", "index.php")
+
+    new_link = SemesterLink(
+        title=clean_title,
+        url=clean_url,
+        semester=data.semester.strip() or "1",
+        is_default=data.is_default,
+    )
+    db.add(new_link)
+    db.commit()
+    db.refresh(new_link)
+    return new_link
+
+
+@app.delete("/api/semester-links/{link_id}", dependencies=[Depends(require_admin)])
+def delete_semester_link(link_id: int, db: Session = Depends(get_db)):
+    link = db.query(SemesterLink).filter(SemesterLink.id == link_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Semester link not found.")
+    title = link.title
+    db.delete(link)
+    db.commit()
+    return {"message": f"Semester link '{title}' deleted successfully."}
+
+
+# -------------------------------------------------------------
+# System & Playwright Diagnostics
+# -------------------------------------------------------------
+
+@app.get("/api/system/browser-status")
+def get_browser_status():
+    """Checks whether Playwright Chromium is present and usable."""
+    import os
+    home = Path.home()
+    possible_paths = [
+        os.environ.get("PLAYWRIGHT_BROWSERS_PATH"),
+        str(home / ".cache" / "ms-playwright"),
+        "/opt/render/project/src/.cache/ms-playwright",
+        str(home / "AppData" / "Local" / "ms-playwright"),
+    ]
+    detected_paths = [p for p in possible_paths if p and Path(p).exists()]
+    return {
+        "status": "ready" if detected_paths else "not_found",
+        "detected_paths": detected_paths,
+        "platform": sys.platform,
+    }
+
+
+@app.post("/api/system/install-browser", dependencies=[Depends(require_admin)])
+def install_browser():
+    """Triggers self-healing browser installation in the background."""
+    import subprocess
+    try:
+        res = subprocess.run(
+            [sys.executable, "-m", "playwright", "install", "chromium"],
+            capture_output=True,
+            text=True,
+            timeout=120
+        )
+        if res.returncode == 0:
+            return {"ok": True, "message": "Playwright Chromium verified and ready."}
+        else:
+            return {"ok": False, "message": res.stderr or "Installation failed"}
+    except Exception as e:
+        return {"ok": False, "message": str(e)}
+
 
 
 @app.get("/api/scrape/status", response_model=ScrapeStatus)

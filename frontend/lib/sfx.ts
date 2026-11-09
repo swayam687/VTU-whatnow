@@ -74,6 +74,14 @@ class SoundEngine {
     }
   }
 
+  public playClick() {
+    this.playMechanicalClick();
+  }
+
+  public playSonar() {
+    this.playSonarChime();
+  }
+
   /**
    * Quiet Geiger-counter tick for scraping updates or telemetry scanning.
    */

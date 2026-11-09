@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
 
@@ -68,11 +69,28 @@ class BacklogAnalytics(BaseModel):
     overall_deadliest_subjects: List[SubjectBacklogStat]
     branches: List[BranchBacklogSummary]
 
+class SemesterLinkBase(BaseModel):
+    title: str
+    url: str
+    semester: str = "1"
+    is_default: bool = False
+
+class SemesterLinkCreate(SemesterLinkBase):
+    pass
+
+class SemesterLinkOut(SemesterLinkBase):
+    id: int
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
 class ScrapeRequest(BaseModel):
     start_usn: str
     end_usn: str
     semester: str = "1"
     custom_url: Optional[str] = None
+    semester_link_id: Optional[int] = None
 
 class CaptchaSubmit(BaseModel):
     text: str

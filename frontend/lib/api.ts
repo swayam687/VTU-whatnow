@@ -160,6 +160,7 @@ export async function startScraper(
     end_usn: string;
     semester: string;
     custom_url?: string;
+    semester_link_id?: number;
   },
   adminKey?: string
 ): Promise<{ message: string }> {
@@ -239,4 +240,90 @@ export async function fetchBacklogAnalytics(): Promise<BacklogAnalytics> {
   const res = await fetch(`${API_BASE}/api/analytics/backlogs`, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to load backlog analytics");
   return res.json();
+}
+
+// -------------------------------------------------------------
+// Semester Links Management
+// -------------------------------------------------------------
+
+export interface SemesterLink {
+  id: number;
+  title: string;
+  url: string;
+  semester: string;
+  is_default: boolean;
+  created_at?: string;
+}
+
+export async function fetchSemesterLinks(): Promise<SemesterLink[]> {
+  try {
+    const res = await fetch(`${API_BASE}/api/semester-links`, { cache: "no-store" });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function createSemesterLink(
+  payload: { title: string; url: string; semester: string; is_default?: boolean },
+  adminKey?: string
+): Promise<SemesterLink> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (adminKey) headers["X-Admin-Key"] = adminKey;
+
+  const res = await fetch(`${API_BASE}/api/semester-links`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to create semester link");
+  return data;
+}
+
+export async function deleteSemesterLink(id: number, adminKey?: string): Promise<{ message: string }> {
+  const headers: Record<string, string> = {};
+  if (adminKey) headers["X-Admin-Key"] = adminKey;
+
+  const res = await fetch(`${API_BASE}/api/semester-links/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to delete semester link");
+  return data;
+}
+
+// -------------------------------------------------------------
+// System Diagnostics
+// -------------------------------------------------------------
+
+export interface BrowserStatus {
+  status: "ready" | "not_found";
+  detected_paths: string[];
+  platform: string;
+}
+
+export async function fetchBrowserStatus(): Promise<BrowserStatus> {
+  try {
+    const res = await fetch(`${API_BASE}/api/system/browser-status`, { cache: "no-store" });
+    if (!res.ok) return { status: "not_found", detected_paths: [], platform: "" };
+    return await res.json();
+  } catch {
+    return { status: "not_found", detected_paths: [], platform: "" };
+  }
+}
+
+export async function installBrowser(adminKey?: string): Promise<{ ok: boolean; message: string }> {
+  const headers: Record<string, string> = {};
+  if (adminKey) headers["X-Admin-Key"] = adminKey;
+
+  const res = await fetch(`${API_BASE}/api/system/install-browser`, {
+    method: "POST",
+    headers,
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || data.message || "Failed to trigger browser verification");
+  return data;
 }

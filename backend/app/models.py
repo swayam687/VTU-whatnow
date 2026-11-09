@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from .database import Base
 
@@ -50,3 +50,15 @@ class Mark(Base):
     @property
     def subject_name(self) -> str:
         return self.subject.name if self.subject else ""
+
+
+class SemesterLink(Base):
+    __tablename__ = "semester_links"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False, default="")
+    url = Column(String, nullable=False, default="")
+    semester = Column(String, default="1")
+    is_default = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+

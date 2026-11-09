@@ -6,11 +6,12 @@ services:
     repo: .
     region: oregon
     buildCommand: |
-      pip install -r backend/requirements.txt && playwright install chromium
+      pip install -r backend/requirements.txt && PLAYWRIGHT_BROWSERS_PATH=/opt/render/project/src/.cache/ms-playwright playwright install --with-deps chromium
     startCommand: |
       uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    healthCheckPath: /api/health
     envVars:
+      PLAYWRIGHT_BROWSERS_PATH: /opt/render/project/src/.cache/ms-playwright
       # SQLite default for immediate local running without any setup
       DATABASE_URL: sqlite:///./vtuwhatnow.db
       PYTHONPATH: backend

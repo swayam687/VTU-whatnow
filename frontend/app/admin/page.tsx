@@ -5,6 +5,8 @@ import Link from "next/link";
 import {
   ScrapeStatus,
   Student,
+  SemesterLink,
+  BrowserStatus,
   fetchScrapeStatus,
   fetchStudents,
   startScraper,
@@ -13,6 +15,12 @@ import {
   verifyAdminPassword,
   deleteStudent,
   updateStudentSocials,
+  fetchSemesterLinks,
+  createSemesterLink,
+  deleteSemesterLink,
+  fetchBrowserStatus,
+  installBrowser,
+  checkBackendHealth,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -26,12 +34,6 @@ import {
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";
 
-const PRESET_SEMESTERS = [
-  { id: "1", label: "Semester 1", url: "https://results.vtu.ac.in/D25J26Ecbcs/index.php" },
-  { id: "2", label: "Semester 2", url: "https://results.vtu.ac.in/MJ26cbcs/index.php" },
-  { id: "custom", label: "Custom Link", url: "" },
-];
-
 const QUICK_BRANCHES = [
   { code: "CS", name: "CSE" },
   { code: "CD", name: "DS" },
@@ -39,9 +41,13 @@ const QUICK_BRANCHES = [
   { code: "IS", name: "ISE" },
   { code: "CI", name: "AIML" },
   { code: "IE", name: "ECE" },
+  { code: "EE", name: "EEE" },
+  { code: "ME", name: "MECH" },
+  { code: "CV", name: "CIVIL" },
 ];
 
 export default function AdminPanel() {
+  // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
   const [adminKey, setAdminKey] = useState<string>("admin123");
@@ -49,13 +55,27 @@ export default function AdminPanel() {
   const [authError, setAuthError] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
+  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'system'
+  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "system">("scraper");
+
+  // Scraper configuration
   const [mode, setMode] = useState<"single" | "range">("single");
-  const [semester, setSemester] = useState("1");
-  const [customUrl, setCustomUrl] = useState("");
   const [singleUsn, setSingleUsn] = useState("1RM25CS001");
   const [startUsn, setStartUsn] = useState("1RM25CS001");
   const [endUsn, setEndUsn] = useState("1RM25CS060");
-  
+  const [selectedSemesterLinkId, setSelectedSemesterLinkId] = useState<number | null>(null);
+  const [customUrl, setCustomUrl] = useState("");
+  const [useCustomUrl, setUseCustomUrl] = useState(false);
+
+  // Dynamic Semester Links
+  const [semesterLinks, setSemesterLinks] = useState<SemesterLink[]>([]);
+  const [newLinkTitle, setNewLinkTitle] = useState("");
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [newLinkSem, setNewLinkSem] = useState("1");
+  const [addingLink, setAddingLink] = useState(false);
+  const [linkActionMsg, setLinkActionMsg] = useState("");
+
+  // Scraper status & Captcha
   const [status, setStatus] = useState<ScrapeStatus>({
     is_running: false,
     status: "idle",
@@ -64,21 +84,24 @@ export default function AdminPanel() {
     total_count: 0,
     logs: [],
   });
-
-  // Captcha solving state & visual inspection helpers
   const [captchaInput, setCaptchaInput] = useState("");
   const [captchaZoom, setCaptchaZoom] = useState<1 | 2 | 3>(2);
   const [captchaInvert, setCaptchaInvert] = useState<boolean>(false);
   const [submittingCaptcha, setSubmittingCaptcha] = useState(false);
-  const [actionError, setActionError] = useState("");
+
+  // System & Browser Diagnostics
+  const [browserStatus, setBrowserStatus] = useState<BrowserStatus | null>(null);
+  const [verifyingBrowser, setVerifyingBrowser] = useState(false);
+  const [browserMsg, setBrowserMsg] = useState("");
+  const [backendOnline, setBackendOnline] = useState(true);
 
   // Stored students management
-  const [recentStudents, setRecentStudents] = useState<Student[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [studentSearch, setStudentSearch] = useState("");
   const [deleteSuccessMsg, setDeleteSuccessMsg] = useState("");
+  const [actionError, setActionError] = useState("");
 
-  // Admin Socials Edit Modal
+  // Socials edit modal
   const [editingStudent, setEditingStudent] = useState<Student | null>(null);
   const [editGithub, setEditGithub] = useState("");
   const [editLinkedin, setEditLinkedin] = useState("");
@@ -88,7 +111,7 @@ export default function AdminPanel() {
   const captchaInputRef = useRef<HTMLInputElement>(null);
   const logContainerRef = useRef<HTMLDivElement>(null);
 
-  // Check saved admin session
+  // Check saved admin session on mount
   useEffect(() => {
     try {
       const savedKey = typeof window !== "undefined" ? sessionStorage.getItem("vtu_admin_key") : null;
@@ -103,39 +126,52 @@ export default function AdminPanel() {
     }
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!passwordInput.trim()) return;
-    setAuthError("");
-    setIsVerifying(true);
+  // Check backend health & browser status
+  const checkHealthAndDiagnostics = async () => {
+    const isHealthy = await checkBackendHealth();
+    setBackendOnline(isHealthy);
+    if (isHealthy) {
+      const bStatus = await fetchBrowserStatus();
+      setBrowserStatus(bStatus);
+    }
+  };
+
+  useEffect(() => {
+    checkHealthAndDiagnostics();
+  }, []);
+
+  // Load Semester Links
+  const loadSemesterLinks = async () => {
     try {
-      const ok = await verifyAdminPassword(passwordInput.trim());
-      if (ok) {
-        if (typeof window !== "undefined") {
-          sessionStorage.setItem("vtu_admin_key", passwordInput.trim());
-        }
-        setAdminKey(passwordInput.trim());
-        setIsAuthenticated(true);
-        setPasswordInput("");
-      } else {
-        setAuthError("Incorrect password. Please try again.");
+      const links = await fetchSemesterLinks();
+      setSemesterLinks(links);
+      if (links.length > 0 && selectedSemesterLinkId === null) {
+        const defaultLink = links.find((l) => l.is_default) || links[0];
+        setSelectedSemesterLinkId(defaultLink.id);
       }
-    } catch (err: any) {
-      setAuthError(err.message || "Failed to communicate with backend.");
-    } finally {
-      setIsVerifying(false);
+    } catch {
+      // ignore
     }
   };
 
-  const handleLogout = () => {
-    if (typeof window !== "undefined") {
-      sessionStorage.removeItem("vtu_admin_key");
-    }
-    setAdminKey("");
-    setIsAuthenticated(false);
+  useEffect(() => {
+    loadSemesterLinks();
+  }, []);
+
+  // Load Students
+  const loadStudentRecords = () => {
+    fetchStudents({ sort: "recent" })
+      .then((data) => setAllStudents(data))
+      .catch(() => {});
   };
 
-  // Smart adaptive polling for scraper status
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadStudentRecords();
+    }
+  }, [isAuthenticated, status.is_running, status.status]);
+
+  // Status Polling
   useEffect(() => {
     let alive = true;
     let timer: NodeJS.Timeout;
@@ -151,11 +187,11 @@ export default function AdminPanel() {
           if (data.captcha_base64 && captchaInputRef.current) {
             captchaInputRef.current.focus();
           }
-          const interval = (data.is_running || data.captcha_base64) ? 1000 : 3000;
+          const interval = data.is_running || data.captcha_base64 ? 1000 : 3000;
           timer = setTimeout(poll, interval);
         }
       } catch {
-        if (alive) timer = setTimeout(poll, 3000);
+        if (alive) timer = setTimeout(poll, 4000);
       }
     };
 
@@ -166,20 +202,6 @@ export default function AdminPanel() {
     };
   }, []);
 
-  // Refresh recent and all students
-  const loadStudentRecords = () => {
-    fetchStudents({ sort: "recent" })
-      .then((data) => {
-        setRecentStudents(data.slice(0, 8));
-        setAllStudents(data);
-      })
-      .catch(() => {});
-  };
-
-  useEffect(() => {
-    loadStudentRecords();
-  }, [status.is_running, status.status]);
-
   // Auto scroll logs
   useEffect(() => {
     if (logContainerRef.current) {
@@ -187,76 +209,194 @@ export default function AdminPanel() {
     }
   }, [status.logs]);
 
+  // Admin Login
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!passwordInput.trim()) return;
+    setAuthError("");
+    setIsVerifying(true);
+    sfx.playClick();
+    try {
+      const ok = await verifyAdminPassword(passwordInput.trim());
+      if (ok) {
+        if (typeof window !== "undefined") {
+          sessionStorage.setItem("vtu_admin_key", passwordInput.trim());
+        }
+        setAdminKey(passwordInput.trim());
+        setIsAuthenticated(true);
+        setPasswordInput("");
+        sfx.playSonar();
+      } else {
+        setAuthError("Incorrect password. Please verify your admin password.");
+      }
+    } catch (err: any) {
+      setAuthError(err.message || "Failed to reach backend server. Cold start may take ~45s.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const handleLogout = () => {
+    sfx.playClick();
+    if (typeof window !== "undefined") {
+      sessionStorage.removeItem("vtu_admin_key");
+    }
+    setAdminKey("");
+    setIsAuthenticated(false);
+  };
+
+  // Start Scraper
   const handleStart = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setActionError("");
+    sfx.playClick();
 
     const targetStart = mode === "single" ? singleUsn.trim().toUpperCase() : startUsn.trim().toUpperCase();
     const targetEnd = mode === "single" ? targetStart : endUsn.trim().toUpperCase();
 
     if (!targetStart) {
-      setActionError("Please enter a valid USN.");
+      setActionError("Please provide a valid USN.");
       return;
     }
 
+    const payload: {
+      start_usn: string;
+      end_usn: string;
+      semester: string;
+      custom_url?: string;
+      semester_link_id?: number;
+    } = {
+      start_usn: targetStart,
+      end_usn: targetEnd,
+      semester: "1",
+    };
+
+    if (useCustomUrl && customUrl.trim()) {
+      payload.custom_url = customUrl.trim();
+    } else if (selectedSemesterLinkId) {
+      payload.semester_link_id = selectedSemesterLinkId;
+      const foundLink = semesterLinks.find((l) => l.id === selectedSemesterLinkId);
+      if (foundLink) {
+        payload.semester = foundLink.semester;
+      }
+    }
+
     try {
-      await startScraper(
-        {
-          start_usn: targetStart,
-          end_usn: targetEnd,
-          semester,
-          custom_url: semester === "custom" ? customUrl.trim() : undefined,
-        },
-        adminKey
-      );
+      await startScraper(payload, adminKey);
     } catch (err: any) {
       if (err.message && (err.message.includes("401") || err.message.toLowerCase().includes("admin authorization"))) {
         handleLogout();
         setActionError("Session expired. Please sign in again.");
       } else {
-        setActionError(err.message || "Failed to start scraper. Check if backend is running.");
+        setActionError(err.message || "Failed to initiate scraper.");
       }
     }
   };
 
+  // Stop Scraper
   const handleStop = async () => {
+    sfx.playClick();
     try {
       await stopScraper(adminKey);
     } catch (err: any) {
-      if (err.message && (err.message.includes("401") || err.message.toLowerCase().includes("admin authorization"))) {
-        handleLogout();
-      }
       setActionError(err.message || "Failed to stop scraper");
     }
   };
 
+  // Captcha Submit
   const handleCaptchaSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!captchaInput.trim() || submittingCaptcha) return;
 
     setSubmittingCaptcha(true);
     setActionError("");
+    sfx.playClick();
     try {
       await submitScraperCaptcha(captchaInput.trim(), adminKey);
       setCaptchaInput("");
+      sfx.playSonar();
     } catch (err: any) {
-      if (err.message && (err.message.includes("401") || err.message.toLowerCase().includes("admin authorization"))) {
-        handleLogout();
-      }
       setActionError(err.message || "Failed to submit captcha");
     } finally {
       setSubmittingCaptcha(false);
     }
   };
 
-  const handleDeleteStudent = async (usn: string) => {
-    if (!confirm(`Are you sure you want to permanently delete student ${usn} and all marks from the database?`)) {
-      return;
-    }
+  // Semester Links CRUD
+  const handleAddSemesterLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newLinkTitle.trim() || !newLinkUrl.trim()) return;
+
+    setAddingLink(true);
+    setLinkActionMsg("");
     setActionError("");
+    sfx.playClick();
+
+    try {
+      const created = await createSemesterLink(
+        {
+          title: newLinkTitle.trim(),
+          url: newLinkUrl.trim(),
+          semester: newLinkSem.trim() || "1",
+        },
+        adminKey
+      );
+      setNewLinkTitle("");
+      setNewLinkUrl("");
+      setNewLinkSem("1");
+      setLinkActionMsg(`Added "${created.title}" successfully!`);
+      await loadSemesterLinks();
+      setSelectedSemesterLinkId(created.id);
+      setTimeout(() => setLinkActionMsg(""), 3000);
+    } catch (err: any) {
+      setActionError(err.message || "Failed to add semester link");
+    } finally {
+      setAddingLink(false);
+    }
+  };
+
+  const handleDeleteSemesterLink = async (id: number, title: string) => {
+    if (!confirm(`Are you sure you want to remove semester portal link "${title}"?`)) return;
+
+    setActionError("");
+    sfx.playClick();
+    try {
+      await deleteSemesterLink(id, adminKey);
+      setLinkActionMsg(`Deleted "${title}".`);
+      await loadSemesterLinks();
+      if (selectedSemesterLinkId === id) {
+        setSelectedSemesterLinkId(semesterLinks.length > 1 ? semesterLinks[0].id : null);
+      }
+      setTimeout(() => setLinkActionMsg(""), 3000);
+    } catch (err: any) {
+      setActionError(err.message || "Failed to delete semester link");
+    }
+  };
+
+  // Verify / Prewarm Playwright Browser
+  const handleVerifyBrowser = async () => {
+    setVerifyingBrowser(true);
+    setBrowserMsg("");
+    sfx.playClick();
+    try {
+      const res = await installBrowser(adminKey);
+      setBrowserMsg(res.message);
+      await checkHealthAndDiagnostics();
+    } catch (err: any) {
+      setBrowserMsg(err.message || "Browser check failed.");
+    } finally {
+      setVerifyingBrowser(false);
+    }
+  };
+
+  // Student Delete & Socials
+  const handleDeleteStudent = async (usn: string) => {
+    if (!confirm(`Permanently delete student ${usn} and all associated marks from Supabase?`)) return;
+    setActionError("");
+    sfx.playClick();
     try {
       await deleteStudent(usn, adminKey);
-      setDeleteSuccessMsg(`Student ${usn} was successfully deleted.`);
+      setDeleteSuccessMsg(`Student ${usn} deleted successfully.`);
       setTimeout(() => setDeleteSuccessMsg(""), 3500);
       loadStudentRecords();
     } catch (err: any) {
@@ -264,44 +404,41 @@ export default function AdminPanel() {
     }
   };
 
-  // Open Socials Edit Modal
   const handleOpenEditSocials = (student: Student) => {
+    sfx.playClick();
     setEditingStudent(student);
     setEditGithub(student.github_url || "");
     setEditLinkedin(student.linkedin_url || "");
     setSaveSocialsMsg("");
   };
 
-  // Save Socials via Admin
   const handleSaveSocials = async () => {
     if (!editingStudent) return;
     setSavingSocials(true);
     setSaveSocialsMsg("");
     setActionError("");
+    sfx.playClick();
     try {
-      const res = await updateStudentSocials(
+      await updateStudentSocials(
         editingStudent.usn,
-        {
-          github_url: editGithub,
-          linkedin_url: editLinkedin,
-        },
+        { github_url: editGithub, linkedin_url: editLinkedin },
         adminKey
       );
-
       setSaveSocialsMsg("Social accounts saved successfully!");
       loadStudentRecords();
       setTimeout(() => {
         setEditingStudent(null);
         setSaveSocialsMsg("");
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
-      setActionError(err.message || "Failed to update social profiles.");
+      setActionError(err.message || "Failed to update profiles.");
     } finally {
       setSavingSocials(false);
     }
   };
 
   const handleQuickBranch = (code: string) => {
+    sfx.playClick();
     setStartUsn(`1RM25${code}001`);
     setEndUsn(`1RM25${code}060`);
     setSingleUsn(`1RM25${code}001`);
@@ -314,28 +451,33 @@ export default function AdminPanel() {
   });
 
   const progressPercent =
-    status.total_count > 0
-      ? Math.round((status.processed_count / status.total_count) * 100)
-      : 0;
+    status.total_count > 0 ? Math.round((status.processed_count / status.total_count) * 100) : 0;
 
+  // -------------------------------------------------------------
+  // Render: Loading Screen
+  // -------------------------------------------------------------
   if (checkingAuth) {
     return (
-      <div className="max-w-md mx-auto my-20 p-8 text-center text-slate-400 font-medium text-xs sm:text-sm">
-        Verifying administrator session...
+      <div className="max-w-md mx-auto my-28 p-8 text-center text-slate-400 font-medium text-xs sm:text-sm">
+        <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mx-auto mb-3" />
+        Verifying administrator credentials...
       </div>
     );
   }
 
+  // -------------------------------------------------------------
+  // Render: Login Screen
+  // -------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="max-w-md mx-auto my-12 p-6 sm:p-8 bg-white border border-slate-200 rounded-3xl shadow-sm space-y-5">
+      <div className="max-w-md mx-auto my-16 p-6 sm:p-8 bg-white border border-slate-200/90 rounded-3xl shadow-sm space-y-6">
         <div className="text-center space-y-2">
-          <div className="w-10 h-10 bg-slate-100 text-slate-800 rounded-2xl flex items-center justify-center mx-auto text-base font-bold">
+          <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto text-lg font-bold shadow-sm">
             🔒
           </div>
-          <h2 className="text-xl font-bold text-slate-900">Admin Authentication</h2>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            The scraper control room is restricted to admins to manage VTU scraping tasks, delete records, and update student profiles.
+          <h2 className="text-xl font-black text-slate-900 tracking-tight">Admin Portal</h2>
+          <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+            Manage VTU scraping queues, configure examination semester links, and inspect student records.
           </p>
         </div>
 
@@ -348,14 +490,14 @@ export default function AdminPanel() {
               type="password"
               value={passwordInput}
               onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Enter password (default: admin123)"
+              placeholder="Enter admin password (default: admin123)"
               className="w-full p-3 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all font-mono"
               autoFocus
             />
           </div>
 
           {authError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl">
+            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl leading-relaxed">
               {authError}
             </div>
           )}
@@ -365,12 +507,12 @@ export default function AdminPanel() {
             disabled={isVerifying || !passwordInput.trim()}
             className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm disabled:opacity-50"
           >
-            {isVerifying ? "Verifying..." : "Unlock Control Room"}
+            {isVerifying ? "Verifying..." : "Sign In to Admin Portal"}
           </button>
 
           <div className="text-center pt-2">
-            <Link href="/" className="text-xs font-medium text-slate-500 hover:text-slate-800">
-              ← Return to Public Dashboard
+            <Link href="/" className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">
+              ← Return to Student Directory
             </Link>
           </div>
         </form>
@@ -378,30 +520,33 @@ export default function AdminPanel() {
     );
   }
 
+  // -------------------------------------------------------------
+  // Render: Main Admin Dashboard
+  // -------------------------------------------------------------
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      {/* Top Navigation & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+      {/* Top Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
         <div>
-          <Link href="/" className="text-xs font-bold text-blue-600 hover:underline">
-            ← Back to Dashboard
+          <Link
+            href="/"
+            onClick={() => sfx.playClick()}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline mb-1"
+          >
+            ← Public Results Dashboard
           </Link>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 mt-1">
-            Admin Scraper Control Room
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
+            Admin Scraper & Results Portal
           </h1>
           <p className="text-slate-500 text-xs mt-0.5">
-            Query student marks from VTU with case-sensitive captcha inspection, database record deletion, and profile management.
+            Real-time VTU indexing, dynamic semester link management, and permanent cloud database records.
           </p>
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="text-xs font-semibold text-slate-600 hover:text-rose-600 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-sm"
-          >
-            Sign Out
-          </button>
-          <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-sm">
+
+        {/* Status Indicators & Sign Out */}
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          {/* Scraper Status Badge */}
+          <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-xs">
             <span
               className={`w-2 h-2 rounded-full ${
                 status.is_running
@@ -412,499 +557,926 @@ export default function AdminPanel() {
               }`}
             />
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-              {status.is_running
-                ? "Scraper Active"
-                : status.status === "error"
-                ? "Error"
-                : "Ready"}
+              {status.is_running ? "Scraper Active" : status.status === "error" ? "Scraper Error" : "Idle"}
             </span>
           </div>
+
+          {/* Browser Health Badge */}
+          <div
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-xs ${
+              browserStatus?.status === "ready"
+                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                : "bg-amber-50 border-amber-200 text-amber-800"
+            }`}
+          >
+            <span>{browserStatus?.status === "ready" ? "Browser Ready ✅" : "Browser Check ⚠️"}</span>
+          </div>
+
+          {/* Sign Out Button */}
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-xs font-semibold text-slate-600 hover:text-rose-600 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-xs"
+          >
+            Sign Out
+          </button>
         </div>
       </div>
 
+      {/* Global Alerts */}
       {actionError && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-medium flex items-center justify-between">
+        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-medium flex items-center justify-between shadow-xs">
           <span>{actionError}</span>
-          <button onClick={() => setActionError("")} className="text-rose-500 text-xs font-bold p-1">
+          <button onClick={() => setActionError("")} className="text-rose-500 hover:text-rose-800 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
       {deleteSuccessMsg && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-2xl font-medium flex items-center justify-between">
+        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-2xl font-medium flex items-center justify-between shadow-xs">
           <span>{deleteSuccessMsg}</span>
-          <button onClick={() => setDeleteSuccessMsg("")} className="text-emerald-500 text-xs font-bold p-1">
+          <button onClick={() => setDeleteSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
-      {/* Main Scraper Form Card */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm space-y-5">
-        {/* Mode Selector Tabs */}
-        <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Scraping Mode
-          </label>
-          <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl">
-            <button
-              type="button"
-              onClick={() => setMode("single")}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
-                mode === "single"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Single Student USN
-            </button>
-            <button
-              type="button"
-              onClick={() => setMode("range")}
-              className={`py-2 text-xs font-bold rounded-xl transition-all ${
-                mode === "range"
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              Batch Range Scraper (001–060)
-            </button>
-          </div>
-        </div>
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 overflow-x-auto scrollbar-none">
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("scraper");
+          }}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap ${
+            activeTab === "scraper"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          🚀 Scraper Engine
+        </button>
 
-        {/* Examination / Semester Link */}
-        <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Target Examination / Semester Link
-          </label>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {PRESET_SEMESTERS.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setSemester(s.id)}
-                disabled={status.is_running}
-                className={`p-3 rounded-2xl border text-left transition-all ${
-                  semester === s.id
-                    ? "border-slate-900 bg-slate-900 text-white font-bold"
-                    : "border-slate-200 text-slate-700 hover:bg-slate-50 font-medium"
-                } disabled:opacity-50`}
-              >
-                <div className="text-xs sm:text-sm">{s.label}</div>
-                {s.url && <div className={`text-[10px] truncate mt-0.5 ${semester === s.id ? "text-slate-300" : "text-slate-400"}`}>{s.url}</div>}
-              </button>
-            ))}
-          </div>
-          {semester === "custom" && (
-            <input
-              type="url"
-              value={customUrl}
-              onChange={(e) => setCustomUrl(e.target.value)}
-              placeholder="https://results.vtu.ac.in/.../index.php"
-              className="w-full mt-2 p-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-          )}
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("semesters");
+          }}
+          className={`flex-1 min-w-[130px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+            activeTab === "semesters"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <span>🔗 Semester Links</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+            {semesterLinks.length}
+          </span>
+        </button>
 
-        {/* Quick Branch Autofill */}
-        <div>
-          <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
-            Quick Branch Autofill (2025 Batch)
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {QUICK_BRANCHES.map((b) => (
-              <button
-                key={b.code}
-                type="button"
-                onClick={() => handleQuickBranch(b.code)}
-                disabled={status.is_running}
-                className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 disabled:opacity-50 transition-colors"
-              >
-                {b.name} ({b.code})
-              </button>
-            ))}
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("records");
+          }}
+          className={`flex-1 min-w-[130px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+            activeTab === "records"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <span>👥 Students</span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+            {allStudents.length}
+          </span>
+        </button>
 
-        {/* Form Inputs */}
-        <form onSubmit={handleStart} className="space-y-4">
-          {mode === "single" ? (
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("system");
+          }}
+          className={`flex-1 min-w-[110px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap ${
+            activeTab === "system"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          ⚙️ Diagnostics
+        </button>
+      </div>
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 1: SCRAPER ENGINE                                         */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "scraper" && (
+        <div className="space-y-6">
+          {/* Main Control Card */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-5">
+            {/* Mode Selector */}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Student USN
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                Scraping Target Mode
               </label>
-              <input
-                type="text"
-                value={singleUsn}
-                onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
-                placeholder="e.g. 1RM25CS045"
-                disabled={status.is_running}
-                className="w-full p-3 font-mono text-sm sm:text-base uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
-              />
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                  Start USN
-                </label>
-                <input
-                  type="text"
-                  value={startUsn}
-                  onChange={(e) => setStartUsn(e.target.value.toUpperCase())}
-                  placeholder="1RM25CS001"
-                  disabled={status.is_running}
-                  className="w-full p-3 font-mono text-xs sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
-                />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                  End USN
-                </label>
-                <input
-                  type="text"
-                  value={endUsn}
-                  onChange={(e) => setEndUsn(e.target.value.toUpperCase())}
-                  placeholder="1RM25CS060"
-                  disabled={status.is_running}
-                  className="w-full p-3 font-mono text-xs sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Action Button: Start / Stop */}
-          <div className="pt-2">
-            {status.is_running ? (
-              <button
-                type="button"
-                onClick={handleStop}
-                className="w-full py-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
-              >
-                Stop Current Scraping Task
-              </button>
-            ) : (
-              <button
-                type="submit"
-                className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
-              >
-                {mode === "single" ? `Fetch Results for ${singleUsn}` : "Start Scraping Range"}
-              </button>
-            )}
-          </div>
-        </form>
-      </div>
-
-      {/* Progress & Current Status Card */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-sm space-y-3">
-        <div className="flex items-center justify-between text-xs sm:text-sm">
-          <div>
-            <span className="font-bold text-slate-800">Status:</span>
-            <span className="ml-2 font-medium text-slate-600">{status.message}</span>
-          </div>
-          {status.total_count > 0 && (
-            <span className="font-bold text-slate-900 font-mono">
-              {status.processed_count} / {status.total_count} ({progressPercent}%)
-            </span>
-          )}
-        </div>
-
-        <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-          <div
-            className={`h-full transition-all duration-500 ease-out ${
-              status.status === "error" ? "bg-rose-500" : "bg-slate-900"
-            }`}
-            style={{ width: `${status.total_count > 0 ? progressPercent : 0}%` }}
-          />
-        </div>
-
-        {status.current_usn && (
-          <div className="text-[11px] text-slate-500 flex justify-between">
-            <span>Querying: <strong className="font-mono text-slate-800">{status.current_usn}</strong></span>
-            <span>Range: {status.start_usn} → {status.end_usn}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Enhanced Case-Sensitive Captcha Solving Box */}
-      {status.captcha_base64 && (
-        <div className="bg-amber-50/80 border-2 border-amber-300 rounded-3xl p-5 sm:p-7 shadow-lg space-y-4 animate-in fade-in duration-200">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 px-2 py-0.5 rounded bg-amber-200/70">
-                Action Required
-              </span>
-              <h3 className="font-black text-amber-950 text-base sm:text-lg mt-1">
-                Solve VTU Captcha for <span className="font-mono text-blue-700">{status.current_usn}</span>
-              </h3>
-            </div>
-            
-            {/* Visual Inspection Controls (Zoom & Invert) */}
-            <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-amber-200 shadow-sm">
-              <span className="text-[10px] font-bold text-slate-400 px-1">Zoom:</span>
-              {([1, 2, 3] as const).map((z) => (
+              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl">
                 <button
-                  key={z}
                   type="button"
-                  onClick={() => setCaptchaZoom(z)}
-                  className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${
-                    captchaZoom === z
-                      ? "bg-amber-500 text-white shadow-xs"
-                      : "text-slate-600 hover:bg-slate-100"
+                  onClick={() => {
+                    sfx.playClick();
+                    setMode("single");
+                  }}
+                  className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                    mode === "single"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  {z}x
+                  Single Student USN
                 </button>
-              ))}
-              <div className="w-px h-4 bg-slate-200 mx-0.5" />
-              <button
-                type="button"
-                onClick={() => setCaptchaInvert((v) => !v)}
-                className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border transition-colors ${
-                  captchaInvert
-                    ? "bg-slate-900 text-white border-slate-900"
-                    : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                }`}
-              >
-                {captchaInvert ? "Normal Contrast" : "High Contrast"}
-              </button>
-            </div>
-          </div>
-
-          {/* Captcha Image Display Container */}
-          <div className="bg-white p-4 rounded-2xl border border-amber-200/80 flex flex-col sm:flex-row items-center gap-4">
-            <div
-              className={`bg-slate-100 p-3 rounded-xl border border-slate-200 flex items-center justify-center transition-all ${
-                captchaInvert ? "filter invert" : ""
-              }`}
-            >
-              <img
-                src={`data:image/png;base64,${status.captcha_base64}`}
-                alt="VTU Captcha"
-                style={{
-                  height: captchaZoom === 1 ? "42px" : captchaZoom === 2 ? "64px" : "84px",
-                }}
-                className="object-contain transition-all"
-              />
-            </div>
-
-            {/* Input Form without uppercase CSS class */}
-            <form onSubmit={handleCaptchaSubmit} className="flex-1 w-full space-y-2">
-              <div className="flex gap-2">
-                <input
-                  ref={captchaInputRef}
-                  type="text"
-                  value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  placeholder="Type captcha (exact small & caps)..."
-                  autoFocus
-                  className="flex-1 p-3 border-2 border-amber-300 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
-                />
                 <button
-                  type="submit"
-                  disabled={submittingCaptcha || !captchaInput.trim()}
-                  className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-sm disabled:opacity-50 whitespace-nowrap"
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    setMode("range");
+                  }}
+                  className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                    mode === "range"
+                      ? "bg-white text-slate-900 shadow-xs"
+                      : "text-slate-600 hover:text-slate-900"
+                  }`}
                 >
-                  {submittingCaptcha ? "Submitting..." : "Submit Captcha"}
+                  Batch Range Scraper (e.g. 001–060)
+                </button>
+              </div>
+            </div>
+
+            {/* Target Examination / Semester Links Selector */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  Target Examination Portal Link
+                </label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    setActiveTab("semesters");
+                  }}
+                  className="text-[11px] font-bold text-blue-600 hover:underline"
+                >
+                  + Add / Edit Portal Links
                 </button>
               </div>
 
-              {/* Real-time Character Breakdown to Differentiate Small vs Capital */}
-              {captchaInput && (
-                <div className="p-2.5 rounded-xl bg-amber-100/50 border border-amber-200">
-                  <p className="text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1.5 text-center">
-                    Character Breakdown (Verify Small vs Capital):
-                  </p>
-                  <div className="flex flex-wrap gap-1.5 justify-center">
-                    {captchaInput.split("").map((ch, idx) => {
-                      const isLower = /[a-z]/.test(ch);
-                      const isUpper = /[A-Z]/.test(ch);
-                      const isDigit = /[0-9]/.test(ch);
-                      return (
-                        <div
-                          key={idx}
-                          className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold flex items-center gap-1 border ${
-                            isLower
-                              ? "bg-blue-100 border-blue-300 text-blue-900"
-                              : isUpper
-                              ? "bg-purple-100 border-purple-300 text-purple-900"
-                              : "bg-slate-100 border-slate-300 text-slate-800"
+              {/* Dynamic Semester Link Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {semesterLinks.map((link) => {
+                  const isSelected = !useCustomUrl && selectedSemesterLinkId === link.id;
+                  return (
+                    <button
+                      key={link.id}
+                      type="button"
+                      onClick={() => {
+                        sfx.playClick();
+                        setUseCustomUrl(false);
+                        setSelectedSemesterLinkId(link.id);
+                      }}
+                      disabled={status.is_running}
+                      className={`p-3 rounded-2xl border text-left transition-all relative ${
+                        isSelected
+                          ? "border-slate-900 bg-slate-900 text-white shadow-xs"
+                          : "border-slate-200 text-slate-700 hover:bg-slate-50 bg-white"
+                      } disabled:opacity-50`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-xs sm:text-sm font-bold truncate">{link.title}</span>
+                        <span
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full uppercase shrink-0 font-bold ${
+                            isSelected
+                              ? "bg-slate-800 text-slate-200"
+                              : "bg-slate-100 text-slate-600"
                           }`}
                         >
-                          <span className="text-sm font-black underline underline-offset-2">{ch}</span>
-                          <span className="text-[9px] font-sans uppercase font-bold opacity-75">
-                            {isLower ? "small" : isUpper ? "CAPS" : "digit"}
-                          </span>
-                        </div>
-                      );
-                    })}
+                          Sem {link.semester}
+                        </span>
+                      </div>
+                      <div
+                        className={`text-[10px] truncate mt-1 font-mono ${
+                          isSelected ? "text-slate-300" : "text-slate-400"
+                        }`}
+                      >
+                        {link.url}
+                      </div>
+                    </button>
+                  );
+                })}
+
+                {/* Custom URL Option */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    setUseCustomUrl(true);
+                  }}
+                  disabled={status.is_running}
+                  className={`p-3 rounded-2xl border text-left transition-all ${
+                    useCustomUrl
+                      ? "border-slate-900 bg-slate-900 text-white shadow-xs"
+                      : "border-slate-200 text-slate-700 hover:bg-slate-50 bg-white"
+                  } disabled:opacity-50`}
+                >
+                  <div className="text-xs sm:text-sm font-bold">Custom Portal URL</div>
+                  <div
+                    className={`text-[10px] mt-1 ${
+                      useCustomUrl ? "text-slate-300" : "text-slate-400"
+                    }`}
+                  >
+                    Enter any VTU index.php result endpoint manually
+                  </div>
+                </button>
+              </div>
+
+              {useCustomUrl && (
+                <div className="mt-3">
+                  <input
+                    type="url"
+                    value={customUrl}
+                    onChange={(e) => setCustomUrl(e.target.value)}
+                    placeholder="https://results.vtu.ac.in/.../index.php"
+                    className="w-full p-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
+                  />
+                  <p className="text-[10px] text-slate-400 mt-1">
+                    Make sure the URL points to <code>index.php</code> (the student USN entry page).
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Quick Branch Autofill */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+                Quick Branch Autofill (2025 Batch)
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {QUICK_BRANCHES.map((b) => (
+                  <button
+                    key={b.code}
+                    type="button"
+                    onClick={() => handleQuickBranch(b.code)}
+                    disabled={status.is_running}
+                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 disabled:opacity-50 transition-colors"
+                  >
+                    {b.name} ({b.code})
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* USN Input Form */}
+            <form onSubmit={handleStart} className="space-y-4 pt-1 border-t border-slate-100">
+              {mode === "single" ? (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Student USN
+                  </label>
+                  <input
+                    type="text"
+                    value={singleUsn}
+                    onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
+                    placeholder="e.g. 1RM25CD052"
+                    disabled={status.is_running}
+                    className="w-full p-3 font-mono text-sm sm:text-base uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                  />
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      Start USN
+                    </label>
+                    <input
+                      type="text"
+                      value={startUsn}
+                      onChange={(e) => setStartUsn(e.target.value.toUpperCase())}
+                      placeholder="1RM25CS001"
+                      disabled={status.is_running}
+                      className="w-full p-3 font-mono text-xs sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                      End USN
+                    </label>
+                    <input
+                      type="text"
+                      value={endUsn}
+                      onChange={(e) => setEndUsn(e.target.value.toUpperCase())}
+                      placeholder="1RM25CS060"
+                      disabled={status.is_running}
+                      className="w-full p-3 font-mono text-xs sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                    />
                   </div>
                 </div>
               )}
+
+              {/* Start / Stop Button */}
+              <div className="pt-2">
+                {status.is_running ? (
+                  <button
+                    type="button"
+                    onClick={handleStop}
+                    className="w-full py-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
+                  >
+                    Stop Current Scraping Task
+                  </button>
+                ) : (
+                  <button
+                    type="submit"
+                    className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
+                  >
+                    {mode === "single" ? `Fetch Results for ${singleUsn}` : "Start Scraping Range"}
+                  </button>
+                )}
+              </div>
             </form>
           </div>
 
-          <p className="text-[11px] text-amber-700 text-center font-medium">
-            Tip: Press <kbd className="px-1.5 py-0.5 bg-amber-200/60 rounded font-mono font-bold text-amber-900">Enter</kbd> to submit immediately.
-          </p>
+          {/* Scraper Progress Bar */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs space-y-3">
+            <div className="flex items-center justify-between text-xs sm:text-sm">
+              <div>
+                <span className="font-bold text-slate-800">Status:</span>
+                <span className="ml-2 font-medium text-slate-600">{status.message}</span>
+              </div>
+              {status.total_count > 0 && (
+                <span className="font-bold text-slate-900 font-mono">
+                  {status.processed_count} / {status.total_count} ({progressPercent}%)
+                </span>
+              )}
+            </div>
+
+            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-500 ease-out ${
+                  status.status === "error" ? "bg-rose-500" : "bg-slate-900"
+                }`}
+                style={{ width: `${status.total_count > 0 ? progressPercent : 0}%` }}
+              />
+            </div>
+
+            {status.current_usn && (
+              <div className="text-[11px] text-slate-500 flex justify-between">
+                <span>
+                  Querying: <strong className="font-mono text-slate-800">{status.current_usn}</strong>
+                </span>
+                <span>
+                  Range: {status.start_usn} → {status.end_usn}
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Interactive Captcha Solving Card */}
+          {status.captcha_base64 && (
+            <div className="bg-amber-50/90 border-2 border-amber-300 rounded-3xl p-5 sm:p-7 shadow-lg space-y-4 animate-in fade-in duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 px-2 py-0.5 rounded bg-amber-200/70">
+                    Action Required
+                  </span>
+                  <h3 className="font-black text-amber-950 text-base sm:text-lg mt-1">
+                    Solve Captcha for <span className="font-mono text-blue-700">{status.current_usn}</span>
+                  </h3>
+                </div>
+
+                {/* Captcha Controls */}
+                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-amber-200 shadow-xs self-start sm:self-auto">
+                  <span className="text-[10px] font-bold text-slate-400 px-1">Zoom:</span>
+                  {([1, 2, 3] as const).map((z) => (
+                    <button
+                      key={z}
+                      type="button"
+                      onClick={() => setCaptchaZoom(z)}
+                      className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${
+                        captchaZoom === z ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                      }`}
+                    >
+                      {z}x
+                    </button>
+                  ))}
+                  <div className="w-px h-4 bg-slate-200 mx-0.5" />
+                  <button
+                    type="button"
+                    onClick={() => setCaptchaInvert((v) => !v)}
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border transition-colors ${
+                      captchaInvert
+                        ? "bg-slate-900 text-white border-slate-900"
+                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                    }`}
+                  >
+                    {captchaInvert ? "Normal Contrast" : "High Contrast"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Captcha Image & Form */}
+              <div className="bg-white p-4 rounded-2xl border border-amber-200/80 flex flex-col sm:flex-row items-center gap-4">
+                <div
+                  className={`bg-slate-100 p-3 rounded-xl border border-slate-200 flex items-center justify-center transition-all ${
+                    captchaInvert ? "filter invert" : ""
+                  }`}
+                >
+                  <img
+                    src={`data:image/png;base64,${status.captcha_base64}`}
+                    alt="VTU Captcha"
+                    style={{
+                      height: captchaZoom === 1 ? "42px" : captchaZoom === 2 ? "64px" : "84px",
+                    }}
+                    className="object-contain transition-all"
+                  />
+                </div>
+
+                <form onSubmit={handleCaptchaSubmit} className="flex-1 w-full space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      ref={captchaInputRef}
+                      type="text"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      placeholder="Type captcha (exact small & caps)..."
+                      autoFocus
+                      className="flex-1 p-3 border-2 border-amber-300 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                    />
+                    <button
+                      type="submit"
+                      disabled={submittingCaptcha || !captchaInput.trim()}
+                      className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-xs disabled:opacity-50 whitespace-nowrap"
+                    >
+                      {submittingCaptcha ? "Submitting..." : "Submit Captcha"}
+                    </button>
+                  </div>
+
+                  {/* Character Breakdown */}
+                  {captchaInput && (
+                    <div className="p-2.5 rounded-xl bg-amber-100/50 border border-amber-200">
+                      <p className="text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1.5 text-center">
+                        Verify Case Sensitivity:
+                      </p>
+                      <div className="flex flex-wrap gap-1.5 justify-center">
+                        {captchaInput.split("").map((ch, idx) => {
+                          const isLower = /[a-z]/.test(ch);
+                          const isUpper = /[A-Z]/.test(ch);
+                          return (
+                            <div
+                              key={idx}
+                              className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold flex items-center gap-1 border ${
+                                isLower
+                                  ? "bg-blue-100 border-blue-300 text-blue-900"
+                                  : isUpper
+                                  ? "bg-purple-100 border-purple-300 text-purple-900"
+                                  : "bg-slate-100 border-slate-300 text-slate-800"
+                              }`}
+                            >
+                              <span className="text-sm font-black underline underline-offset-2">{ch}</span>
+                              <span className="text-[9px] uppercase font-bold opacity-75">
+                                {isLower ? "small" : isUpper ? "CAPS" : "digit"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </form>
+              </div>
+
+              <p className="text-[11px] text-amber-800 text-center font-medium">
+                Tip: Press <kbd className="px-1.5 py-0.5 bg-amber-200/70 rounded font-mono font-bold">Enter</kbd> to submit immediately.
+              </p>
+            </div>
+          )}
+
+          {/* Terminal Scraper Output */}
+          <div className="bg-slate-900 rounded-3xl p-5 text-slate-200 shadow-sm">
+            <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 mb-3">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
+                  Live Scraping Activity Log
+                </span>
+              </div>
+              <span className="text-[10px] text-slate-500 font-mono">Stream Active</span>
+            </div>
+
+            <div
+              ref={logContainerRef}
+              className="h-44 overflow-y-auto font-mono text-xs space-y-1 pr-2 scrollbar-thin text-slate-300"
+            >
+              {status.logs.length === 0 ? (
+                <p className="text-slate-600 italic">No activity logs recorded yet. Start a scraper job above.</p>
+              ) : (
+                status.logs.map((log, idx) => (
+                  <div key={idx} className="leading-relaxed">
+                    <span className="text-slate-600 mr-2">›</span>
+                    <span
+                      className={
+                        log.includes("✅")
+                          ? "text-emerald-400 font-semibold"
+                          : log.includes("❌")
+                          ? "text-rose-400 font-semibold"
+                          : log.includes("⚠️")
+                          ? "text-amber-300"
+                          : "text-slate-300"
+                      }
+                    >
+                      {log}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Live Activity Log */}
-      <div className="bg-slate-900 rounded-3xl p-5 text-slate-200 shadow-sm">
-        <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 mb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400" />
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
-              Scraper Activity Log
-            </span>
-          </div>
-          <span className="text-[10px] text-slate-500 font-mono">Real-time</span>
-        </div>
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 2: SEMESTER LINKS MANAGER                                 */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "semesters" && (
+        <div className="space-y-6">
+          {/* Add Semester Link Card */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-4">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Add New Semester Result Portal Link</h2>
+              <p className="text-xs text-slate-500">
+                Configure any VTU examination result portal URL to scrape from. These are stored permanently in Supabase.
+              </p>
+            </div>
 
-        <div
-          ref={logContainerRef}
-          className="h-44 overflow-y-auto font-mono text-xs space-y-1 pr-2 scrollbar-thin text-slate-300"
-        >
-          {status.logs.length === 0 ? (
-            <p className="text-slate-600 italic">No activity logs recorded yet. Start a scraper job above.</p>
-          ) : (
-            status.logs.map((log, idx) => (
-              <div key={idx} className="leading-relaxed">
-                <span className="text-slate-600 mr-2">›</span>
-                <span
-                  className={
-                    log.includes("✅")
-                      ? "text-emerald-400 font-semibold"
-                      : log.includes("❌")
-                      ? "text-rose-400 font-semibold"
-                      : log.includes("⚠️")
-                      ? "text-amber-300"
-                      : "text-slate-300"
-                  }
-                >
-                  {log}
-                </span>
+            {linkActionMsg && (
+              <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-xl font-medium">
+                {linkActionMsg}
               </div>
-            ))
+            )}
+
+            <form onSubmit={handleAddSemesterLink} className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="sm:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Semester Title / Label
+                  </label>
+                  <input
+                    type="text"
+                    value={newLinkTitle}
+                    onChange={(e) => setNewLinkTitle(e.target.value)}
+                    placeholder="e.g. Sem 1 & 2 (2022 Scheme - Jan/Feb 2026)"
+                    className="w-full p-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Semester Number
+                  </label>
+                  <select
+                    value={newLinkSem}
+                    onChange={(e) => setNewLinkSem(e.target.value)}
+                    className="w-full p-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                  >
+                    {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                      <option key={num} value={String(num)}>
+                        Semester {num}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                  VTU Portal URL (index.php)
+                </label>
+                <input
+                  type="url"
+                  value={newLinkUrl}
+                  onChange={(e) => setNewLinkUrl(e.target.value)}
+                  placeholder="https://results.vtu.ac.in/MJ26cbcs/index.php"
+                  className="w-full p-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
+                  required
+                />
+              </div>
+
+              <div className="pt-1 flex justify-end">
+                <button
+                  type="submit"
+                  disabled={addingLink || !newLinkTitle.trim() || !newLinkUrl.trim()}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50"
+                >
+                  {addingLink ? "Saving..." : "Add Semester Portal Link"}
+                </button>
+              </div>
+            </form>
+          </div>
+
+          {/* List of Configured Semester Links */}
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-bold text-slate-900 text-base">
+                  Configured Semester Links ({semesterLinks.length})
+                </h3>
+                <p className="text-xs text-slate-400">
+                  Select, copy, or delete examination portal links.
+                </p>
+              </div>
+            </div>
+
+            {semesterLinks.length === 0 ? (
+              <p className="text-center py-8 text-xs text-slate-400">
+                No custom semester links configured. Add one above.
+              </p>
+            ) : (
+              <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
+                {semesterLinks.map((link) => (
+                  <div
+                    key={link.id}
+                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm">{link.title}</span>
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
+                          Sem {link.semester}
+                        </span>
+                        {selectedSemesterLinkId === link.id && !useCustomUrl && (
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800">
+                            Active in Scraper
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={link.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-[11px] font-mono text-blue-600 hover:underline truncate block mt-1"
+                      >
+                        {link.url}
+                      </a>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playClick();
+                          setUseCustomUrl(false);
+                          setSelectedSemesterLinkId(link.id);
+                          setActiveTab("scraper");
+                        }}
+                        className="px-3 py-1.5 text-xs font-semibold rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 transition-colors"
+                      >
+                        Use in Scraper
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteSemesterLink(link.id, link.title)}
+                        title={`Delete ${link.title}`}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors"
+                      >
+                        <IconTrash className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 3: STUDENT RECORDS MANAGEMENT                             */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "records" && (
+        <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <h2 className="font-bold text-slate-900 text-base">
+                Permanent Student Records in Supabase ({allStudents.length})
+              </h2>
+              <p className="text-xs text-slate-400">Search students, manage GitHub/LinkedIn links, or delete records.</p>
+            </div>
+
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                value={studentSearch}
+                onChange={(e) => setStudentSearch(e.target.value)}
+                placeholder="Search USN, name, or branch..."
+                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900"
+              />
+              <span className="absolute left-2.5 top-2 text-slate-400">
+                <IconSearch className="w-3.5 h-3.5" />
+              </span>
+            </div>
+          </div>
+
+          {filteredStoredStudents.length === 0 ? (
+            <p className="text-center py-12 text-xs text-slate-400">
+              {studentSearch ? "No students matching your search criteria." : "No student records currently stored."}
+            </p>
+          ) : (
+            <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+              {filteredStoredStudents.map((s) => (
+                <div
+                  key={s.usn}
+                  className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <Identicon
+                      usn={s.usn}
+                      percentage={s.percentage}
+                      totalBacklogs={s.total_backlogs}
+                      size={36}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
+                        <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.2 rounded bg-slate-100 uppercase">
+                          {s.branch}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="font-mono text-xs text-slate-400">{s.usn}</span>
+                        {s.github_url && (
+                          <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded font-mono">
+                            GitHub
+                          </span>
+                        )}
+                        {s.linkedin_url && (
+                          <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded font-mono">
+                            LinkedIn
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+                    <div className="text-right hidden sm:block">
+                      <span className="font-bold text-xs text-slate-900">{s.percentage.toFixed(1)}%</span>
+                      <span className="text-[10px] text-slate-400 block">{s.total_marks} marks</span>
+                    </div>
+
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                        s.total_backlogs > 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                      }`}
+                    >
+                      {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => handleOpenEditSocials(s)}
+                      title={`Edit Socials for ${s.name}`}
+                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
+                    >
+                      Socials
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteStudent(s.usn)}
+                      title={`Delete ${s.name} (${s.usn})`}
+                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors"
+                    >
+                      <IconTrash className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Stored Students Database Management (Delete Power & Social Profiles Control) */}
-      <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold text-slate-900 text-base">
-              Stored Student Records in Database ({allStudents.length})
-            </h2>
-            <p className="text-xs text-slate-400">Search, edit social profile links, or delete student records</p>
-          </div>
+      {/* ------------------------------------------------------------- */}
+      {/* TAB 4: SYSTEM & PLAYWRIGHT DIAGNOSTICS                        */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "system" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-5">
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Host & Browser Engine Diagnostics</h2>
+              <p className="text-xs text-slate-500">
+                Verify Playwright Chromium installation status to prevent scraper launch errors.
+              </p>
+            </div>
 
-          <div className="relative w-full sm:w-64">
-            <input
-              type="text"
-              value={studentSearch}
-              onChange={(e) => setStudentSearch(e.target.value)}
-              placeholder="Search USN or Name..."
-              className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900"
-            />
-            <span className="absolute left-2.5 top-2 text-slate-400">
-              <IconSearch className="w-3.5 h-3.5" />
-            </span>
-          </div>
-        </div>
+            {browserMsg && (
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-xl font-medium">
+                {browserMsg}
+              </div>
+            )}
 
-        {filteredStoredStudents.length === 0 ? (
-          <p className="text-center py-8 text-xs text-slate-400">
-            {studentSearch ? "No students matching your search." : "No students currently stored in the database."}
-          </p>
-        ) : (
-          <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-96 overflow-y-auto">
-            {filteredStoredStudents.map((s) => (
-              <div
-                key={s.usn}
-                className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <Identicon
-                    usn={s.usn}
-                    percentage={s.percentage}
-                    totalBacklogs={s.total_backlogs}
-                    size={36}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
-                      <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.2 rounded bg-slate-100 uppercase">
-                        {s.branch}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="font-mono text-xs text-slate-400">{s.usn}</span>
-                      {s.github_url && (
-                        <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded font-mono">
-                          GitHub
-                        </span>
-                      )}
-                      {s.linkedin_url && (
-                        <span className="text-[10px] text-blue-600 bg-blue-50 px-1.5 py-0.2 rounded font-mono">
-                          LinkedIn
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                  <div className="text-right hidden sm:block">
-                    <span className="font-bold text-xs text-slate-900">{s.percentage.toFixed(1)}%</span>
-                    <span className="text-[10px] text-slate-400 block">{s.total_marks} marks</span>
-                  </div>
-
+            {/* Status Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Backend API Service
+                </span>
+                <div className="flex items-center gap-2 mt-1">
                   <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      s.total_backlogs > 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-                    }`}
-                  >
-                    {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
+                    className={`w-2 h-2 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-rose-500"}`}
+                  />
+                  <span className="text-sm font-bold text-slate-900">
+                    {backendOnline ? "Online (Healthy)" : "Offline"}
                   </span>
-
-                  {/* Admin Edit Socials Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleOpenEditSocials(s)}
-                    title={`Edit GitHub & LinkedIn for ${s.name}`}
-                    className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
-                  >
-                    Socials
-                  </button>
-
-                  {/* Admin Delete Button */}
-                  <button
-                    type="button"
-                    onClick={() => handleDeleteStudent(s.usn)}
-                    title={`Delete ${s.name} (${s.usn})`}
-                    className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors"
-                  >
-                    <IconTrash className="w-3.5 h-3.5" />
-                  </button>
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
 
-      {/* Admin Socials Edit Modal */}
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Playwright Chromium
+                </span>
+                <div className="flex items-center gap-2 mt-1">
+                  <span
+                    className={`w-2 h-2 rounded-full ${
+                      browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"
+                    }`}
+                  />
+                  <span className="text-sm font-bold text-slate-900">
+                    {browserStatus?.status === "ready" ? "Ready & Installed" : "Not Detected"}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Operating Platform
+                </span>
+                <div className="text-sm font-bold text-slate-900 mt-1 capitalize font-mono">
+                  {browserStatus?.platform || "Linux / Windows"}
+                </div>
+              </div>
+            </div>
+
+            {/* Detected Cache Paths */}
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
+                Detected Browser Cache Paths
+              </label>
+              {browserStatus?.detected_paths && browserStatus.detected_paths.length > 0 ? (
+                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-xs space-y-1">
+                  {browserStatus.detected_paths.map((p, i) => (
+                    <div key={i} className="truncate text-emerald-400">
+                      ✓ {p}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-xl">
+                  No default Chromium browser cache was detected in standard directories. Click below to verify or prewarm the browser.
+                </p>
+              )}
+            </div>
+
+            {/* Prewarm / Check Browser Button */}
+            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+              <span className="text-xs text-slate-500">
+                Playwright self-healing auto-installs Chromium if missing during scrape.
+              </span>
+              <button
+                type="button"
+                onClick={handleVerifyBrowser}
+                disabled={verifyingBrowser}
+                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50"
+              >
+                {verifyingBrowser ? "Verifying Chromium..." : "Verify / Prewarm Browser"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* Socials Edit Modal                                            */}
+      {/* ------------------------------------------------------------- */}
       {editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-150">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-5 sm:p-6 space-y-4">
             <div className="flex items-start justify-between">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  Admin Profile Manager
+                  Profile Editor
                 </span>
                 <h3 className="font-bold text-slate-900 text-base mt-0.5">
                   Edit Socials for {editingStudent.name}
@@ -976,7 +1548,7 @@ export default function AdminPanel() {
                 type="button"
                 onClick={handleSaveSocials}
                 disabled={savingSocials}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-sm disabled:opacity-50"
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50"
               >
                 {savingSocials ? "Saving..." : "Save Profiles"}
               </button>

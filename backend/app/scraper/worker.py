@@ -1,11 +1,21 @@
 import asyncio
 import base64
+import os
 import random
 import re
 import sys
 import threading
 import traceback
+from pathlib import Path
 from typing import List, Optional
+
+# Ensure persistent Playwright cache on Linux / Render hosts
+if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and sys.platform != "win32":
+    render_cache = Path("/opt/render/project/src/.cache/ms-playwright")
+    if Path("/opt/render/project/src").exists():
+        render_cache.mkdir(parents=True, exist_ok=True)
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(render_cache)
+
 from playwright.async_api import async_playwright
 
 from ..config import settings
