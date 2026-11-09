@@ -13,7 +13,7 @@ import secrets
 from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, desc
+from sqlalchemy import text, desc, func, distinct
 
 from .config import settings
 from .database import engine, get_db

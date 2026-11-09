@@ -79,6 +79,7 @@ export default function AdminPanel() {
   const [logsSubTab, setLogsSubTab] = useState<"logins" | "comparisons">("logins");
   const [comparisonLogsData, setComparisonLogsData] = useState<ComparisonLogsData | null>(null);
   const [compareLogsLoading, setCompareLogsLoading] = useState(false);
+  const [compareLogsError, setCompareLogsError] = useState("");
 
   // Scraper configuration
   const [mode, setMode] = useState<"single" | "range">("single");
@@ -222,10 +223,13 @@ export default function AdminPanel() {
   const loadComparisonLogs = async () => {
     if (!adminKey) return;
     setCompareLogsLoading(true);
+    setCompareLogsError("");
     try {
       const data = await fetchAdminComparisonLogs(adminKey);
       setComparisonLogsData(data);
-    } catch (err) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load comparison logs";
+      setCompareLogsError(msg);
       console.error("Failed to load comparison logs", err);
     } finally {
       setCompareLogsLoading(false);
@@ -1760,6 +1764,19 @@ export default function AdminPanel() {
             {logsSubTab === "comparisons" ? (
               compareLogsLoading ? (
                 <div className="text-center py-12 text-xs text-slate-400">Loading student comparison tracker...</div>
+              ) : compareLogsError ? (
+                <div className="text-center py-10 border border-rose-200 bg-rose-50/50 rounded-2xl p-4">
+                  <span className="text-2xl">⚠️</span>
+                  <p className="font-bold text-xs text-rose-700 mt-2">Error loading comparison logs</p>
+                  <p className="text-[11px] text-rose-500 mt-0.5">{compareLogsError}</p>
+                  <button
+                    type="button"
+                    onClick={() => loadComparisonLogs()}
+                    className="mt-3 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
+                  >
+                    Retry
+                  </button>
+                </div>
               ) : !comparisonLogsData || comparisonLogsData.recent_logs.length === 0 ? (
                 <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
                   <span className="text-2xl">🔍</span>
