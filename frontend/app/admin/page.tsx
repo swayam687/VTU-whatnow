@@ -1837,32 +1837,38 @@ export default function AdminPanel() {
                       {comparisonLogsData.recent_logs.map((log) => (
                         <div
                           key={log.id}
-                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-50/50"
+                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs hover:bg-slate-50/50"
                         >
-                          <div className="space-y-1">
+                          <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-semibold text-slate-500">Initiator:</span>
-                              <span className="font-bold text-slate-900 px-1.5 py-0.5 rounded bg-slate-100 font-mono">
-                                {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn || "guest"})` : log.viewer_usn || "Anonymous Visitor"}
+                              <span className="font-semibold text-slate-500">Student User:</span>
+                              <span className="font-bold text-blue-900 px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 font-mono text-[11px]">
+                                {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn})` : log.viewer_usn}
                               </span>
-                              <span className="text-slate-400 font-bold">compared</span>
+                              <span className="text-slate-400 font-semibold text-[11px]">compared</span>
                             </div>
-                            <div className="flex items-center gap-1.5 text-slate-700 flex-wrap">
-                              <span className="font-semibold text-blue-700">{log.student1_name} ({log.student1_usn})</span>
-                              <span className="font-bold text-slate-400">vs</span>
-                              <span className="font-semibold text-purple-700">{log.student2_name} ({log.student2_usn})</span>
+                            <div className="flex items-center gap-2 text-slate-800 flex-wrap text-xs">
+                              <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                                {log.student1_name ? `${log.student1_name} (${log.student1_usn})` : log.student1_usn}
+                              </span>
+                              <span className="font-black text-amber-500 text-[11px]">⚔️ VS</span>
+                              <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                                {log.student2_name ? `${log.student2_name} (${log.student2_usn})` : log.student2_usn}
+                              </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px] text-slate-400 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
-                            {log.ip_address && (
-                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
-                                IP: {log.ip_address}
-                              </span>
-                            )}
+                          <div className="flex items-center justify-between sm:justify-end gap-2.5 text-[11px] text-slate-500 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                             {log.compared_at && (
-                              <span className="font-mono text-[10px]">
-                                {new Date(log.compared_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.compared_at).toLocaleDateString()}
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
+                                <span>📅 {new Date(log.compared_at).toLocaleDateString()}</span>
+                                <span className="text-slate-300">•</span>
+                                <span>⏰ {new Date(log.compared_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                              </div>
+                            )}
+                            {log.ip_address && (
+                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 hidden sm:inline-block">
+                                IP: {log.ip_address}
                               </span>
                             )}
                           </div>

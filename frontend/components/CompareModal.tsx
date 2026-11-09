@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { Student, Mark, fetchStudent } from "../lib/api";
+import React, { useState, useMemo, useEffect } from "react";
+import { Student, Mark, fetchStudent, logStudentComparison } from "../lib/api";
 import { IconClose, IconCompare } from "./Icons";
 import Identicon from "./Identicon";
 import { sfx } from "../lib/sfx";
@@ -12,6 +12,7 @@ interface CompareModalProps {
   allStudents?: Student[];
   onClose: () => void;
   isObsidian?: boolean;
+  viewer?: { usn: string; name?: string } | null;
 }
 
 export default function CompareModal({
@@ -20,10 +21,27 @@ export default function CompareModal({
   allStudents = [],
   onClose,
   isObsidian = true,
+  viewer = null,
 }: CompareModalProps) {
   // Direct student states guaranteed to preserve cross-branch selections
   const [s1, setS1] = useState<Student>(initialS1);
   const [s2, setS2] = useState<Student>(initialS2);
+
+  // Guarantee compare event is recorded on mount if user is logged in
+  useEffect(() => {
+    if (viewer?.usn && initialS1?.usn && initialS2?.usn) {
+      logStudentComparison({
+        viewer_usn: viewer.usn,
+        viewer_name: viewer.name,
+        student1_usn: initialS1.usn,
+        student1_name: initialS1.name,
+        student1_branch: initialS1.branch,
+        student2_usn: initialS2.usn,
+        student2_name: initialS2.name,
+        student2_branch: initialS2.branch,
+      });
+    }
+  }, []);
 
   // Guarantee that initialS1 and initialS2 are always included in the dropdown options
   const selectableStudents = useMemo(() => {
@@ -52,6 +70,18 @@ export default function CompareModal({
           setS1(found);
         }
       }
+      if (viewer?.usn) {
+        logStudentComparison({
+          viewer_usn: viewer.usn,
+          viewer_name: viewer.name,
+          student1_usn: found.usn,
+          student1_name: found.name,
+          student1_branch: found.branch,
+          student2_usn: s2.usn,
+          student2_name: s2.name,
+          student2_branch: s2.branch,
+        });
+      }
     }
   };
 
@@ -68,6 +98,18 @@ export default function CompareModal({
         } catch {
           setS2(found);
         }
+      }
+      if (viewer?.usn) {
+        logStudentComparison({
+          viewer_usn: viewer.usn,
+          viewer_name: viewer.name,
+          student1_usn: s1.usn,
+          student1_name: s1.name,
+          student1_branch: s1.branch,
+          student2_usn: found.usn,
+          student2_name: found.name,
+          student2_branch: found.branch,
+        });
       }
     }
   };

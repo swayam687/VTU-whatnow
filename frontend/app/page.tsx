@@ -151,27 +151,36 @@ export default function Dashboard() {
     loadStudentsData(null);
   };
 
-  const handleCompareWithMe = (targetStudent: Student) => {
+  const handleCompareWithMe = async (targetStudent: Student) => {
     sfx.playMechanicalClick();
     const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
-    const myProfile = pool.find((s) => s.usn.toUpperCase() === myUsn.toUpperCase());
+    let myProfile = pool.find((s) => s.usn.toUpperCase() === myUsn.toUpperCase());
+    if (!myProfile && myUsn) {
+      try {
+        myProfile = await fetchStudent(myUsn);
+      } catch {
+        // Fallback
+      }
+    }
     if (myProfile) {
       setCompareStudent1(myProfile);
       setCompareStudent2(targetStudent);
       setSelectedUsn(null);
       setIsCompareOpen(true);
 
-      // Log comparison for Admin visibility
-      logStudentComparison({
-        viewer_usn: studentSession?.usn || myUsn || undefined,
-        viewer_name: studentSession?.name || undefined,
-        student1_usn: myProfile.usn,
-        student1_name: myProfile.name,
-        student1_branch: myProfile.branch,
-        student2_usn: targetStudent.usn,
-        student2_name: targetStudent.name,
-        student2_branch: targetStudent.branch,
-      });
+      // Log comparison for Admin visibility (logged-in user requirement)
+      if (studentSession?.usn || myUsn) {
+        logStudentComparison({
+          viewer_usn: studentSession?.usn || myUsn,
+          viewer_name: studentSession?.name || myProfile.name,
+          student1_usn: myProfile.usn,
+          student1_name: myProfile.name,
+          student1_branch: myProfile.branch,
+          student2_usn: targetStudent.usn,
+          student2_name: targetStudent.name,
+          student2_branch: targetStudent.branch,
+        });
+      }
     } else {
       alert(`Could not find profile for ${myUsn}. Please ensure your marks have been scraped.`);
     }
@@ -275,17 +284,19 @@ export default function Dashboard() {
       setCompareStudent2(s2);
       setIsCompareOpen(true);
 
-      // Log comparison for Admin visibility
-      logStudentComparison({
-        viewer_usn: studentSession?.usn || myUsn || undefined,
-        viewer_name: studentSession?.name || undefined,
-        student1_usn: s1.usn,
-        student1_name: s1.name,
-        student1_branch: s1.branch,
-        student2_usn: s2.usn,
-        student2_name: s2.name,
-        student2_branch: s2.branch,
-      });
+      // Log comparison for Admin visibility (logged-in user requirement)
+      if (studentSession?.usn || myUsn) {
+        logStudentComparison({
+          viewer_usn: studentSession?.usn || myUsn,
+          viewer_name: studentSession?.name,
+          student1_usn: s1.usn,
+          student1_name: s1.name,
+          student1_branch: s1.branch,
+          student2_usn: s2.usn,
+          student2_name: s2.name,
+          student2_branch: s2.branch,
+        });
+      }
     } catch (err) {
       console.error("Failed to fetch students for comparison", err);
     }
@@ -759,6 +770,7 @@ export default function Dashboard() {
           student1={compareStudent1}
           student2={compareStudent2}
           allStudents={allCollegeStudents.length > 0 ? allCollegeStudents : students}
+          viewer={studentSession ? { usn: studentSession.usn, name: studentSession.name } : myUsn ? { usn: myUsn } : null}
           onClose={() => setIsCompareOpen(false)}
         />
       )}

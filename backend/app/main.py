@@ -145,6 +145,43 @@ async def lifespan(app: FastAPI):
                         conn.execute(text(col_stmt))
                     except Exception:
                         pass
+
+                # Explicitly guarantee comparison_logs table exists
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS comparison_logs (
+                            id SERIAL PRIMARY KEY,
+                            viewer_usn VARCHAR,
+                            viewer_name VARCHAR DEFAULT '',
+                            student1_usn VARCHAR NOT NULL,
+                            student1_name VARCHAR DEFAULT '',
+                            student1_branch VARCHAR DEFAULT '',
+                            student2_usn VARCHAR NOT NULL,
+                            student2_name VARCHAR DEFAULT '',
+                            student2_branch VARCHAR DEFAULT '',
+                            compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address VARCHAR DEFAULT ''
+                        );
+                    """))
+                except Exception:
+                    try:
+                        conn.execute(text("""
+                            CREATE TABLE IF NOT EXISTS comparison_logs (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                viewer_usn TEXT,
+                                viewer_name TEXT DEFAULT '',
+                                student1_usn TEXT NOT NULL,
+                                student1_name TEXT DEFAULT '',
+                                student1_branch TEXT DEFAULT '',
+                                student2_usn TEXT NOT NULL,
+                                student2_name TEXT DEFAULT '',
+                                student2_branch TEXT DEFAULT '',
+                                compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                ip_address TEXT DEFAULT ''
+                            );
+                        """))
+                    except Exception:
+                        pass
                 conn.commit()
             print("✅ Database schema initialized/verified.")
         except Exception as e:
@@ -695,23 +732,52 @@ def log_student_comparison(
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
     db: Session = Depends(get_db)
 ):
-    client_ip = request.client.host if request.client else "unknown"
+    # Rule: compare logs should appear ONLY if a logged-in user is trying to compare
     viewer_usn = verify_session_token(x_student_token, db) or req.viewer_usn
-    viewer_name = req.viewer_name or ""
-    if viewer_usn and not viewer_name:
-        viewer_student = db.query(Student).filter(Student.usn == viewer_usn.upper()).first()
-        if viewer_student:
-            viewer_name = viewer_student.name
+    if not viewer_usn or not viewer_usn.strip():
+        return {"ok": False, "message": "Only logged-in user comparisons are recorded"}
+
+    clean_viewer_usn = viewer_usn.strip().upper()
+    viewer_name = (req.viewer_name or "").strip()
+    viewer_student = db.query(Student).filter(Student.usn == clean_viewer_usn).first()
+    if viewer_student and (not viewer_name or viewer_name == clean_viewer_usn):
+        viewer_name = viewer_student.name
+
+    # Client IP with header resolution
+    client_ip = request.headers.get("x-forwarded-for")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+
+    # Fill student 1 and student 2 details if omitted
+    s1_usn = req.student1_usn.strip().upper()
+    s1_name = (req.student1_name or "").strip()
+    s1_branch = (req.student1_branch or "").strip()
+    if not s1_name or not s1_branch:
+        st1 = db.query(Student).filter(Student.usn == s1_usn).first()
+        if st1:
+            s1_name = s1_name or st1.name
+            s1_branch = s1_branch or st1.branch
+
+    s2_usn = req.student2_usn.strip().upper()
+    s2_name = (req.student2_name or "").strip()
+    s2_branch = (req.student2_branch or "").strip()
+    if not s2_name or not s2_branch:
+        st2 = db.query(Student).filter(Student.usn == s2_usn).first()
+        if st2:
+            s2_name = s2_name or st2.name
+            s2_branch = s2_branch or st2.branch
 
     entry = ComparisonLog(
-        viewer_usn=viewer_usn.upper() if viewer_usn else None,
+        viewer_usn=clean_viewer_usn,
         viewer_name=viewer_name,
-        student1_usn=req.student1_usn.upper(),
-        student1_name=req.student1_name or "",
-        student1_branch=req.student1_branch or "",
-        student2_usn=req.student2_usn.upper(),
-        student2_name=req.student2_name or "",
-        student2_branch=req.student2_branch or "",
+        student1_usn=s1_usn,
+        student1_name=s1_name,
+        student1_branch=s1_branch,
+        student2_usn=s2_usn,
+        student2_name=s2_name,
+        student2_branch=s2_branch,
         compared_at=datetime.utcnow(),
         ip_address=client_ip,
     )
@@ -722,8 +788,12 @@ def log_student_comparison(
 
 @app.get("/api/admin/compare-logs", dependencies=[Depends(require_admin)])
 def get_admin_compare_logs(db: Session = Depends(get_db)):
-    total_comparisons = db.query(ComparisonLog).count()
-    recent = db.query(ComparisonLog).order_by(desc(ComparisonLog.compared_at)).limit(100).all()
+    base_query = db.query(ComparisonLog).filter(
+        ComparisonLog.viewer_usn.isnot(None),
+        ComparisonLog.viewer_usn != ""
+    )
+    total_comparisons = base_query.count()
+    recent = base_query.order_by(desc(ComparisonLog.compared_at)).limit(100).all()
 
     # Top compared against students
     top_targets = (
@@ -733,20 +803,21 @@ def get_admin_compare_logs(db: Session = Depends(get_db)):
             ComparisonLog.student2_branch,
             func.count(ComparisonLog.id).label("count")
         )
+        .filter(ComparisonLog.viewer_usn.isnot(None), ComparisonLog.viewer_usn != "")
         .group_by(ComparisonLog.student2_usn, ComparisonLog.student2_name, ComparisonLog.student2_branch)
         .order_by(desc("count"))
         .limit(15)
         .all()
     )
 
-    # Active viewers who initiated comparisons
+    # Active viewers (which logged-in students are comparing most)
     active_viewers = (
         db.query(
             ComparisonLog.viewer_usn,
             ComparisonLog.viewer_name,
             func.count(ComparisonLog.id).label("count")
         )
-        .filter(ComparisonLog.viewer_usn.isnot(None))
+        .filter(ComparisonLog.viewer_usn.isnot(None), ComparisonLog.viewer_usn != "")
         .group_by(ComparisonLog.viewer_usn, ComparisonLog.viewer_name)
         .order_by(desc("count"))
         .limit(15)
