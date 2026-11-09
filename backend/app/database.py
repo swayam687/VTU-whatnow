@@ -34,9 +34,18 @@ else:
     # Cloud Postgres connection resilience (Supabase / Neon / Render)
     engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_recycle"] = 300
-    engine_kwargs["connect_args"] = {
+    connect_args = {
         "connect_timeout": 8,  # Prevent infinite TCP hang on cloud port scans
     }
+    # In psycopg (psycopg 3), prepared statements must be disabled when using PgBouncer / Supabase transaction poolers
+    # to prevent psycopg.errors.DuplicatePreparedStatement: prepared statement "_pg3_0" already exists
+    if "psycopg" in db_url or (db_url.startswith("postgresql://") and "psycopg2" not in db_url):
+        try:
+            import psycopg  # noqa: F401
+            connect_args["prepare_threshold"] = None
+        except ImportError:
+            pass
+    engine_kwargs["connect_args"] = connect_args
 
 engine = create_engine(db_url, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

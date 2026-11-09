@@ -25,7 +25,7 @@ class Student(Base):
     login_count = Column(Integer, default=0)
     last_login_at = Column(DateTime, nullable=True)
 
-    marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan")
+    marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")
 
 
 class Subject(Base):
@@ -51,7 +51,7 @@ class Mark(Base):
     status = Column(String, default="P")  # P (Pass), F (Fail), A (Absent), W (Withdrawn)
 
     student = relationship("Student", back_populates="marks")
-    subject = relationship("Subject", back_populates="marks")
+    subject = relationship("Subject", back_populates="marks", lazy="joined")
 
     @property
     def subject_name(self) -> str:
