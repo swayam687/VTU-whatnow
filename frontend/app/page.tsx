@@ -105,15 +105,14 @@ export default function Dashboard() {
             sessionStorage.removeItem("vtu_student_token");
             sessionStorage.removeItem("vtu_student_session");
             sessionStorage.removeItem("vtu_student_usn");
+            localStorage.removeItem("vtu_my_usn");
             setStudentSession(null);
+            setMyUsn("");
           } else {
             setStudentSession(parsed);
             setMyUsn(parsed.usn);
           }
         });
-      } else {
-        const saved = localStorage.getItem("vtu_my_usn");
-        if (saved) setMyUsn(saved);
       }
     } catch {
       // ignore
@@ -121,7 +120,12 @@ export default function Dashboard() {
 
     // Active listener: Kick out user immediately if token is invalidated on the server
     const handleRevocation = () => {
+      sessionStorage.removeItem("vtu_student_token");
+      sessionStorage.removeItem("vtu_student_session");
+      sessionStorage.removeItem("vtu_student_usn");
+      localStorage.removeItem("vtu_my_usn");
       setStudentSession(null);
+      setMyUsn("");
       loadStudentsData(null);
       alert("⚠️ Your session has been terminated because ownership of this USN was verified and transferred to another user. Please log in with the new password.");
     };
@@ -141,18 +145,10 @@ export default function Dashboard() {
     sessionStorage.removeItem("vtu_student_token");
     sessionStorage.removeItem("vtu_student_session");
     sessionStorage.removeItem("vtu_student_usn");
+    localStorage.removeItem("vtu_my_usn");
     setStudentSession(null);
+    setMyUsn("");
     loadStudentsData(null);
-  };
-
-  const handleSetMyUsn = (usn: string) => {
-    const clean = usn.trim().toUpperCase();
-    setMyUsn(clean);
-    if (clean) {
-      localStorage.setItem("vtu_my_usn", clean);
-    } else {
-      localStorage.removeItem("vtu_my_usn");
-    }
   };
 
   const handleCompareWithMe = (targetStudent: Student) => {
@@ -888,7 +884,7 @@ export default function Dashboard() {
                     </div>
                   </div>
 
-                  {/* Compare with Yourself or Pin Profile Action */}
+                  {/* Head-to-Head Comparison Banner */}
                   <div
                     className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${
                       isObsidian
@@ -904,27 +900,18 @@ export default function Dashboard() {
                         )}
                       </div>
                       <p className="text-[11px] opacity-70">
-                        {selectedUsn.toUpperCase() === myUsn.toUpperCase()
-                          ? "This is your personal marksheet."
+                        {myUsn && selectedUsn.toUpperCase() === myUsn.toUpperCase()
+                          ? "This is your verified personal marksheet."
                           : myUsn
                           ? "Instantly evaluate subject marks and leads side-by-side."
-                          : "Compare this student directly against your own marks."}
+                          : "Log in with your USN to compare marks side-by-side."}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                      {selectedUsn.toUpperCase() === myUsn.toUpperCase() ? (
-                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
+                      {myUsn && selectedUsn.toUpperCase() === myUsn.toUpperCase() ? (
+                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
                           <span>⭐️ Your Profile</span>
-                          <button
-                            onClick={() => {
-                              sfx.playMechanicalClick();
-                              handleSetMyUsn("");
-                            }}
-                            className="text-[10px] underline opacity-60 hover:opacity-100 ml-1"
-                          >
-                            (unpin)
-                          </button>
                         </span>
                       ) : myUsn ? (
                         <button
@@ -935,41 +922,15 @@ export default function Dashboard() {
                           <span>Compare with Me</span>
                         </button>
                       ) : (
-                        <div className="flex items-center gap-1.5 w-full sm:w-auto">
-                          <button
-                            onClick={() => {
-                              sfx.playMechanicalClick();
-                              handleSetMyUsn(selectedUsn);
-                            }}
-                            title="Pin this USN as your profile"
-                            className="px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
-                          >
-                            ⭐️ Pin as My USN
-                          </button>
-                          <button
-                            onClick={() => {
-                              sfx.playMechanicalClick();
-                              const inputUsn = prompt("Enter your USN to compare with:", "1RM25CS");
-                              if (inputUsn) {
-                                handleSetMyUsn(inputUsn);
-                                const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
-                                const myProfile = pool.find((s) => s.usn.toUpperCase() === inputUsn.trim().toUpperCase());
-                                if (myProfile) {
-                                  setCompareStudent1(myProfile);
-                                  setCompareStudent2(detailStudent);
-                                  setSelectedUsn(null);
-                                  setIsCompareOpen(true);
-                                } else {
-                                  alert(`Saved your USN as ${inputUsn.toUpperCase()}. Scrape your USN in Admin room to populate marks.`);
-                                }
-                              }
-                            }}
-                            className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors flex items-center gap-1"
-                          >
-                            <IconCompare className="w-3.5 h-3.5" />
-                            <span>Compare with You</span>
-                          </button>
-                        </div>
+                        <button
+                          onClick={() => {
+                            sfx.playMechanicalClick();
+                            setIsAuthModalOpen(true);
+                          }}
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+                        >
+                          <span>🔑 Log In to Compare</span>
+                        </button>
                       )}
                     </div>
                   </div>

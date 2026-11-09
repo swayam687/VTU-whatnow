@@ -1843,7 +1843,7 @@ export default function AdminPanel() {
                             <div className="flex items-center gap-1.5 flex-wrap">
                               <span className="font-semibold text-slate-500">Initiator:</span>
                               <span className="font-bold text-slate-900 px-1.5 py-0.5 rounded bg-slate-100 font-mono">
-                                {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn || "unpinned"})` : log.viewer_usn || "Anonymous Visitor"}
+                                {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn || "guest"})` : log.viewer_usn || "Anonymous Visitor"}
                               </span>
                               <span className="text-slate-400 font-bold">compared</span>
                             </div>
