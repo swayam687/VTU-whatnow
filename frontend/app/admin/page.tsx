@@ -30,9 +30,7 @@ import {
   IconExternalLink,
   IconGitHub,
   IconLinkedIn,
-  IconDownload,
 } from "../../components/Icons";
-import { downloadResultsCsv } from "../../lib/exportUtils";
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";
 
@@ -52,7 +50,7 @@ export default function AdminPanel() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [checkingAuth, setCheckingAuth] = useState<boolean>(true);
-  const [adminKey, setAdminKey] = useState<string>("admin123");
+  const [adminKey, setAdminKey] = useState<string>("");
   const [passwordInput, setPasswordInput] = useState<string>("");
   const [authError, setAuthError] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
@@ -573,20 +571,6 @@ export default function AdminPanel() {
           >
             <span>{browserStatus?.status === "ready" ? "Browser Ready ✅" : "Browser Check ⚠️"}</span>
           </div>
-
-          {/* Export / Download CSV */}
-          <button
-            type="button"
-            onClick={() => {
-              sfx.playClick();
-              downloadResultsCsv();
-            }}
-            title="Download / Export Results (CSV)"
-            className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-xs flex items-center gap-1.5"
-          >
-            <IconDownload className="w-3.5 h-3.5 text-blue-600" />
-            <span className="hidden sm:inline">Export</span>
-          </button>
 
           {/* Sign Out Button */}
           <button

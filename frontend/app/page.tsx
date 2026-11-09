@@ -245,59 +245,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Mobile View Switcher */}
-        <div
-          className={`flex lg:hidden items-center justify-between gap-1 p-1 rounded-2xl border text-xs ${
-            isObsidian
-              ? "bg-slate-900/80 border-slate-800 text-slate-300"
-              : "bg-slate-100 border-slate-200 text-slate-700"
-          }`}
-        >
-          <button
-            onClick={() => {
-              sfx.playMechanicalClick();
-              setCurrentView("dashboard");
-            }}
-            className={`flex-1 py-1.5 rounded-xl text-center font-semibold text-xs transition-all ${
-              currentView === "dashboard"
-                ? isObsidian
-                  ? "bg-cyan-500 text-slate-950 font-bold"
-                  : "bg-white text-slate-900 font-bold shadow-sm"
-                : "opacity-60"
-            }`}
-          >
-            Results
-          </button>
-          <button
-            onClick={() => {
-              sfx.playSonarChime();
-              setCurrentView("topology");
-            }}
-            className={`flex-1 py-1.5 rounded-xl text-center font-semibold text-xs transition-all ${
-              currentView === "topology"
-                ? isObsidian
-                  ? "bg-cyan-500 text-slate-950 font-bold"
-                  : "bg-white text-slate-900 font-bold shadow-sm"
-                : "opacity-60"
-            }`}
-          >
-            Graph
-          </button>
-          <button
-            onClick={() => {
-              sfx.playMechanicalClick();
-              setCurrentView("backlogs");
-            }}
-            className={`flex-1 py-1.5 rounded-xl text-center font-semibold text-xs transition-all ${
-              currentView === "backlogs"
-                ? "bg-rose-500 text-white font-bold"
-                : "opacity-60"
-            }`}
-          >
-            Analytics
-          </button>
-        </div>
-
         {/* =========================================================================
             VIEW 1: Interactive Campus Graph
         ========================================================================= */}

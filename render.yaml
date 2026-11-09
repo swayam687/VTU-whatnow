@@ -21,15 +21,15 @@ services:
       VTU_URL_SEM2: https://results.vtu.ac.in/MJ26cbcs/index.php
 
       # Delay between student scrapes in seconds (to mimic human behavior)
-      DELAY_MIN: "5"
-      DELAY_MAX: "10"
+      DELAY_MIN: "2"
+      DELAY_MAX: "3"
 
       # Allow the frontend service to call the API (will be overwritten by the
       # actual frontend URL after it is created)
       ALLOWED_ORIGINS: https://vtu-frontend.onrender.com
 
       # Admin panel protection password
-      ADMIN_PASSWORD: admin123
+      ADMIN_PASSWORD: admin
 
   # ---------- Frontend ----------
   - type: web
