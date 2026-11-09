@@ -24,7 +24,9 @@ import {
   IconCompare,
   IconGitHub,
   IconLinkedIn,
+  IconInstallApp,
 } from "../components/Icons";
+import InstallAppModal from "../components/InstallAppModal";
 import { sfx } from "../lib/sfx";
 
 const ALL_BRANCHES = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
@@ -76,6 +78,39 @@ export default function Dashboard() {
   const [selectedUsn, setSelectedUsn] = useState<string | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+
+  // User Profile / "This is Me" state
+  const [myUsn, setMyUsn] = useState<string>("");
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("vtu_my_usn");
+    if (saved) setMyUsn(saved);
+  }, []);
+
+  const handleSetMyUsn = (usn: string) => {
+    const clean = usn.trim().toUpperCase();
+    setMyUsn(clean);
+    if (clean) {
+      localStorage.setItem("vtu_my_usn", clean);
+    } else {
+      localStorage.removeItem("vtu_my_usn");
+    }
+  };
+
+  const handleCompareWithMe = (targetStudent: Student) => {
+    sfx.playMechanicalClick();
+    const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
+    const myProfile = pool.find((s) => s.usn.toUpperCase() === myUsn.toUpperCase());
+    if (myProfile) {
+      setCompareStudent1(myProfile);
+      setCompareStudent2(targetStudent);
+      setSelectedUsn(null);
+      setIsCompareOpen(true);
+    } else {
+      alert(`Could not find profile for ${myUsn}. Please ensure your marks have been scraped.`);
+    }
+  };
 
   // Load initial branches & backend health
   const loadBranchData = () => {
@@ -185,7 +220,7 @@ export default function Dashboard() {
         onToggleTheme={handleToggleTheme}
       />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 space-y-5 sm:space-y-6">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-20 lg:pb-8 space-y-5 sm:space-y-6">
         {/* Backend Offline Notice */}
         {backendOnline === false && (
           <div className="bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
@@ -495,6 +530,7 @@ export default function Dashboard() {
                       onToggleCompare={() => handleToggleCompare(s.usn)}
                       onOpenDetail={() => handleOpenDetail(s.usn)}
                       isObsidian={isObsidian}
+                      isMyProfile={s.usn.toUpperCase() === myUsn.toUpperCase()}
                     />
                   ))}
                 </div>
@@ -506,7 +542,7 @@ export default function Dashboard() {
 
       {/* Floating Comparison Action Bar */}
       {compareUsns.length > 0 && (
-        <div className="fixed bottom-5 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4">
+        <div className="fixed bottom-16 sm:bottom-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4">
           <div
             className={`rounded-2xl p-3 shadow-xl flex items-center justify-between gap-3 border transition-all ${
               isObsidian
@@ -689,6 +725,92 @@ export default function Dashboard() {
                     </div>
                   </div>
 
+                  {/* Compare with Yourself or Pin Profile Action */}
+                  <div
+                    className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${
+                      isObsidian
+                        ? "bg-gradient-to-r from-cyan-950/30 to-blue-950/20 border-cyan-800/40"
+                        : "bg-gradient-to-r from-blue-50 to-indigo-50/50 border-blue-200"
+                    }`}
+                  >
+                    <div className="text-left w-full sm:w-auto">
+                      <div className="flex items-center gap-1.5 text-xs font-bold">
+                        <span>⚡️ Head-to-Head</span>
+                        {myUsn && myUsn.toUpperCase() !== selectedUsn.toUpperCase() && (
+                          <span className="text-[10px] opacity-70 font-mono">vs You ({myUsn})</span>
+                        )}
+                      </div>
+                      <p className="text-[11px] opacity-70">
+                        {selectedUsn.toUpperCase() === myUsn.toUpperCase()
+                          ? "This is your personal marksheet."
+                          : myUsn
+                          ? "Instantly evaluate subject marks and leads side-by-side."
+                          : "Compare this student directly against your own marks."}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                      {selectedUsn.toUpperCase() === myUsn.toUpperCase() ? (
+                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1">
+                          <span>⭐️ Your Profile</span>
+                          <button
+                            onClick={() => {
+                              sfx.playMechanicalClick();
+                              handleSetMyUsn("");
+                            }}
+                            className="text-[10px] underline opacity-60 hover:opacity-100 ml-1"
+                          >
+                            (unpin)
+                          </button>
+                        </span>
+                      ) : myUsn ? (
+                        <button
+                          onClick={() => handleCompareWithMe(detailStudent)}
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-md shadow-cyan-500/20 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+                        >
+                          <IconCompare className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <span>Compare with Me</span>
+                        </button>
+                      ) : (
+                        <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                          <button
+                            onClick={() => {
+                              sfx.playMechanicalClick();
+                              handleSetMyUsn(selectedUsn);
+                            }}
+                            title="Pin this USN as your profile"
+                            className="px-3 py-1.5 rounded-xl text-[11px] font-semibold border border-amber-500/40 text-amber-400 hover:bg-amber-500/10 transition-colors"
+                          >
+                            ⭐️ Pin as My USN
+                          </button>
+                          <button
+                            onClick={() => {
+                              sfx.playMechanicalClick();
+                              const inputUsn = prompt("Enter your USN to compare with:", "1RM25CS");
+                              if (inputUsn) {
+                                handleSetMyUsn(inputUsn);
+                                const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
+                                const myProfile = pool.find((s) => s.usn.toUpperCase() === inputUsn.trim().toUpperCase());
+                                if (myProfile) {
+                                  setCompareStudent1(myProfile);
+                                  setCompareStudent2(detailStudent);
+                                  setSelectedUsn(null);
+                                  setIsCompareOpen(true);
+                                } else {
+                                  alert(`Saved your USN as ${inputUsn.toUpperCase()}. Scrape your USN in Admin room to populate marks.`);
+                                }
+                              }
+                            }}
+                            className="px-3 py-1.5 rounded-xl text-[11px] font-bold bg-blue-600 text-white hover:bg-blue-500 transition-colors flex items-center gap-1"
+                          >
+                            <IconCompare className="w-3.5 h-3.5" />
+                            <span>Compare with You</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
                   {/* Social Profile Badges */}
                   {(detailStudent.github_url || detailStudent.linkedin_url) && (
                     <div
@@ -809,6 +931,91 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* Mobile Bottom Navigation Bar (Thumb Zone) */}
+      <nav
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around transition-colors ${
+          isObsidian
+            ? "bg-[#08090a]/95 border-slate-800/80 text-slate-400"
+            : "bg-white/95 border-slate-200/80 text-slate-500 shadow-lg"
+        }`}
+      >
+        <button
+          onClick={() => {
+            sfx.playMechanicalClick();
+            setCurrentView("dashboard");
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+            currentView === "dashboard"
+              ? isObsidian
+                ? "text-cyan-400 font-bold"
+                : "text-blue-600 font-bold"
+              : "opacity-70 hover:opacity-100"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+          </svg>
+          <span className="text-[10px]">Results</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sfx.playSonarChime();
+            setCurrentView("topology");
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+            currentView === "topology"
+              ? isObsidian
+                ? "text-cyan-400 font-bold"
+                : "text-blue-600 font-bold"
+              : "opacity-70 hover:opacity-100"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" strokeWidth={2} />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v6m0 6v6M3 12h6m6 0h6" />
+          </svg>
+          <span className="text-[10px]">Graph</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sfx.playMechanicalClick();
+            setCurrentView("backlogs");
+          }}
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+            currentView === "backlogs"
+              ? isObsidian
+                ? "text-cyan-400 font-bold"
+                : "text-blue-600 font-bold"
+              : "opacity-70 hover:opacity-100"
+          }`}
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+          </svg>
+          <span className="text-[10px]">Backlogs</span>
+        </button>
+
+        <button
+          onClick={() => {
+            sfx.playMechanicalClick();
+            setIsInstallModalOpen(true);
+          }}
+          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl opacity-70 hover:opacity-100 transition-all text-cyan-400"
+        >
+          <IconInstallApp className="w-5 h-5 stroke-[2.2]" />
+          <span className="text-[10px]">Get App</span>
+        </button>
+      </nav>
+
+      {/* PWA Install Modal for Mobile */}
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        isObsidian={isObsidian}
+      />
     </div>
   );
 }

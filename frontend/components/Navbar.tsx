@@ -47,14 +47,22 @@ export default function Navbar({
           className="flex items-center gap-2.5 group"
         >
           <div
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105 ${
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105 overflow-hidden relative ${
               isObsidian
                 ? "bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 shadow-cyan-500/20"
                 : "bg-blue-600 text-white"
             }`}
           >
+            <img
+              src="/app-icon.png"
+              alt="VTU WhatNow Logo"
+              className="w-full h-full object-cover relative z-10"
+              onError={(e) => {
+                (e.target as HTMLElement).style.display = "none";
+              }}
+            />
             <svg
-              className="w-4 h-4 sm:w-4.5 sm:h-4.5"
+              className="w-4 h-4 sm:w-4.5 sm:h-4.5 absolute"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
