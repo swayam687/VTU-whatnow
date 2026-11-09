@@ -34,6 +34,9 @@ else:
     # Cloud Postgres connection resilience (Supabase / Neon / Render)
     engine_kwargs["pool_pre_ping"] = True
     engine_kwargs["pool_recycle"] = 300
+    engine_kwargs["connect_args"] = {
+        "connect_timeout": 8,  # Prevent infinite TCP hang on cloud port scans
+    }
 
 engine = create_engine(db_url, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -32,13 +32,23 @@ from .schemas import (
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
 
-# Create DB tables on startup safely (tables are already seeded in Supabase)
-try:
-    models.Base.metadata.create_all(bind=engine)
-except Exception as e:
-    print(f"⚠️ Warning: metadata.create_all did not run on import ({e}). Will proceed.")
+from contextlib import asynccontextmanager
+import threading
 
-app = FastAPI(title="VTU WhatNow API", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Run DB table verification in a background thread so port binds immediately (<1s)
+    def init_db():
+        try:
+            models.Base.metadata.create_all(bind=engine)
+            print("✅ Database schema initialized/verified.")
+        except Exception as e:
+            print(f"⚠️ Notice: DB connection check ({e}). Web service remains live.")
+
+    threading.Thread(target=init_db, daemon=True).start()
+    yield
+
+app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 
 # CORS setup
 origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
