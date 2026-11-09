@@ -110,3 +110,67 @@ class ScrapeStatus(BaseModel):
     captcha_base64: Optional[str] = None
     logs: List[str] = []
 
+# ---------------- Student Authentication & USN Ownership ----------------
+class AuthStatusResponse(BaseModel):
+    usn: str
+    exists: bool
+    is_claimed: bool
+    name: Optional[str] = ""
+    branch: Optional[str] = ""
+
+class AuthLoginRequest(BaseModel):
+    usn: str
+    password: str
+
+class AuthResponse(BaseModel):
+    ok: bool
+    status: str  # "registered" or "authenticated"
+    token: str
+    usn: str
+    name: str
+    branch: str
+    login_count: int
+
+class DisputeCreateRequest(BaseModel):
+    usn: str
+    new_password: str
+    selfie_base64: str
+
+class DisputeOut(BaseModel):
+    id: int
+    usn: str
+    name: str
+    branch: str
+    selfie_base64: str
+    status: str
+    created_at: Optional[datetime] = None
+    reviewed_at: Optional[datetime] = None
+    admin_notes: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
+
+class DisputeReviewRequest(BaseModel):
+    action: str  # "approve" or "reject"
+    admin_notes: Optional[str] = ""
+
+class LoginLogOut(BaseModel):
+    id: int
+    usn: str
+    name: str
+    branch: str
+    login_at: Optional[datetime] = None
+    ip_address: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
+
+class StudentDirectoryResponse(BaseModel):
+    is_authenticated: bool
+    total_students: int
+    students: List[StudentOut]
+    my_usn: Optional[str] = None
+    my_rank_overall: Optional[int] = None
+    my_rank_branch: Optional[int] = None
+
+

@@ -19,6 +19,12 @@ class Student(Base):
     linkedin_url = Column(String, nullable=True, default="")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Student Ownership & Authentication
+    password_hash = Column(String, nullable=True)  # Nullable = Unclaimed
+    is_claimed = Column(Boolean, default=False)
+    login_count = Column(Integer, default=0)
+    last_login_at = Column(DateTime, nullable=True)
+
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan")
 
 
@@ -61,4 +67,31 @@ class SemesterLink(Base):
     semester = Column(String, default="1")
     is_default = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class LoginLog(Base):
+    __tablename__ = "login_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usn = Column(String, index=True, nullable=False)
+    name = Column(String, default="")
+    branch = Column(String, default="")
+    login_at = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String, nullable=True, default="")
+
+
+class USNDispute(Base):
+    __tablename__ = "usn_disputes"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usn = Column(String, index=True, nullable=False)
+    name = Column(String, default="")
+    branch = Column(String, default="")
+    selfie_base64 = Column(String, nullable=False)  # Base64 string of student selfie
+    new_password_hash = Column(String, nullable=False)
+    status = Column(String, default="pending")  # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime, nullable=True)
+    admin_notes = Column(String, nullable=True, default="")
+
 

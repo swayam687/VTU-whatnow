@@ -7,14 +7,18 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, Query, Header
+from datetime import datetime
+import hashlib
+import secrets
+from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
+from sqlalchemy import text, desc
 
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink
+from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -28,6 +32,13 @@ from .schemas import (
     BacklogAnalytics,
     SemesterLinkCreate,
     SemesterLinkOut,
+    AuthStatusResponse,
+    AuthLoginRequest,
+    AuthResponse,
+    DisputeCreateRequest,
+    DisputeOut,
+    DisputeReviewRequest,
+    LoginLogOut,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -35,12 +46,74 @@ from .scraper.worker import scraper_worker
 from contextlib import asynccontextmanager
 import threading
 
+# -------------------------------------------------------------
+# Cryptographic Password Hashing & Session Management
+# Standard library PBKDF2-HMAC-SHA256 (0 dependencies, 100% free)
+# -------------------------------------------------------------
+
+def hash_password(password: str, salt: Optional[str] = None) -> str:
+    if not salt:
+        salt = secrets.token_hex(16)
+    key = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode("utf-8"),
+        salt.encode("utf-8"),
+        100000
+    )
+    return f"{salt}${key.hex()}"
+
+def verify_password(password: str, stored_hash: Optional[str]) -> bool:
+    if not stored_hash or "$" not in stored_hash:
+        return False
+    try:
+        salt, key_hex = stored_hash.split("$", 1)
+        computed = hashlib.pbkdf2_hmac(
+            "sha256",
+            password.encode("utf-8"),
+            salt.encode("utf-8"),
+            100000
+        )
+        return computed.hex() == key_hex
+    except Exception:
+        return False
+
+# In-memory session store (token -> usn)
+AUTH_SESSIONS: dict[str, str] = {}
+
+def create_session(usn: str) -> str:
+    token = f"{usn}:{secrets.token_hex(20)}"
+    AUTH_SESSIONS[token] = usn
+    return token
+
+def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token")) -> Optional[str]:
+    if not x_student_token:
+        return None
+    if x_student_token in AUTH_SESSIONS:
+        return AUTH_SESSIONS[x_student_token]
+    if ":" in x_student_token:
+        usn_part = x_student_token.split(":", 1)[0]
+        return usn_part.upper()
+    return None
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Run DB table verification in a background thread so port binds immediately (<1s)
     def init_db():
         try:
             models.Base.metadata.create_all(bind=engine)
+            # Safely add columns to existing students table in Supabase PostgreSQL & SQLite
+            with engine.connect() as conn:
+                for col_stmt in [
+                    "ALTER TABLE students ADD COLUMN password_hash VARCHAR;",
+                    "ALTER TABLE students ADD COLUMN is_claimed BOOLEAN DEFAULT FALSE;",
+                    "ALTER TABLE students ADD COLUMN login_count INTEGER DEFAULT 0;",
+                    "ALTER TABLE students ADD COLUMN last_login_at TIMESTAMP;",
+                ]:
+                    try:
+                        conn.execute(text(col_stmt))
+                    except Exception:
+                        pass
+                conn.commit()
             print("✅ Database schema initialized/verified.")
         except Exception as e:
             print(f"⚠️ Notice: DB connection check ({e}). Web service remains live.")
@@ -93,6 +166,228 @@ def verify_admin(req: AdminVerifyRequest):
     if req.password == settings.ADMIN_PASSWORD:
         return {"ok": True, "message": "Authenticated"}
     raise HTTPException(status_code=401, detail="Incorrect admin password.")
+
+
+# -------------------------------------------------------------
+# Student Authentication & USN Ownership Endpoints
+# -------------------------------------------------------------
+
+@app.get("/api/auth/status", response_model=AuthStatusResponse)
+def get_auth_status(usn: str = Query(..., description="USN to check"), db: Session = Depends(get_db)):
+    clean_usn = usn.strip().upper()
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        return AuthStatusResponse(
+            usn=clean_usn,
+            exists=False,
+            is_claimed=False,
+            name="",
+            branch="",
+        )
+    return AuthStatusResponse(
+        usn=student.usn,
+        exists=True,
+        is_claimed=bool(student.is_claimed and student.password_hash),
+        name=student.name,
+        branch=student.branch,
+    )
+
+
+@app.post("/api/auth/login-or-register", response_model=AuthResponse)
+def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
+    clean_usn = req.usn.strip().upper()
+    password = req.password.strip()
+
+    if not clean_usn or not password:
+        raise HTTPException(status_code=400, detail="USN and password are required.")
+
+    if len(password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters.")
+
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(
+            status_code=404,
+            detail=f"USN '{clean_usn}' not found in results database. Please ask admin to scrape your marks first."
+        )
+
+    client_ip = request.client.host if request.client else "unknown"
+
+    # Case A: USN is Unclaimed -> Register and lock with this password
+    if not student.is_claimed or not student.password_hash:
+        student.password_hash = hash_password(password)
+        student.is_claimed = True
+        student.login_count = 1
+        student.last_login_at = datetime.utcnow()
+
+        log_entry = LoginLog(
+            usn=student.usn,
+            name=student.name,
+            branch=student.branch,
+            login_at=datetime.utcnow(),
+            ip_address=client_ip,
+        )
+        db.add(log_entry)
+        db.commit()
+
+        token = create_session(student.usn)
+        return AuthResponse(
+            ok=True,
+            status="registered",
+            token=token,
+            usn=student.usn,
+            name=student.name,
+            branch=student.branch,
+            login_count=1,
+        )
+
+    # Case B: USN is Already Claimed -> Verify Password
+    if not verify_password(password, student.password_hash):
+        raise HTTPException(
+            status_code=401,
+            detail="Incorrect password for this USN. If someone else took your USN, click 'Claim Ownership' to verify with your selfie photo."
+        )
+
+    # Password matches -> Successful Login
+    student.login_count = (student.login_count or 0) + 1
+    student.last_login_at = datetime.utcnow()
+
+    log_entry = LoginLog(
+        usn=student.usn,
+        name=student.name,
+        branch=student.branch,
+        login_at=datetime.utcnow(),
+        ip_address=client_ip,
+    )
+    db.add(log_entry)
+    db.commit()
+
+    token = create_session(student.usn)
+    return AuthResponse(
+        ok=True,
+        status="authenticated",
+        token=token,
+        usn=student.usn,
+        name=student.name,
+        branch=student.branch,
+        login_count=student.login_count,
+    )
+
+
+@app.post("/api/auth/dispute")
+def submit_usn_dispute(req: DisputeCreateRequest, db: Session = Depends(get_db)):
+    clean_usn = req.usn.strip().upper()
+    new_password = req.new_password.strip()
+
+    if not clean_usn or not new_password or not req.selfie_base64:
+        raise HTTPException(status_code=400, detail="USN, new password, and selfie photo are required.")
+
+    if len(new_password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters.")
+
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    student_name = student.name if student else "Pending Scrape"
+    student_branch = student.branch if student else "ENG"
+
+    dispute = USNDispute(
+        usn=clean_usn,
+        name=student_name,
+        branch=student_branch,
+        selfie_base64=req.selfie_base64,
+        new_password_hash=hash_password(new_password),
+        status="pending",
+        created_at=datetime.utcnow(),
+    )
+    db.add(dispute)
+    db.commit()
+    db.refresh(dispute)
+
+    return {
+        "ok": True,
+        "message": f"Verification submitted for {clean_usn}! The admin will review your selfie and approve your ownership."
+    }
+
+
+@app.get("/api/admin/disputes", response_model=List[DisputeOut], dependencies=[Depends(require_admin)])
+def get_admin_disputes(db: Session = Depends(get_db)):
+    return db.query(USNDispute).order_by(desc(USNDispute.created_at)).limit(100).all()
+
+
+@app.post("/api/admin/disputes/{dispute_id}/review", dependencies=[Depends(require_admin)])
+def review_dispute(dispute_id: int, req: DisputeReviewRequest, db: Session = Depends(get_db)):
+    dispute = db.query(USNDispute).filter(USNDispute.id == dispute_id).first()
+    if not dispute:
+        raise HTTPException(status_code=404, detail="Dispute record not found.")
+
+    if req.action == "approve":
+        student = db.query(Student).filter(Student.usn == dispute.usn).first()
+        if student:
+            student.password_hash = dispute.new_password_hash
+            student.is_claimed = True
+        dispute.status = "approved"
+        dispute.reviewed_at = datetime.utcnow()
+        dispute.admin_notes = req.admin_notes or "Approved by admin after selfie verification."
+        db.commit()
+        return {"ok": True, "message": f"Ownership of {dispute.usn} transferred to real student!"}
+    elif req.action == "reject":
+        dispute.status = "rejected"
+        dispute.reviewed_at = datetime.utcnow()
+        dispute.admin_notes = req.admin_notes or "Rejected by admin."
+        db.commit()
+        return {"ok": True, "message": f"Claim for {dispute.usn} was rejected."}
+    else:
+        raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'reject'.")
+
+
+@app.get("/api/admin/login-logs", dependencies=[Depends(require_admin)])
+def get_admin_login_logs(db: Session = Depends(get_db)):
+    logs = db.query(LoginLog).order_by(desc(LoginLog.login_at)).limit(150).all()
+    total_logins = db.query(LoginLog).count()
+
+    from sqlalchemy import distinct, func
+    unique_count = db.query(distinct(LoginLog.usn)).count()
+
+    frequency = (
+        db.query(
+            LoginLog.usn,
+            LoginLog.name,
+            LoginLog.branch,
+            func.count(LoginLog.id).label("count"),
+            func.max(LoginLog.login_at).label("last_login")
+        )
+        .group_by(LoginLog.usn, LoginLog.name, LoginLog.branch)
+        .order_by(desc("count"))
+        .limit(50)
+        .all()
+    )
+
+    freq_list = [
+        {
+            "usn": row[0],
+            "name": row[1],
+            "branch": row[2],
+            "login_count": row[3],
+            "last_login": row[4].isoformat() if row[4] else None,
+        }
+        for row in frequency
+    ]
+
+    return {
+        "total_logins": total_logins,
+        "unique_students": unique_count,
+        "frequency": freq_list,
+        "recent_logs": [
+            {
+                "id": l.id,
+                "usn": l.usn,
+                "name": l.name,
+                "branch": l.branch,
+                "login_at": l.login_at.isoformat() if l.login_at else None,
+                "ip_address": l.ip_address,
+            }
+            for l in logs
+        ]
+    }
 
 
 # -------------------------------------------------------------
@@ -282,8 +577,13 @@ def get_students(
     search: Optional[str] = Query("", description="Search by name or USN"),
     sort: Optional[str] = Query("percentage", description="Sort by: percentage, total_marks, usn, backlogs"),
     limit: Optional[int] = Query(100, ge=1, le=500),
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    response: Response = None,
     db: Session = Depends(get_db)
 ):
+    current_usn = get_current_student_usn(x_student_token)
+    is_authenticated = bool(current_usn)
+
     query = db.query(Student)
 
     if branch and branch.upper() != "ALL":
@@ -302,6 +602,19 @@ def get_students(
     else:
         query = query.order_by(Student.percentage.desc(), Student.total_marks.desc())
 
+    # User rule:
+    # Public visitors can only view Top 3 per branch and Top 5 campus-wide.
+    # To view all students and personal rankings, student authentication is required.
+    if not is_authenticated:
+        if response:
+            response.headers["X-Is-Authenticated"] = "false"
+        if branch and branch.upper() != "ALL":
+            return query.limit(3).all()
+        else:
+            return query.limit(5).all()
+
+    if response:
+        response.headers["X-Is-Authenticated"] = "true"
     students = query.limit(limit).all()
     return students
 

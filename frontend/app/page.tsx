@@ -17,6 +17,7 @@ import {
   fetchBranches,
   fetchLeaderboard,
   checkBackendHealth,
+  AuthSession,
 } from "../lib/api";
 import {
   IconSearch,
@@ -27,6 +28,7 @@ import {
   IconInstallApp,
 } from "../components/Icons";
 import InstallAppModal from "../components/InstallAppModal";
+import StudentAuthModal from "../components/StudentAuthModal";
 import { sfx } from "../lib/sfx";
 
 const ALL_BRANCHES = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
@@ -40,6 +42,10 @@ export default function Dashboard() {
   const [sortBy, setSortBy] = useState<"percentage" | "backlogs" | "usn">("percentage");
   const [loading, setLoading] = useState(true);
   const [backendOnline, setBackendOnline] = useState<boolean | null>(null);
+
+  // Student Authentication state (Session-only, resets on browser close)
+  const [studentSession, setStudentSession] = useState<AuthSession | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   // View state: 'dashboard' | 'topology' | 'backlogs'
   const [currentView, setCurrentView] = useState<"dashboard" | "topology" | "backlogs">("dashboard");
@@ -83,10 +89,37 @@ export default function Dashboard() {
   const [myUsn, setMyUsn] = useState<string>("");
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
+  // Restore authenticated session from sessionStorage on mount (resets on tab/browser close)
   useEffect(() => {
-    const saved = localStorage.getItem("vtu_my_usn");
-    if (saved) setMyUsn(saved);
+    try {
+      const storedSession = sessionStorage.getItem("vtu_student_session");
+      if (storedSession) {
+        const parsed = JSON.parse(storedSession) as AuthSession;
+        setStudentSession(parsed);
+        setMyUsn(parsed.usn);
+      } else {
+        const saved = localStorage.getItem("vtu_my_usn");
+        if (saved) setMyUsn(saved);
+      }
+    } catch {
+      // ignore
+    }
   }, []);
+
+  const handleAuthSuccess = (session: AuthSession) => {
+    setStudentSession(session);
+    setMyUsn(session.usn);
+    // Reload student data with the new auth token
+    loadStudentsData(session.token);
+  };
+
+  const handleSignOut = () => {
+    sessionStorage.removeItem("vtu_student_token");
+    sessionStorage.removeItem("vtu_student_session");
+    sessionStorage.removeItem("vtu_student_usn");
+    setStudentSession(null);
+    loadStudentsData(null);
+  };
 
   const handleSetMyUsn = (usn: string) => {
     const clean = usn.trim().toUpperCase();
@@ -134,10 +167,14 @@ export default function Dashboard() {
   }, []);
 
   // Load students & leaderboard on branch or sort change
-  const loadStudentsData = () => {
+  const loadStudentsData = (authToken?: string | null) => {
     setLoading(true);
+    const effectiveToken = authToken !== undefined 
+      ? (authToken || undefined) 
+      : (studentSession?.token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") || undefined : undefined));
+
     Promise.all([
-      fetchStudents({ branch: activeBranch, search: "", sort: sortBy }),
+      fetchStudents({ branch: activeBranch, search: "", sort: sortBy, token: effectiveToken }),
       fetchLeaderboard({ branch: activeBranch, limit: 5 }),
     ])
       .then(([studentList, topperList]) => {
@@ -150,7 +187,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadStudentsData();
-  }, [activeBranch, sortBy]);
+  }, [activeBranch, sortBy, studentSession?.token]);
 
   // Client-side search filtering
   const filteredStudents = useMemo(() => {
@@ -218,6 +255,9 @@ export default function Dashboard() {
         onSelectView={setCurrentView}
         isObsidian={isObsidian}
         onToggleTheme={handleToggleTheme}
+        studentSession={studentSession}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onSignOut={handleSignOut}
       />
 
       <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-20 lg:pb-8 space-y-5 sm:space-y-6">
@@ -341,6 +381,101 @@ export default function Dashboard() {
                 </div>
               </div>
             </div>
+
+            {/* Student Auth / Public Mode Notice Banner */}
+            {studentSession ? (
+              <div
+                className={`rounded-2xl p-4 border transition-all ${
+                  isObsidian
+                    ? "bg-gradient-to-r from-emerald-950/40 via-teal-950/20 to-transparent border-emerald-500/30 text-white"
+                    : "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-xl shrink-0">
+                      🎓
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                          {studentSession.usn}
+                        </span>
+                        <span className="text-xs opacity-60">• {studentSession.branch}</span>
+                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
+                          Unlocked
+                        </span>
+                      </div>
+                      <p className="font-bold text-sm sm:text-base mt-0.5">
+                        Logged in as {studentSession.name}
+                      </p>
+                      <p className="text-xs opacity-70">
+                        Full branch rankings &amp; marks unlocked for this session.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-auto">
+                    <button
+                      onClick={() => handleOpenDetail(studentSession.usn)}
+                      className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
+                    >
+                      My Marksheet
+                    </button>
+                    <button
+                      onClick={handleSignOut}
+                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                        isObsidian
+                          ? "bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300"
+                          : "bg-white border-zinc-200 hover:bg-zinc-100 text-zinc-700"
+                      }`}
+                    >
+                      Sign Out
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`rounded-2xl p-4 border transition-all ${
+                  isObsidian
+                    ? "bg-gradient-to-r from-cyan-950/30 via-slate-900/40 to-transparent border-cyan-500/30 text-white"
+                    : "bg-blue-50/80 border-blue-200 text-blue-950"
+                }`}
+              >
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start sm:items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-xl shrink-0">
+                      🔒
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          Public Preview
+                        </span>
+                        <span className="text-xs opacity-75">
+                          Viewing Top 3 per branch &amp; Top 5 campus
+                        </span>
+                      </div>
+                      <p className="font-bold text-sm sm:text-base mt-0.5">
+                        Want to see your ranking and full batch results?
+                      </p>
+                      <p className="text-xs opacity-70">
+                        Log in with your USN to unlock your marks, rank in branch, and campus standings.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      setIsAuthModalOpen(true);
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-all self-stretch sm:self-auto text-center"
+                  >
+                    🔑 Login / Claim Your USN
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Department Stream Tabs */}
             <section>
@@ -480,6 +615,39 @@ export default function Dashboard() {
                       isMyProfile={s.usn.toUpperCase() === myUsn.toUpperCase()}
                     />
                   ))}
+
+                  {/* Public Locked Teaser Card */}
+                  {!studentSession && (
+                    <div
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsAuthModalOpen(true);
+                      }}
+                      className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:scale-[1.008] active:scale-[0.99] ${
+                        isObsidian
+                          ? "bg-slate-900/30 border-cyan-500/40 hover:bg-slate-900/60 text-white shadow-lg shadow-black/20"
+                          : "bg-blue-50/50 border-blue-300 hover:bg-blue-50/80 text-slate-800 shadow-sm"
+                      }`}
+                    >
+                      <div className="w-11 h-11 mx-auto rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-xl">
+                        🔐
+                      </div>
+                      <h3 className="font-bold text-sm sm:text-base">
+                        Unlock Full Batch Results &amp; Ranking
+                      </h3>
+                      <p className="text-xs opacity-75 max-w-md mx-auto leading-relaxed">
+                        In public mode, only the Top 3 students per department are visible. Enter your USN to unlock the full campus directory, see all scores, and view your personal marksheet.
+                      </p>
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md shadow-emerald-500/20"
+                        >
+                          🔑 Login / Claim Your USN →
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -962,6 +1130,15 @@ export default function Dashboard() {
         isOpen={isInstallModalOpen}
         onClose={() => setIsInstallModalOpen(false)}
         isObsidian={isObsidian}
+      />
+
+      {/* Student Authentication & USN Claim Modal */}
+      <StudentAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+        isObsidian={isObsidian}
+        initialUsn={myUsn}
       />
     </div>
   );

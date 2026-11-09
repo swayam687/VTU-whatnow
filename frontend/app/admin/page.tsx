@@ -7,6 +7,8 @@ import {
   Student,
   SemesterLink,
   BrowserStatus,
+  DisputeRecord,
+  LoginLogsData,
   fetchScrapeStatus,
   fetchStudents,
   startScraper,
@@ -21,6 +23,9 @@ import {
   fetchBrowserStatus,
   installBrowser,
   checkBackendHealth,
+  fetchAdminDisputes,
+  reviewAdminDispute,
+  fetchAdminLoginLogs,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -55,8 +60,20 @@ export default function AdminPanel() {
   const [authError, setAuthError] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'system'
-  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "system">("scraper");
+  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'disputes' | 'logs' | 'system'
+  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "disputes" | "logs" | "system">("scraper");
+
+  // USN Disputes state
+  const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
+  const [disputesLoading, setDisputesLoading] = useState(false);
+  const [disputeFilter, setDisputeFilter] = useState<string>("all");
+  const [selectedSelfieZoom, setSelectedSelfieZoom] = useState<string | null>(null);
+  const [disputeActionMsg, setDisputeActionMsg] = useState<string>("");
+  const [processingDisputeId, setProcessingDisputeId] = useState<number | null>(null);
+
+  // Login Logs state
+  const [loginLogsData, setLoginLogsData] = useState<LoginLogsData | null>(null);
+  const [logsLoading, setLogsLoading] = useState(false);
 
   // Scraper configuration
   const [mode, setMode] = useState<"single" | "range">("single");
@@ -165,11 +182,66 @@ export default function AdminPanel() {
       .catch(() => {});
   };
 
+  // Load Disputes
+  const loadDisputes = async () => {
+    if (!adminKey) return;
+    setDisputesLoading(true);
+    try {
+      const data = await fetchAdminDisputes(
+        adminKey,
+        disputeFilter === "all" ? undefined : disputeFilter
+      );
+      setDisputes(data);
+    } catch (err) {
+      console.error("Failed to load disputes", err);
+    } finally {
+      setDisputesLoading(false);
+    }
+  };
+
+  // Load Login Logs
+  const loadLoginLogs = async () => {
+    if (!adminKey) return;
+    setLogsLoading(true);
+    try {
+      const data = await fetchAdminLoginLogs(adminKey);
+      setLoginLogsData(data);
+    } catch (err) {
+      console.error("Failed to load login logs", err);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const handleReviewDispute = async (id: number, action: "approve" | "reject", notes?: string) => {
+    if (!adminKey) return;
+    setProcessingDisputeId(id);
+    setDisputeActionMsg("");
+    sfx.playClick();
+    try {
+      const res = await reviewAdminDispute(id, action, notes, adminKey);
+      setDisputeActionMsg(res.message);
+      await loadDisputes();
+      loadStudentRecords();
+      sfx.playSonar();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to review dispute";
+      setDisputeActionMsg(msg);
+    } finally {
+      setProcessingDisputeId(null);
+    }
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       loadStudentRecords();
+      if (activeTab === "disputes") {
+        loadDisputes();
+      } else if (activeTab === "logs") {
+        loadLoginLogs();
+      }
     }
-  }, [isAuthenticated, status.is_running, status.status]);
+  }, [isAuthenticated, activeTab, disputeFilter]);
 
   // Status Polling
   useEffect(() => {
@@ -653,6 +725,48 @@ export default function AdminPanel() {
           <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
             {allStudents.length}
           </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("disputes");
+            loadDisputes();
+          }}
+          className={`flex-1 min-w-[130px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+            activeTab === "disputes"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <span>🛡️ USN Claims</span>
+          {disputes.filter((d) => d.status === "pending").length > 0 && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500 text-white font-mono animate-pulse font-bold">
+              {disputes.filter((d) => d.status === "pending").length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("logs");
+            loadLoginLogs();
+          }}
+          className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+            activeTab === "logs"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <span>📋 Login Logs</span>
+          {loginLogsData && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+              {loginLogsData.total_logins}
+            </span>
+          )}
         </button>
 
         <button
@@ -1371,6 +1485,312 @@ export default function AdminPanel() {
       )}
 
       {/* ------------------------------------------------------------- */}
+      {/* TAB: USN OWNERSHIP CLAIMS & DISPUTES                          */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "disputes" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">🛡️ USN Ownership Claims &amp; Disputes</h2>
+                <p className="text-xs text-slate-500">
+                  Review selfie verifications submitted by genuine students claiming their USN ownership.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                  {["all", "pending", "approved", "rejected"].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => {
+                        sfx.playClick();
+                        setDisputeFilter(f);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg font-bold capitalize transition-colors ${
+                        disputeFilter === f ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      {f}
+                    </button>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    loadDisputes();
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
+            </div>
+
+            {disputeActionMsg && (
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-xl font-medium flex items-center justify-between">
+                <span>{disputeActionMsg}</span>
+                <button onClick={() => setDisputeActionMsg("")} className="text-blue-500 hover:text-blue-800 font-bold">
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {disputesLoading ? (
+              <div className="text-center py-12 text-xs text-slate-400">Loading dispute requests...</div>
+            ) : disputes.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
+                <span className="text-2xl">🛡️</span>
+                <p className="font-bold text-xs text-slate-700 mt-2">No dispute requests found</p>
+                <p className="text-[11px] text-slate-400">
+                  {disputeFilter === "all"
+                    ? "No students have submitted dispute claims yet."
+                    : `No disputes matching filter '${disputeFilter}'.`}
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {disputes.map((d) => (
+                  <div
+                    key={d.id}
+                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100">
+                            {d.usn}
+                          </span>
+                          <span className="text-[11px] font-bold text-slate-600 uppercase px-1.5 py-0.2 rounded bg-slate-100">
+                            {d.branch}
+                          </span>
+                        </div>
+                        <h3 className="font-bold text-sm text-slate-900 mt-1">{d.name}</h3>
+                        {d.created_at && (
+                          <p className="text-[10px] text-slate-400">
+                            Submitted: {new Date(d.created_at).toLocaleString()}
+                          </p>
+                        )}
+                      </div>
+
+                      <span
+                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                          d.status === "pending"
+                            ? "bg-amber-100 text-amber-800 border border-amber-200"
+                            : d.status === "approved"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            : "bg-rose-100 text-rose-800 border border-rose-200"
+                        }`}
+                      >
+                        {d.status}
+                      </span>
+                    </div>
+
+                    {/* Selfie Preview */}
+                    <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100">
+                      <div
+                        onClick={() => setSelectedSelfieZoom(d.selfie_base64)}
+                        className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 shrink-0 relative group"
+                        title="Click to zoom selfie"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={d.selfie_base64}
+                          alt={`Selfie of ${d.name}`}
+                          className="w-full h-full object-cover"
+                        />
+                        <span className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-[10px] font-bold transition-opacity">
+                          Zoom
+                        </span>
+                      </div>
+                      <div className="text-xs">
+                        <p className="font-semibold text-slate-700">Verification Selfie</p>
+                        <p className="text-[11px] text-slate-400">
+                          Click thumbnail to inspect full photograph
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Actions */}
+                    {d.status === "pending" ? (
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                        <button
+                          type="button"
+                          disabled={processingDisputeId === d.id}
+                          onClick={() => handleReviewDispute(d.id, "approve")}
+                          className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors disabled:opacity-50"
+                        >
+                          {processingDisputeId === d.id ? "Processing..." : "✓ Approve & Transfer"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={processingDisputeId === d.id}
+                          onClick={() => {
+                            const notes = prompt("Enter rejection reason (optional):") || undefined;
+                            handleReviewDispute(d.id, "reject", notes);
+                          }}
+                          className="py-2 px-3 text-xs font-bold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
+                        <span>
+                          Reviewed: {d.reviewed_at ? new Date(d.reviewed_at).toLocaleDateString() : "Done"}
+                        </span>
+                        {d.admin_notes && (
+                          <span className="text-slate-400 italic">Note: {d.admin_notes}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB: LOGIN AUDIT LOGS                                         */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "logs" && (
+        <div className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900">📋 Student Login Audit Logs</h2>
+                <p className="text-xs text-slate-500">
+                  Real-time record of students who logged in, how many times, with timestamps and network IPs.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  loadLoginLogs();
+                }}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors self-start sm:self-auto"
+              >
+                ↻ Refresh Logs
+              </button>
+            </div>
+
+            {logsLoading ? (
+              <div className="text-center py-12 text-xs text-slate-400">Loading audit logs...</div>
+            ) : !loginLogsData ? (
+              <div className="text-center py-12 text-xs text-slate-400">No login logs available.</div>
+            ) : (
+              <>
+                {/* Metrics Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Total Portal Logins
+                    </span>
+                    <p className="text-2xl font-black font-mono text-slate-900 mt-1">
+                      {loginLogsData.total_logins}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Unique Students Logged In
+                    </span>
+                    <p className="text-2xl font-black font-mono text-emerald-600 mt-1">
+                      {loginLogsData.unique_students}
+                    </p>
+                  </div>
+                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                      Most Active Student
+                    </span>
+                    <p className="text-sm font-bold text-slate-900 mt-1 truncate">
+                      {loginLogsData.frequency[0]
+                        ? `${loginLogsData.frequency[0].name} (${loginLogsData.frequency[0].login_count}x)`
+                        : "None"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Most Active Frequency Table */}
+                <div className="space-y-3">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
+                    Student Login Frequency
+                  </h3>
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto">
+                    {loginLogsData.frequency.length === 0 ? (
+                      <p className="text-xs text-slate-400 p-4 text-center">No student logins recorded yet.</p>
+                    ) : (
+                      loginLogsData.frequency.map((item) => (
+                        <div
+                          key={item.usn}
+                          className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-slate-900">{item.usn}</span>
+                            <span className="text-slate-600">• {item.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase">({item.branch})</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
+                              {item.login_count} logins
+                            </span>
+                            {item.last_login && (
+                              <span className="text-[10px] text-slate-400 hidden sm:inline">
+                                Last: {new Date(item.last_login).toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+
+                {/* Recent Login Audit Stream */}
+                <div className="space-y-3">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
+                    Recent Login Audit Stream
+                  </h3>
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-72 overflow-y-auto">
+                    {loginLogsData.recent_logs.length === 0 ? (
+                      <p className="text-xs text-slate-400 p-4 text-center">No logins recorded yet.</p>
+                    ) : (
+                      loginLogsData.recent_logs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs hover:bg-slate-50/50"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <span className="font-mono font-bold text-slate-900">{log.usn}</span>
+                            <span className="text-slate-700">{log.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase">({log.branch})</span>
+                          </div>
+                          <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-500">
+                            {log.ip_address && (
+                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
+                                IP: {log.ip_address}
+                              </span>
+                            )}
+                            <span className="text-slate-400 font-mono text-[10px]">
+                              {new Date(log.login_at).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
       {/* TAB 4: SYSTEM & PLAYWRIGHT DIAGNOSTICS                        */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "system" && (
@@ -1554,6 +1974,39 @@ export default function AdminPanel() {
               >
                 {savingSocials ? "Saving..." : "Save Profiles"}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Selfie Fullscreen Zoom Modal */}
+      {selectedSelfieZoom && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-md animate-in fade-in"
+          onClick={() => setSelectedSelfieZoom(null)}
+        >
+          <div
+            className="relative max-w-lg w-full bg-slate-900 border border-white/10 rounded-2xl p-3 shadow-2xl space-y-3"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-white/10">
+              <span className="text-white text-xs font-bold tracking-tight">
+                📸 Identity Verification Selfie
+              </span>
+              <button
+                onClick={() => setSelectedSelfieZoom(null)}
+                className="text-white/60 hover:text-white p-1 rounded-lg"
+              >
+                <IconClose className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="rounded-xl overflow-hidden bg-black flex items-center justify-center max-h-[75vh]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={selectedSelfieZoom}
+                alt="Enlarged verification selfie"
+                className="w-full h-auto object-contain"
+              />
             </div>
           </div>
         </div>

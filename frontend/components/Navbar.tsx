@@ -5,12 +5,16 @@ import Link from "next/link";
 import { sfx } from "../lib/sfx";
 import { IconInstallApp } from "./Icons";
 import InstallAppModal from "./InstallAppModal";
+import { AuthSession } from "../lib/api";
 
 interface NavbarProps {
   currentView?: "dashboard" | "topology" | "backlogs";
   onSelectView?: (view: "dashboard" | "topology" | "backlogs") => void;
   isObsidian?: boolean;
   onToggleTheme?: () => void;
+  studentSession?: AuthSession | null;
+  onOpenAuth?: () => void;
+  onSignOut?: () => void;
 }
 
 export default function Navbar({
@@ -18,6 +22,9 @@ export default function Navbar({
   onSelectView,
   isObsidian = true,
   onToggleTheme,
+  studentSession,
+  onOpenAuth,
+  onSignOut,
 }: NavbarProps) {
   const [muted, setMuted] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
@@ -213,11 +220,57 @@ export default function Navbar({
             </button>
           )}
 
+          {/* Student Auth / Profile Pill */}
+          {studentSession ? (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  sfx.playMechanicalClick();
+                  onOpenAuth?.();
+                }}
+                title={`Signed in as ${studentSession.name} (${studentSession.usn})`}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                  isObsidian
+                    ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
+                }`}
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-mono text-[11px] font-bold">{studentSession.usn}</span>
+              </button>
+              <button
+                onClick={() => {
+                  sfx.playMechanicalClick();
+                  onSignOut?.();
+                }}
+                title="Sign Out"
+                className={`p-1.5 rounded-xl border text-[11px] transition-all ${
+                  isObsidian
+                    ? "bg-slate-900 border-slate-800 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30"
+                    : "bg-slate-100 border-slate-200 text-zinc-600 hover:text-rose-600 hover:border-rose-300"
+                }`}
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => {
+                sfx.playMechanicalClick();
+                onOpenAuth?.();
+              }}
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+            >
+              <span>🔑</span>
+              <span className="text-[11px] sm:text-xs">Login</span>
+            </button>
+          )}
+
           {/* Admin Room Link */}
           <Link
             href="/admin"
             onClick={() => sfx.playMechanicalClick()}
-            className={`flex items-center gap-1 px-3 py-2 font-semibold text-xs rounded-xl transition-all shadow-sm ${
+            className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl transition-all shadow-sm ${
               isObsidian
                 ? "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
                 : "bg-slate-900 hover:bg-slate-800 text-white"

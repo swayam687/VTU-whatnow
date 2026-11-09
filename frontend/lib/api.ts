@@ -48,6 +48,60 @@ export interface ScrapeStatus {
   logs: string[];
 }
 
+export interface AuthStatus {
+  usn: string;
+  exists: boolean;
+  is_claimed: boolean;
+  name?: string;
+  branch?: string;
+}
+
+export interface AuthSession {
+  ok: boolean;
+  status: "registered" | "authenticated";
+  token: string;
+  usn: string;
+  name: string;
+  branch: string;
+  login_count: number;
+}
+
+export interface DisputeRecord {
+  id: number;
+  usn: string;
+  name: string;
+  branch: string;
+  selfie_base64: string;
+  status: "pending" | "approved" | "rejected";
+  created_at?: string;
+  reviewed_at?: string;
+  admin_notes?: string;
+}
+
+export interface LoginLogEntry {
+  id: number;
+  usn: string;
+  name: string;
+  branch: string;
+  login_at: string;
+  ip_address?: string;
+}
+
+export interface LoginFrequencyEntry {
+  usn: string;
+  name: string;
+  branch: string;
+  login_count: number;
+  last_login?: string;
+}
+
+export interface LoginLogsData {
+  total_logins: number;
+  unique_students: number;
+  frequency: LoginFrequencyEntry[];
+  recent_logs: LoginLogEntry[];
+}
+
 export async function checkBackendHealth(): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/api/health`, { cache: "no-store" });
@@ -61,6 +115,7 @@ export async function fetchStudents(params?: {
   branch?: string;
   search?: string;
   sort?: string;
+  token?: string;
 }): Promise<Student[]> {
   try {
     const query = new URLSearchParams();
@@ -68,7 +123,16 @@ export async function fetchStudents(params?: {
     if (params?.search) query.set("search", params.search);
     if (params?.sort) query.set("sort", params.sort);
 
-    const res = await fetch(`${API_BASE}/api/students?${query.toString()}`, { cache: "no-store" });
+    const headers: Record<string, string> = {};
+    const token = params?.token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+    if (token) {
+      headers["X-Student-Token"] = token;
+    }
+
+    const res = await fetch(`${API_BASE}/api/students?${query.toString()}`, {
+      headers,
+      cache: "no-store",
+    });
     if (!res.ok) return [];
     return await res.json();
   } catch (err) {
@@ -326,4 +390,88 @@ export async function installBrowser(adminKey?: string): Promise<{ ok: boolean; 
   const data = await res.json();
   if (!res.ok) throw new Error(data.detail || data.message || "Failed to trigger browser verification");
   return data;
+}
+
+// -------------------------------------------------------------
+// Student Auth & Dispute Management
+// -------------------------------------------------------------
+
+export async function fetchAuthStatus(usn: string): Promise<AuthStatus> {
+  const res = await fetch(`${API_BASE}/api/auth/status?usn=${encodeURIComponent(usn.trim().toUpperCase())}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to check USN status");
+  return res.json();
+}
+
+export async function loginOrRegisterStudent(usn: string, password: string): Promise<AuthSession> {
+  const res = await fetch(`${API_BASE}/api/auth/login-or-register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ usn: usn.trim().toUpperCase(), password: password.trim() }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Authentication failed. Check your password.");
+  }
+  return data;
+}
+
+export async function submitUsnDispute(
+  usn: string,
+  newPassword: string,
+  selfieBase64: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/auth/dispute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      usn: usn.trim().toUpperCase(),
+      new_password: newPassword.trim(),
+      selfie_base64: selfieBase64,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to submit ownership dispute.");
+  }
+  return data;
+}
+
+export async function fetchAdminDisputes(adminKey: string, status?: string): Promise<DisputeRecord[]> {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  const res = await fetch(`${API_BASE}/api/admin/disputes${query}`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load USN disputes");
+  return res.json();
+}
+
+export async function reviewAdminDispute(
+  disputeId: number,
+  action: "approve" | "reject",
+  adminNotes?: string,
+  adminKey?: string
+): Promise<{ ok: boolean; message: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (adminKey) headers["X-Admin-Key"] = adminKey;
+
+  const res = await fetch(`${API_BASE}/api/admin/disputes/${disputeId}/review`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ action, admin_notes: adminNotes || "" }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to process dispute action");
+  return data;
+}
+
+export async function fetchAdminLoginLogs(adminKey: string): Promise<LoginLogsData> {
+  const res = await fetch(`${API_BASE}/api/admin/login-logs`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load login audit logs");
+  return res.json();
 }
