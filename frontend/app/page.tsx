@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
+import Link from "next/link";
 import BranchTabs from "../components/BranchTabs";
 import StudentCard from "../components/StudentCard";
 import Leaderboard from "../components/Leaderboard";
@@ -1113,12 +1114,21 @@ export default function Dashboard() {
           <span className="text-[10px]">Backlogs</span>
         </button>
 
+        <Link
+          href="/admin"
+          onClick={() => sfx.playMechanicalClick()}
+          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-slate-400 hover:text-white"
+        >
+          <span className="text-base leading-none">🛡️</span>
+          <span className="text-[10px]">Admin</span>
+        </Link>
+
         <button
           onClick={() => {
             sfx.playMechanicalClick();
             setIsInstallModalOpen(true);
           }}
-          className="flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl opacity-70 hover:opacity-100 transition-all text-cyan-400"
+          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-cyan-400"
         >
           <IconInstallApp className="w-5 h-5 stroke-[2.2]" />
           <span className="text-[10px]">Get App</span>

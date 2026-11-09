@@ -1,11 +1,17 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 5,
+  themeColor: "#08090a",
+};
 
 export const metadata: Metadata = {
   title: "VTU WhatNow - Semester Results & Branch Analytics",
   description: "Fast, elegant semester results explorer, branch rankings, and subject performance analytics for VTU engineering students.",
   manifest: "/manifest.json",
-  themeColor: "#08090a",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",

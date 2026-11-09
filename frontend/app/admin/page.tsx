@@ -542,52 +542,54 @@ export default function AdminPanel() {
   // -------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="max-w-md mx-auto my-16 p-6 sm:p-8 bg-white border border-slate-200/90 rounded-3xl shadow-sm space-y-6">
-        <div className="text-center space-y-2">
-          <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto text-lg font-bold shadow-sm">
-            🔒
-          </div>
-          <h2 className="text-xl font-black text-slate-900 tracking-tight">Admin Portal</h2>
-          <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-            Manage VTU scraping queues, configure examination semester links, and inspect student records.
-          </p>
-        </div>
-
-        <form onSubmit={handleLogin} className="space-y-4">
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-              Admin Password
-            </label>
-            <input
-              type="password"
-              value={passwordInput}
-              onChange={(e) => setPasswordInput(e.target.value)}
-              placeholder="Enter admin password (default: admin123)"
-              className="w-full p-3 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all font-mono"
-              autoFocus
-            />
-          </div>
-
-          {authError && (
-            <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl leading-relaxed">
-              {authError}
+      <div className="w-full max-w-md mx-auto my-6 sm:my-16 px-3 sm:px-0">
+        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm space-y-5">
+          <div className="text-center space-y-2">
+            <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto text-lg font-bold shadow-sm">
+              🔒
             </div>
-          )}
-
-          <button
-            type="submit"
-            disabled={isVerifying || !passwordInput.trim()}
-            className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm disabled:opacity-50"
-          >
-            {isVerifying ? "Verifying..." : "Sign In to Admin Portal"}
-          </button>
-
-          <div className="text-center pt-2">
-            <Link href="/" className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">
-              ← Return to Student Directory
-            </Link>
+            <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Admin Portal</h2>
+            <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+              Manage VTU scraping queues, configure examination semester links, and inspect student records.
+            </p>
           </div>
-        </form>
+
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                Admin Password
+              </label>
+              <input
+                type="password"
+                value={passwordInput}
+                onChange={(e) => setPasswordInput(e.target.value)}
+                placeholder="Enter admin password"
+                className="w-full p-3 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all font-mono"
+                autoFocus
+              />
+            </div>
+
+            {authError && (
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl leading-relaxed">
+                {authError}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              disabled={isVerifying || !passwordInput.trim()}
+              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm disabled:opacity-50"
+            >
+              {isVerifying ? "Verifying..." : "Sign In to Admin Portal"}
+            </button>
+
+            <div className="text-center pt-2">
+              <Link href="/" className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">
+                ← Return to Student Directory
+              </Link>
+            </div>
+          </form>
+        </div>
       </div>
     );
   }
@@ -596,62 +598,64 @@ export default function AdminPanel() {
   // Render: Main Admin Dashboard
   // -------------------------------------------------------------
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-12">
+    <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-16 min-h-screen">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-4">
-        <div>
+      <div className="border-b border-slate-200/80 pb-3 sm:pb-4 space-y-2.5">
+        <div className="flex items-center justify-between gap-2">
           <Link
             href="/"
             onClick={() => sfx.playClick()}
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:underline mb-1"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition-colors"
           >
-            ← Public Results Dashboard
+            ← Results Dashboard
           </Link>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">
-            Admin Scraper & Results Portal
-          </h1>
-          <p className="text-slate-500 text-xs mt-0.5">
-            Real-time VTU indexing, dynamic semester link management, and permanent cloud database records.
-          </p>
-        </div>
 
-        {/* Status Indicators & Sign Out */}
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
-          {/* Scraper Status Badge */}
-          <div className="flex items-center gap-2 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-xs">
-            <span
-              className={`w-2 h-2 rounded-full ${
-                status.is_running
-                  ? "bg-emerald-500 animate-ping"
-                  : status.status === "error"
-                  ? "bg-rose-500"
-                  : "bg-slate-300"
-              }`}
-            />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
-              {status.is_running ? "Scraper Active" : status.status === "error" ? "Scraper Error" : "Idle"}
-            </span>
-          </div>
-
-          {/* Browser Health Badge */}
-          <div
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold border shadow-xs ${
-              browserStatus?.status === "ready"
-                ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                : "bg-amber-50 border-amber-200 text-amber-800"
-            }`}
-          >
-            <span>{browserStatus?.status === "ready" ? "Browser Ready ✅" : "Browser Check ⚠️"}</span>
-          </div>
-
-          {/* Sign Out Button */}
           <button
             type="button"
             onClick={handleLogout}
-            className="text-xs font-semibold text-slate-600 hover:text-rose-600 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-rose-50 hover:border-rose-200 transition-colors shadow-xs"
+            className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors shadow-2xs"
           >
             Sign Out
           </button>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
+          <div>
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
+              Admin Control Room
+            </h1>
+            <p className="text-slate-500 text-[11px] sm:text-xs">
+              Scraper queues, semester links, USN claims verification, and student login audits.
+            </p>
+          </div>
+
+          {/* Status Badges */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-2xs">
+              <span
+                className={`w-2 h-2 rounded-full ${
+                  status.is_running
+                    ? "bg-emerald-500 animate-ping"
+                    : status.status === "error"
+                    ? "bg-rose-500"
+                    : "bg-slate-300"
+                }`}
+              />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">
+                {status.is_running ? "Scraping..." : status.status === "error" ? "Error" : "Idle"}
+              </span>
+            </div>
+
+            <div
+              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border shadow-2xs ${
+                browserStatus?.status === "ready"
+                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
+                  : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}
+            >
+              <span>{browserStatus?.status === "ready" ? "Browser Ready ✅" : "Browser ⚠️"}</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -674,21 +678,22 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-2xl border border-slate-200/80 overflow-x-auto scrollbar-none">
+      {/* Mobile-First Tab Navigation (Responsive 3-col grid on mobile, flex row on tablet/desktop) */}
+      <div className="grid grid-cols-3 sm:flex items-center gap-1 sm:gap-1.5 bg-slate-100 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
         <button
           type="button"
           onClick={() => {
             sfx.playClick();
             setActiveTab("scraper");
           }}
-          className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap ${
+          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "scraper"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
-          🚀 Scraper Engine
+          <span>🚀</span>
+          <span>Scraper</span>
         </button>
 
         <button
@@ -697,14 +702,15 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("semesters");
           }}
-          className={`flex-1 min-w-[130px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "semesters"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
-          <span>🔗 Semester Links</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+          <span>🔗</span>
+          <span>Semesters</span>
+          <span className="hidden sm:inline text-[9px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
             {semesterLinks.length}
           </span>
         </button>
@@ -715,14 +721,15 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("records");
           }}
-          className={`flex-1 min-w-[130px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "records"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
-          <span>👥 Students</span>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+          <span>👥</span>
+          <span>Students</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
             {allStudents.length}
           </span>
         </button>
@@ -734,15 +741,16 @@ export default function AdminPanel() {
             setActiveTab("disputes");
             loadDisputes();
           }}
-          className={`flex-1 min-w-[130px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "disputes"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
-          <span>🛡️ USN Claims</span>
+          <span>🛡️</span>
+          <span>Claims</span>
           {disputes.filter((d) => d.status === "pending").length > 0 && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-500 text-white font-mono animate-pulse font-bold">
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500 text-white font-mono animate-pulse font-bold">
               {disputes.filter((d) => d.status === "pending").length}
             </span>
           )}
@@ -755,15 +763,16 @@ export default function AdminPanel() {
             setActiveTab("logs");
             loadLoginLogs();
           }}
-          className={`flex-1 min-w-[120px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap flex items-center justify-center gap-1.5 ${
+          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "logs"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
-          <span>📋 Login Logs</span>
+          <span>📋</span>
+          <span>Logs</span>
           {loginLogsData && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+            <span className="hidden sm:inline text-[9px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
               {loginLogsData.total_logins}
             </span>
           )}
@@ -775,13 +784,14 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("system");
           }}
-          className={`flex-1 min-w-[110px] py-2.5 px-3 text-xs font-bold rounded-xl transition-all text-center whitespace-nowrap ${
+          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "system"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
-          ⚙️ Diagnostics
+          <span>⚙️</span>
+          <span>System</span>
         </button>
       </div>
 
@@ -936,14 +946,14 @@ export default function AdminPanel() {
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
                 Quick Branch Autofill (2025 Batch)
               </label>
-              <div className="flex flex-wrap gap-2">
+              <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5">
                 {QUICK_BRANCHES.map((b) => (
                   <button
                     key={b.code}
                     type="button"
                     onClick={() => handleQuickBranch(b.code)}
                     disabled={status.is_running}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 disabled:opacity-50 transition-colors"
+                    className="px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] sm:text-xs font-bold text-slate-700 disabled:opacity-50 transition-colors text-center"
                   >
                     {b.name} ({b.code})
                   </button>
@@ -964,7 +974,7 @@ export default function AdminPanel() {
                     onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
                     placeholder="e.g. 1RM25CD052"
                     disabled={status.is_running}
-                    className="w-full p-3 font-mono text-sm sm:text-base uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                    className="w-full p-3 font-mono text-base uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
                   />
                 </div>
               ) : (
@@ -979,7 +989,7 @@ export default function AdminPanel() {
                       onChange={(e) => setStartUsn(e.target.value.toUpperCase())}
                       placeholder="1RM25CS001"
                       disabled={status.is_running}
-                      className="w-full p-3 font-mono text-xs sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                      className="w-full p-3 font-mono text-base sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
                     />
                   </div>
                   <div>
@@ -992,7 +1002,7 @@ export default function AdminPanel() {
                       onChange={(e) => setEndUsn(e.target.value.toUpperCase())}
                       placeholder="1RM25CS060"
                       disabled={status.is_running}
-                      className="w-full p-3 font-mono text-xs sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                      className="w-full p-3 font-mono text-base sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
                     />
                   </div>
                 </div>
@@ -1222,9 +1232,9 @@ export default function AdminPanel() {
       {/* TAB 2: SEMESTER LINKS MANAGER                                 */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "semesters" && (
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Add Semester Link Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
             <div>
               <h2 className="text-base font-bold text-slate-900">Add New Semester Result Portal Link</h2>
               <p className="text-xs text-slate-500">
@@ -1249,7 +1259,7 @@ export default function AdminPanel() {
                     value={newLinkTitle}
                     onChange={(e) => setNewLinkTitle(e.target.value)}
                     placeholder="e.g. Sem 1 & 2 (2022 Scheme - Jan/Feb 2026)"
-                    className="w-full p-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
+                    className="w-full p-2.5 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900"
                     required
                   />
                 </div>
@@ -1261,7 +1271,7 @@ export default function AdminPanel() {
                   <select
                     value={newLinkSem}
                     onChange={(e) => setNewLinkSem(e.target.value)}
-                    className="w-full p-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
+                    className="w-full p-2.5 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 bg-white"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
                       <option key={num} value={String(num)}>
@@ -1281,7 +1291,7 @@ export default function AdminPanel() {
                   value={newLinkUrl}
                   onChange={(e) => setNewLinkUrl(e.target.value)}
                   placeholder="https://results.vtu.ac.in/MJ26cbcs/index.php"
-                  className="w-full p-2.5 text-xs sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
+                  className="w-full p-2.5 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
                   required
                 />
               </div>
@@ -1290,7 +1300,7 @@ export default function AdminPanel() {
                 <button
                   type="submit"
                   disabled={addingLink || !newLinkTitle.trim() || !newLinkUrl.trim()}
-                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 text-center"
                 >
                   {addingLink ? "Saving..." : "Add Semester Portal Link"}
                 </button>
@@ -1299,7 +1309,7 @@ export default function AdminPanel() {
           </div>
 
           {/* List of Configured Semester Links */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-4">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="font-bold text-slate-900 text-base">
@@ -1320,10 +1330,10 @@ export default function AdminPanel() {
                 {semesterLinks.map((link) => (
                   <div
                     key={link.id}
-                    className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors"
+                    className="p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/50 transition-colors"
                   >
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-slate-900 text-xs sm:text-sm">{link.title}</span>
                         <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">
                           Sem {link.semester}
@@ -1344,7 +1354,7 @@ export default function AdminPanel() {
                       </a>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
                       <button
                         type="button"
                         onClick={() => {
@@ -1379,7 +1389,7 @@ export default function AdminPanel() {
       {/* TAB 3: STUDENT RECORDS MANAGEMENT                             */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "records" && (
-        <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-4">
+        <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-slate-900 text-base">
@@ -1394,9 +1404,9 @@ export default function AdminPanel() {
                 value={studentSearch}
                 onChange={(e) => setStudentSearch(e.target.value)}
                 placeholder="Search USN, name, or branch..."
-                className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900"
+                className="w-full pl-8 pr-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 text-base sm:text-xs focus:outline-none focus:ring-2 focus:ring-slate-900"
               />
-              <span className="absolute left-2.5 top-2 text-slate-400">
+              <span className="absolute left-2.5 top-2.5 text-slate-400">
                 <IconSearch className="w-3.5 h-3.5" />
               </span>
             </div>
@@ -1488,8 +1498,8 @@ export default function AdminPanel() {
       {/* TAB: USN OWNERSHIP CLAIMS & DISPUTES                          */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "disputes" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-slate-900">🛡️ USN Ownership Claims &amp; Disputes</h2>
@@ -1497,7 +1507,7 @@ export default function AdminPanel() {
                   Review selfie verifications submitted by genuine students claiming their USN ownership.
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
                   {["all", "pending", "approved", "rejected"].map((f) => (
                     <button
@@ -1507,7 +1517,7 @@ export default function AdminPanel() {
                         sfx.playClick();
                         setDisputeFilter(f);
                       }}
-                      className={`px-2.5 py-1 rounded-lg font-bold capitalize transition-colors ${
+                      className={`px-2 sm:px-2.5 py-1 rounded-lg font-bold capitalize transition-colors text-[11px] sm:text-xs ${
                         disputeFilter === f ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
                       }`}
                     >
@@ -1550,32 +1560,32 @@ export default function AdminPanel() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
                 {disputes.map((d) => (
                   <div
                     key={d.id}
-                    className="p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
+                    className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
                   >
-                    <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono text-xs font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100">
                             {d.usn}
                           </span>
-                          <span className="text-[11px] font-bold text-slate-600 uppercase px-1.5 py-0.2 rounded bg-slate-100">
+                          <span className="text-[10px] font-bold text-slate-600 uppercase px-1.5 py-0.2 rounded bg-slate-100">
                             {d.branch}
                           </span>
                         </div>
                         <h3 className="font-bold text-sm text-slate-900 mt-1">{d.name}</h3>
                         {d.created_at && (
-                          <p className="text-[10px] text-slate-400">
+                          <p className="text-[10px] text-slate-400 mt-0.5">
                             Submitted: {new Date(d.created_at).toLocaleString()}
                           </p>
                         )}
                       </div>
 
                       <span
-                        className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
+                        className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
                           d.status === "pending"
                             ? "bg-amber-100 text-amber-800 border border-amber-200"
                             : d.status === "approved"
@@ -1604,11 +1614,15 @@ export default function AdminPanel() {
                           Zoom
                         </span>
                       </div>
-                      <div className="text-xs">
+                      <div className="text-xs min-w-0">
                         <p className="font-semibold text-slate-700">Verification Selfie</p>
-                        <p className="text-[11px] text-slate-400">
-                          Click thumbnail to inspect full photograph
-                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSelfieZoom(d.selfie_base64)}
+                          className="text-[11px] text-blue-600 hover:underline font-medium block mt-0.5"
+                        >
+                          🔍 Tap to inspect full photo
+                        </button>
                       </div>
                     </div>
 
@@ -1619,7 +1633,7 @@ export default function AdminPanel() {
                           type="button"
                           disabled={processingDisputeId === d.id}
                           onClick={() => handleReviewDispute(d.id, "approve")}
-                          className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors disabled:opacity-50"
+                          className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors disabled:opacity-50 text-center"
                         >
                           {processingDisputeId === d.id ? "Processing..." : "✓ Approve & Transfer"}
                         </button>
@@ -1630,7 +1644,7 @@ export default function AdminPanel() {
                             const notes = prompt("Enter rejection reason (optional):") || undefined;
                             handleReviewDispute(d.id, "reject", notes);
                           }}
-                          className="py-2 px-3 text-xs font-bold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50"
+                          className="py-2.5 px-3 text-xs font-bold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 text-center"
                         >
                           ✕ Reject
                         </button>
@@ -1657,8 +1671,8 @@ export default function AdminPanel() {
       {/* TAB: LOGIN AUDIT LOGS                                         */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "logs" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-6">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-slate-900">📋 Student Login Audit Logs</h2>
@@ -1684,38 +1698,38 @@ export default function AdminPanel() {
               <div className="text-center py-12 text-xs text-slate-400">No login logs available.</div>
             ) : (
               <>
-                {/* Metrics Cards */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Total Portal Logins
+                {/* Metrics Cards: 3 columns on all screen sizes */}
+                <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
+                      Total Logins
                     </span>
-                    <p className="text-2xl font-black font-mono text-slate-900 mt-1">
+                    <p className="text-lg sm:text-2xl font-black font-mono text-slate-900 mt-0.5 sm:mt-1">
                       {loginLogsData.total_logins}
                     </p>
                   </div>
-                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Unique Students Logged In
+                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
+                      Unique Students
                     </span>
-                    <p className="text-2xl font-black font-mono text-emerald-600 mt-1">
+                    <p className="text-lg sm:text-2xl font-black font-mono text-emerald-600 mt-0.5 sm:mt-1">
                       {loginLogsData.unique_students}
                     </p>
                   </div>
-                  <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                      Most Active Student
+                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
+                      Top User
                     </span>
-                    <p className="text-sm font-bold text-slate-900 mt-1 truncate">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 mt-1 truncate">
                       {loginLogsData.frequency[0]
-                        ? `${loginLogsData.frequency[0].name} (${loginLogsData.frequency[0].login_count}x)`
+                        ? `${loginLogsData.frequency[0].name.split(" ")[0]} (${loginLogsData.frequency[0].login_count}x)`
                         : "None"}
                     </p>
                   </div>
                 </div>
 
                 {/* Most Active Frequency Table */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
                     Student Login Frequency
                   </h3>
@@ -1726,20 +1740,20 @@ export default function AdminPanel() {
                       loginLogsData.frequency.map((item) => (
                         <div
                           key={item.usn}
-                          className="p-3 flex items-center justify-between text-xs hover:bg-slate-50/50"
+                          className="p-2.5 sm:p-3 flex items-center justify-between text-xs hover:bg-slate-50/50"
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-slate-900">{item.usn}</span>
-                            <span className="text-slate-600">• {item.name}</span>
-                            <span className="text-[10px] text-slate-400 uppercase">({item.branch})</span>
+                          <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
+                            <span className="font-mono font-bold text-slate-900 shrink-0">{item.usn}</span>
+                            <span className="text-slate-600 truncate">• {item.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase shrink-0">({item.branch})</span>
                           </div>
-                          <div className="flex items-center gap-3">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold">
-                              {item.login_count} logins
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold shrink-0">
+                              {item.login_count}x
                             </span>
                             {item.last_login && (
                               <span className="text-[10px] text-slate-400 hidden sm:inline">
-                                Last: {new Date(item.last_login).toLocaleString()}
+                                {new Date(item.last_login).toLocaleDateString()}
                               </span>
                             )}
                           </div>
@@ -1750,7 +1764,7 @@ export default function AdminPanel() {
                 </div>
 
                 {/* Recent Login Audit Stream */}
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
                     Recent Login Audit Stream
                   </h3>
@@ -1761,22 +1775,22 @@ export default function AdminPanel() {
                       loginLogsData.recent_logs.map((log) => (
                         <div
                           key={log.id}
-                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs hover:bg-slate-50/50"
+                          className="p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs hover:bg-slate-50/50"
                         >
-                          <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                            <span className="font-mono font-bold text-slate-900">{log.usn}</span>
-                            <span className="text-slate-700">{log.name}</span>
-                            <span className="text-[10px] text-slate-400 uppercase">({log.branch})</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                            <span className="font-mono font-bold text-slate-900 shrink-0">{log.usn}</span>
+                            <span className="text-slate-700 truncate">{log.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase shrink-0">({log.branch})</span>
                           </div>
-                          <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-slate-500">
+                          <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px] text-slate-500 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                             {log.ip_address && (
                               <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
                                 IP: {log.ip_address}
                               </span>
                             )}
                             <span className="text-slate-400 font-mono text-[10px]">
-                              {new Date(log.login_at).toLocaleString()}
+                              {new Date(log.login_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.login_at).toLocaleDateString()}
                             </span>
                           </div>
                         </div>
@@ -1794,10 +1808,10 @@ export default function AdminPanel() {
       {/* TAB 4: SYSTEM & PLAYWRIGHT DIAGNOSTICS                        */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "system" && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-5">
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
             <div>
-              <h2 className="text-base font-bold text-slate-900">Host & Browser Engine Diagnostics</h2>
+              <h2 className="text-base font-bold text-slate-900">Host &amp; Browser Engine Diagnostics</h2>
               <p className="text-xs text-slate-500">
                 Verify Playwright Chromium installation status to prevent scraper launch errors.
               </p>
@@ -1811,7 +1825,7 @@ export default function AdminPanel() {
 
             {/* Status Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Backend API Service
                 </span>
@@ -1819,13 +1833,13 @@ export default function AdminPanel() {
                   <span
                     className={`w-2 h-2 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-rose-500"}`}
                   />
-                  <span className="text-sm font-bold text-slate-900">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900">
                     {backendOnline ? "Online (Healthy)" : "Offline"}
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Playwright Chromium
                 </span>
@@ -1835,17 +1849,17 @@ export default function AdminPanel() {
                       browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"
                     }`}
                   />
-                  <span className="text-sm font-bold text-slate-900">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900">
                     {browserStatus?.status === "ready" ? "Ready & Installed" : "Not Detected"}
                   </span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Operating Platform
                 </span>
-                <div className="text-sm font-bold text-slate-900 mt-1 capitalize font-mono">
+                <div className="text-xs sm:text-sm font-bold text-slate-900 mt-1 capitalize font-mono">
                   {browserStatus?.platform || "Linux / Windows"}
                 </div>
               </div>
@@ -1857,7 +1871,7 @@ export default function AdminPanel() {
                 Detected Browser Cache Paths
               </label>
               {browserStatus?.detected_paths && browserStatus.detected_paths.length > 0 ? (
-                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-xs space-y-1">
+                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-xs space-y-1 overflow-x-auto">
                   {browserStatus.detected_paths.map((p, i) => (
                     <div key={i} className="truncate text-emerald-400">
                       ✓ {p}
@@ -1872,7 +1886,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Prewarm / Check Browser Button */}
-            <div className="pt-2 flex items-center justify-between border-t border-slate-100">
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
               <span className="text-xs text-slate-500">
                 Playwright self-healing auto-installs Chromium if missing during scrape.
               </span>
@@ -1880,7 +1894,7 @@ export default function AdminPanel() {
                 type="button"
                 onClick={handleVerifyBrowser}
                 disabled={verifyingBrowser}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 text-center"
               >
                 {verifyingBrowser ? "Verifying Chromium..." : "Verify / Prewarm Browser"}
               </button>

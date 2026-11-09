@@ -46,15 +46,15 @@ export default function Navbar({
           : "bg-white/90 border-slate-200/80 text-slate-900 shadow-sm"
       }`}
     >
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-14 sm:h-16 flex items-center justify-between gap-2 sm:gap-3">
         {/* Brand Logo */}
         <Link
           href="/"
           onClick={() => sfx.playMechanicalClick()}
-          className="flex items-center gap-2.5 group"
+          className="flex items-center gap-2 group shrink-0"
         >
           <div
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105 overflow-hidden relative ${
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105 overflow-hidden relative shrink-0 ${
               isObsidian
                 ? "bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 shadow-cyan-500/20"
                 : "bg-blue-600 text-white"
@@ -83,12 +83,12 @@ export default function Navbar({
             </svg>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-base sm:text-lg tracking-tight">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-extrabold text-sm sm:text-lg tracking-tight">
                 VTU <span className={isObsidian ? "text-cyan-400" : "text-blue-600"}>WhatNow</span>
               </span>
               <span
-                className={`hidden sm:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                className={`hidden md:inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                   isObsidian
                     ? "bg-slate-900 text-slate-300 border-slate-800"
                     : "bg-slate-100 text-slate-600 border-slate-200"
@@ -164,16 +164,16 @@ export default function Navbar({
           </nav>
         )}
 
-        {/* Right Actions: Download App to Homescreen + Theme Toggle + SFX Mute + Admin Link */}
-        <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
-          {/* Download App to Homescreen for Mobile */}
+        {/* Right Actions: Mobile-first compact cluster */}
+        <div className="flex items-center gap-1 sm:gap-2 text-xs shrink-0">
+          {/* Download App to Homescreen (hidden on small mobile because bottom bar has it) */}
           <button
             onClick={() => {
               sfx.playMechanicalClick();
               setIsInstallModalOpen(true);
             }}
             title="Download app into homescreen for mobile"
-            className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
+            className={`p-2 rounded-xl border transition-all hidden sm:flex items-center gap-1.5 ${
               isObsidian
                 ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
                 : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
@@ -183,11 +183,11 @@ export default function Navbar({
             <span className="hidden sm:inline text-[11px] font-medium">Get App</span>
           </button>
 
-          {/* SFX Audio Switch */}
+          {/* SFX Audio Switch (desktop only to preserve mobile header width) */}
           <button
             onClick={handleToggleMute}
             title={muted ? "Unmute Audio" : "Mute Audio"}
-            className={`p-2 rounded-xl border transition-all flex items-center gap-1 ${
+            className={`p-2 rounded-xl border transition-all hidden md:flex items-center gap-1 ${
               isObsidian
                 ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white"
                 : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
@@ -207,14 +207,14 @@ export default function Navbar({
                 onToggleTheme();
               }}
               title="Toggle Light / Dark theme"
-              className={`px-2.5 py-2 rounded-xl border transition-all flex items-center gap-1.5 ${
+              className={`p-1.5 sm:px-2.5 sm:py-2 rounded-xl border transition-all flex items-center gap-1 shrink-0 ${
                 isObsidian
                   ? "bg-slate-900 border-slate-800 text-slate-200 hover:text-white"
                   : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
               }`}
             >
               <span>{isObsidian ? "🌙" : "☀️"}</span>
-              <span className="hidden sm:inline text-[11px] font-medium">
+              <span className="hidden md:inline text-[11px] font-medium">
                 {isObsidian ? "Dark" : "Light"}
               </span>
             </button>
@@ -222,21 +222,21 @@ export default function Navbar({
 
           {/* Student Auth / Profile Pill */}
           {studentSession ? (
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={() => {
                   sfx.playMechanicalClick();
                   onOpenAuth?.();
                 }}
                 title={`Signed in as ${studentSession.name} (${studentSession.usn})`}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all ${
+                className={`flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold transition-all shrink-0 ${
                   isObsidian
                     ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40"
                     : "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
                 }`}
               >
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                <span className="font-mono text-[11px] font-bold">{studentSession.usn}</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="font-mono font-bold max-w-[85px] sm:max-w-none truncate">{studentSession.usn}</span>
               </button>
               <button
                 onClick={() => {
@@ -244,7 +244,7 @@ export default function Navbar({
                   onSignOut?.();
                 }}
                 title="Sign Out"
-                className={`p-1.5 rounded-xl border text-[11px] transition-all ${
+                className={`p-1.5 rounded-xl border text-[10px] sm:text-[11px] transition-all shrink-0 ${
                   isObsidian
                     ? "bg-slate-900 border-slate-800 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30"
                     : "bg-slate-100 border-slate-200 text-zinc-600 hover:text-rose-600 hover:border-rose-300"
@@ -259,24 +259,25 @@ export default function Navbar({
                 sfx.playMechanicalClick();
                 onOpenAuth?.();
               }}
-              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-all"
+              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-all shrink-0"
             >
               <span>🔑</span>
               <span className="text-[11px] sm:text-xs">Login</span>
             </button>
           )}
 
-          {/* Admin Room Link */}
+          {/* Admin Room Link with clean icon and proper margins */}
           <Link
             href="/admin"
             onClick={() => sfx.playMechanicalClick()}
-            className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl transition-all shadow-sm ${
+            className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl transition-all shadow-sm shrink-0 ${
               isObsidian
                 ? "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
                 : "bg-slate-900 hover:bg-slate-800 text-white"
             }`}
           >
-            <span>Admin</span>
+            <span>🛡️</span>
+            <span className="hidden sm:inline">Admin</span>
           </Link>
         </div>
       </div>
