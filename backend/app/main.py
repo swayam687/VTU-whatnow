@@ -18,7 +18,7 @@ from sqlalchemy import text, desc
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute
+from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -39,6 +39,9 @@ from .schemas import (
     DisputeOut,
     DisputeReviewRequest,
     LoginLogOut,
+    CompareLogCreate,
+    CompareLogOut,
+    StudentSessionVerifyResponse,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -80,20 +83,49 @@ def verify_password(password: str, stored_hash: Optional[str]) -> bool:
 # In-memory session store (token -> usn)
 AUTH_SESSIONS: dict[str, str] = {}
 
-def create_session(usn: str) -> str:
-    token = f"{usn}:{secrets.token_hex(20)}"
-    AUTH_SESSIONS[token] = usn
+def compute_pw_sig(usn: str, password_hash: str) -> str:
+    """Computes a token signature tied directly to the current password_hash."""
+    salt = settings.ADMIN_PASSWORD
+    return hashlib.sha256(f"{usn.upper()}:{password_hash}:{salt}".encode("utf-8")).hexdigest()[:16]
+
+def create_session(usn: str, password_hash: str) -> str:
+    clean_usn = usn.strip().upper()
+    pw_sig = compute_pw_sig(clean_usn, password_hash)
+    token = f"{clean_usn}:{pw_sig}:{secrets.token_hex(16)}"
+    AUTH_SESSIONS[token] = clean_usn
     return token
 
-def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token")) -> Optional[str]:
-    if not x_student_token:
+def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
+    """
+    Validates token format and verifies that its signature matches the student's CURRENT
+    password_hash in the database. If a genuine owner transfers ownership via dispute approval,
+    the old password_hash changes, instantly invalidating any previously issued tokens.
+    """
+    if not token or ":" not in token:
         return None
-    if x_student_token in AUTH_SESSIONS:
-        return AUTH_SESSIONS[x_student_token]
-    if ":" in x_student_token:
-        usn_part = x_student_token.split(":", 1)[0]
-        return usn_part.upper()
-    return None
+    parts = token.split(":")
+    if len(parts) < 3:
+        return None
+    usn = parts[0].strip().upper()
+    token_sig = parts[1]
+
+    # Verify student exists and has claimed password
+    student = db.query(Student).filter(Student.usn == usn).first()
+    if not student or not student.password_hash or not student.is_claimed:
+        AUTH_SESSIONS.pop(token, None)
+        return None
+
+    expected_sig = compute_pw_sig(usn, student.password_hash)
+    if token_sig != expected_sig:
+        # Password was changed or ownership transferred! Old user session is REVOKED.
+        AUTH_SESSIONS.pop(token, None)
+        return None
+
+    AUTH_SESSIONS[token] = usn
+    return usn
+
+def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"), db: Session = Depends(get_db)) -> Optional[str]:
+    return verify_session_token(x_student_token, db)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -230,7 +262,7 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
         db.add(log_entry)
         db.commit()
 
-        token = create_session(student.usn)
+        token = create_session(student.usn, student.password_hash)
         return AuthResponse(
             ok=True,
             status="registered",
@@ -262,7 +294,7 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
     db.add(log_entry)
     db.commit()
 
-    token = create_session(student.usn)
+    token = create_session(student.usn, student.password_hash)
     return AuthResponse(
         ok=True,
         status="authenticated",
@@ -271,6 +303,27 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
         name=student.name,
         branch=student.branch,
         login_count=student.login_count,
+    )
+
+
+@app.get("/api/auth/verify-session", response_model=StudentSessionVerifyResponse)
+def verify_student_session(
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    usn = verify_session_token(x_student_token, db)
+    if not usn:
+        raise HTTPException(
+            status_code=401,
+            detail="Session has expired or USN ownership was updated. Please log in again."
+        )
+    student = db.query(Student).filter(Student.usn == usn).first()
+    return StudentSessionVerifyResponse(
+        valid=True,
+        usn=student.usn,
+        name=student.name,
+        branch=student.branch,
+        message="Active"
     )
 
 
@@ -324,11 +377,18 @@ def review_dispute(dispute_id: int, req: DisputeReviewRequest, db: Session = Dep
         if student:
             student.password_hash = dispute.new_password_hash
             student.is_claimed = True
+            # Invalidate all active memory sessions for this USN to immediately kick out old user
+            tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u == student.usn]
+            for t in tokens_to_evict:
+                AUTH_SESSIONS.pop(t, None)
         dispute.status = "approved"
         dispute.reviewed_at = datetime.utcnow()
         dispute.admin_notes = req.admin_notes or "Approved by admin after selfie verification."
         db.commit()
-        return {"ok": True, "message": f"Ownership of {dispute.usn} transferred to real student!"}
+        return {
+            "ok": True,
+            "message": f"Ownership of {dispute.usn} transferred to real student! Previous imposter session was immediately kicked out."
+        }
     elif req.action == "reject":
         dispute.status = "rejected"
         dispute.reviewed_at = datetime.utcnow()
@@ -581,8 +641,13 @@ def get_students(
     response: Response = None,
     db: Session = Depends(get_db)
 ):
-    current_usn = get_current_student_usn(x_student_token)
+    current_usn = verify_session_token(x_student_token, db)
     is_authenticated = bool(current_usn)
+
+    # If client supplied a student token that is no longer valid (e.g. ownership dispute approved)
+    if x_student_token and not is_authenticated and response:
+        response.headers["X-Token-Revoked"] = "true"
+        response.headers["X-Is-Authenticated"] = "false"
 
     query = db.query(Student)
 
@@ -617,6 +682,113 @@ def get_students(
         response.headers["X-Is-Authenticated"] = "true"
     students = query.limit(limit).all()
     return students
+
+
+# -------------------------------------------------------------
+# Comparison Logging & Audit Endpoints (Admin Only Visibility)
+# -------------------------------------------------------------
+
+@app.post("/api/compare/log")
+def log_student_comparison(
+    req: CompareLogCreate,
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    client_ip = request.client.host if request.client else "unknown"
+    viewer_usn = verify_session_token(x_student_token, db) or req.viewer_usn
+    viewer_name = req.viewer_name or ""
+    if viewer_usn and not viewer_name:
+        viewer_student = db.query(Student).filter(Student.usn == viewer_usn.upper()).first()
+        if viewer_student:
+            viewer_name = viewer_student.name
+
+    entry = ComparisonLog(
+        viewer_usn=viewer_usn.upper() if viewer_usn else None,
+        viewer_name=viewer_name,
+        student1_usn=req.student1_usn.upper(),
+        student1_name=req.student1_name or "",
+        student1_branch=req.student1_branch or "",
+        student2_usn=req.student2_usn.upper(),
+        student2_name=req.student2_name or "",
+        student2_branch=req.student2_branch or "",
+        compared_at=datetime.utcnow(),
+        ip_address=client_ip,
+    )
+    db.add(entry)
+    db.commit()
+    return {"ok": True, "message": "Comparison event recorded"}
+
+
+@app.get("/api/admin/compare-logs", dependencies=[Depends(require_admin)])
+def get_admin_compare_logs(db: Session = Depends(get_db)):
+    total_comparisons = db.query(ComparisonLog).count()
+    recent = db.query(ComparisonLog).order_by(desc(ComparisonLog.compared_at)).limit(100).all()
+
+    # Top compared against students
+    top_targets = (
+        db.query(
+            ComparisonLog.student2_usn,
+            ComparisonLog.student2_name,
+            ComparisonLog.student2_branch,
+            func.count(ComparisonLog.id).label("count")
+        )
+        .group_by(ComparisonLog.student2_usn, ComparisonLog.student2_name, ComparisonLog.student2_branch)
+        .order_by(desc("count"))
+        .limit(15)
+        .all()
+    )
+
+    # Active viewers who initiated comparisons
+    active_viewers = (
+        db.query(
+            ComparisonLog.viewer_usn,
+            ComparisonLog.viewer_name,
+            func.count(ComparisonLog.id).label("count")
+        )
+        .filter(ComparisonLog.viewer_usn.isnot(None))
+        .group_by(ComparisonLog.viewer_usn, ComparisonLog.viewer_name)
+        .order_by(desc("count"))
+        .limit(15)
+        .all()
+    )
+
+    return {
+        "total_comparisons": total_comparisons,
+        "recent_logs": [
+            {
+                "id": c.id,
+                "viewer_usn": c.viewer_usn,
+                "viewer_name": c.viewer_name,
+                "student1_usn": c.student1_usn,
+                "student1_name": c.student1_name,
+                "student1_branch": c.student1_branch,
+                "student2_usn": c.student2_usn,
+                "student2_name": c.student2_name,
+                "student2_branch": c.student2_branch,
+                "compared_at": c.compared_at.isoformat() if c.compared_at else None,
+                "ip_address": c.ip_address,
+            }
+            for c in recent
+        ],
+        "top_targets": [
+            {
+                "usn": row[0],
+                "name": row[1],
+                "branch": row[2],
+                "count": row[3],
+            }
+            for row in top_targets
+        ],
+        "active_viewers": [
+            {
+                "usn": row[0],
+                "name": row[1],
+                "count": row[2],
+            }
+            for row in active_viewers
+        ],
+    }
 
 
 @app.get("/api/students/{usn}", response_model=StudentOut)

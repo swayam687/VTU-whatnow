@@ -173,4 +173,38 @@ class StudentDirectoryResponse(BaseModel):
     my_rank_overall: Optional[int] = None
     my_rank_branch: Optional[int] = None
 
+class CompareLogCreate(BaseModel):
+    viewer_usn: Optional[str] = None
+    viewer_name: Optional[str] = ""
+    student1_usn: str
+    student1_name: Optional[str] = ""
+    student1_branch: Optional[str] = ""
+    student2_usn: str
+    student2_name: Optional[str] = ""
+    student2_branch: Optional[str] = ""
+
+class CompareLogOut(BaseModel):
+    id: int
+    viewer_usn: Optional[str] = None
+    viewer_name: Optional[str] = ""
+    student1_usn: str
+    student1_name: str
+    student1_branch: str
+    student2_usn: str
+    student2_name: str
+    student2_branch: str
+    compared_at: Optional[datetime] = None
+    ip_address: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
+
+class StudentSessionVerifyResponse(BaseModel):
+    valid: bool
+    usn: Optional[str] = None
+    name: Optional[str] = None
+    branch: Optional[str] = None
+    message: Optional[str] = ""
+
+
 

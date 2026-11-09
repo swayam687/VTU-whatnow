@@ -133,6 +133,16 @@ export async function fetchStudents(params?: {
       headers,
       cache: "no-store",
     });
+
+    if (res.headers.get("X-Token-Revoked") === "true") {
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem("vtu_student_token");
+        sessionStorage.removeItem("vtu_student_session");
+        sessionStorage.removeItem("vtu_student_usn");
+        window.dispatchEvent(new CustomEvent("vtu:session-revoked"));
+      }
+    }
+
     if (!res.ok) return [];
     return await res.json();
   } catch (err) {
@@ -474,4 +484,84 @@ export async function fetchAdminLoginLogs(adminKey: string): Promise<LoginLogsDa
   });
   if (!res.ok) throw new Error("Failed to load login audit logs");
   return res.json();
+}
+
+// -------------------------------------------------------------
+// Comparison Tracking & Admin Audit (Admin Only Visibility)
+// -------------------------------------------------------------
+
+export interface ComparisonLogEntry {
+  id: number;
+  viewer_usn?: string;
+  viewer_name?: string;
+  student1_usn: string;
+  student1_name: string;
+  student1_branch: string;
+  student2_usn: string;
+  student2_name: string;
+  student2_branch: string;
+  compared_at?: string;
+  ip_address?: string;
+}
+
+export interface ComparisonLogsData {
+  total_comparisons: number;
+  recent_logs: ComparisonLogEntry[];
+  top_targets: { usn: string; name: string; branch: string; count: number }[];
+  active_viewers: { usn: string; name: string; count: number }[];
+}
+
+export async function logStudentComparison(payload: {
+  viewer_usn?: string;
+  viewer_name?: string;
+  student1_usn: string;
+  student1_name?: string;
+  student1_branch?: string;
+  student2_usn: string;
+  student2_name?: string;
+  student2_branch?: string;
+}): Promise<void> {
+  try {
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    const token = typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null;
+    if (token) headers["X-Student-Token"] = token;
+
+    await fetch(`${API_BASE}/api/compare/log`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // Non-blocking telemetry
+  }
+}
+
+export async function fetchAdminComparisonLogs(adminKey: string): Promise<ComparisonLogsData> {
+  const res = await fetch(`${API_BASE}/api/admin/compare-logs`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load comparison logs");
+  return res.json();
+}
+
+export async function verifyStudentSession(token?: string): Promise<{
+  valid: boolean;
+  usn?: string;
+  name?: string;
+  branch?: string;
+}> {
+  const activeToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  if (!activeToken) return { valid: false };
+
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/verify-session`, {
+      headers: { "X-Student-Token": activeToken },
+      cache: "no-store",
+    });
+    if (!res.ok) return { valid: false };
+    return await res.json();
+  } catch {
+    return { valid: false };
+  }
 }

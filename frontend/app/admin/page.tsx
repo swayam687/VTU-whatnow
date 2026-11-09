@@ -26,6 +26,8 @@ import {
   fetchAdminDisputes,
   reviewAdminDispute,
   fetchAdminLoginLogs,
+  fetchAdminComparisonLogs,
+  ComparisonLogsData,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -71,9 +73,12 @@ export default function AdminPanel() {
   const [disputeActionMsg, setDisputeActionMsg] = useState<string>("");
   const [processingDisputeId, setProcessingDisputeId] = useState<number | null>(null);
 
-  // Login Logs state
+  // Login Logs & Comparison state
   const [loginLogsData, setLoginLogsData] = useState<LoginLogsData | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
+  const [logsSubTab, setLogsSubTab] = useState<"logins" | "comparisons">("logins");
+  const [comparisonLogsData, setComparisonLogsData] = useState<ComparisonLogsData | null>(null);
+  const [compareLogsLoading, setCompareLogsLoading] = useState(false);
 
   // Scraper configuration
   const [mode, setMode] = useState<"single" | "range">("single");
@@ -213,6 +218,20 @@ export default function AdminPanel() {
     }
   };
 
+  // Load Comparison Tracker Logs
+  const loadComparisonLogs = async () => {
+    if (!adminKey) return;
+    setCompareLogsLoading(true);
+    try {
+      const data = await fetchAdminComparisonLogs(adminKey);
+      setComparisonLogsData(data);
+    } catch (err) {
+      console.error("Failed to load comparison logs", err);
+    } finally {
+      setCompareLogsLoading(false);
+    }
+  };
+
   const handleReviewDispute = async (id: number, action: "approve" | "reject", notes?: string) => {
     if (!adminKey) return;
     setProcessingDisputeId(id);
@@ -239,9 +258,10 @@ export default function AdminPanel() {
         loadDisputes();
       } else if (activeTab === "logs") {
         loadLoginLogs();
+        loadComparisonLogs();
       }
     }
-  }, [isAuthenticated, activeTab, disputeFilter]);
+  }, [isAuthenticated, activeTab, disputeFilter, logsSubTab]);
 
   // Status Polling
   useEffect(() => {
@@ -1668,31 +1688,191 @@ export default function AdminPanel() {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* TAB: LOGIN AUDIT LOGS                                         */}
+      {/* TAB: LOGIN & COMPARISON AUDIT LOGS                            */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "logs" && (
         <div className="space-y-4 sm:space-y-6">
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">📋 Student Login Audit Logs</h2>
+                <h2 className="text-base font-bold text-slate-900">
+                  {logsSubTab === "logins" ? "📋 Student Login Audit Logs" : "🔍 Student Comparison Tracker"}
+                </h2>
                 <p className="text-xs text-slate-500">
-                  Real-time record of students who logged in, how many times, with timestamps and network IPs.
+                  {logsSubTab === "logins"
+                    ? "Real-time record of students who logged in, how many times, with timestamps and network IPs."
+                    : "Real-time record of which students compared themselves or their peers to whom."}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => {
                   sfx.playClick();
-                  loadLoginLogs();
+                  if (logsSubTab === "logins") loadLoginLogs();
+                  else loadComparisonLogs();
                 }}
                 className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors self-start sm:self-auto"
               >
-                ↻ Refresh Logs
+                ↻ Refresh
               </button>
             </div>
 
-            {logsLoading ? (
+            {/* Sub-tab switcher: Logins vs Comparisons */}
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setLogsSubTab("logins");
+                  loadLoginLogs();
+                }}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                  logsSubTab === "logins"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                📋 Student Logins ({loginLogsData?.total_logins || 0})
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setLogsSubTab("comparisons");
+                  loadComparisonLogs();
+                }}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                  logsSubTab === "comparisons"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                <span>🔍 Who Compared Whom</span>
+                {comparisonLogsData && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-700 text-white font-mono">
+                    {comparisonLogsData.total_comparisons}
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {logsSubTab === "comparisons" ? (
+              compareLogsLoading ? (
+                <div className="text-center py-12 text-xs text-slate-400">Loading student comparison tracker...</div>
+              ) : !comparisonLogsData || comparisonLogsData.recent_logs.length === 0 ? (
+                <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
+                  <span className="text-2xl">🔍</span>
+                  <p className="font-bold text-xs text-slate-700 mt-2">No comparisons recorded yet</p>
+                  <p className="text-[11px] text-slate-400">
+                    Whenever students compare themselves or peers, the exact who-compared-whom record appears here for the admin.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Metrics Cards */}
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
+                        Comparisons
+                      </span>
+                      <p className="text-lg sm:text-2xl font-black font-mono text-slate-900 mt-0.5 sm:mt-1">
+                        {comparisonLogsData.total_comparisons}
+                      </p>
+                    </div>
+                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
+                        Most Compared Peer
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-emerald-600 mt-1 truncate">
+                        {comparisonLogsData.top_targets[0]
+                          ? `${comparisonLogsData.top_targets[0].name.split(" ")[0]} (${comparisonLogsData.top_targets[0].count}x)`
+                          : "None"}
+                      </p>
+                    </div>
+                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
+                        Active Viewer
+                      </span>
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 mt-1 truncate">
+                        {comparisonLogsData.active_viewers[0]
+                          ? `${comparisonLogsData.active_viewers[0].name || comparisonLogsData.active_viewers[0].usn}`
+                          : "Anonymous"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Top Targeted Students Leaderboard */}
+                  {comparisonLogsData.top_targets.length > 0 && (
+                    <div className="space-y-2.5">
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
+                        Most Compared-Against Students (Peers Being Checked)
+                      </h3>
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-48 overflow-y-auto">
+                        {comparisonLogsData.top_targets.map((target) => (
+                          <div
+                            key={target.usn}
+                            className="p-2.5 sm:p-3 flex items-center justify-between text-xs hover:bg-slate-50/50"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-mono font-bold text-slate-900 shrink-0">{target.usn}</span>
+                              <span className="text-slate-700 truncate">{target.name}</span>
+                              <span className="text-[10px] text-slate-400 uppercase shrink-0">({target.branch})</span>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold shrink-0">
+                              {target.count} peer compares
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Real-time Who Compared Whom Live Stream */}
+                  <div className="space-y-2.5">
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
+                      Live Stream: Who Compared Themselves To Whom
+                    </h3>
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-80 overflow-y-auto">
+                      {comparisonLogsData.recent_logs.map((log) => (
+                        <div
+                          key={log.id}
+                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs hover:bg-slate-50/50"
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-semibold text-slate-500">Initiator:</span>
+                              <span className="font-bold text-slate-900 px-1.5 py-0.5 rounded bg-slate-100 font-mono">
+                                {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn || "unpinned"})` : log.viewer_usn || "Anonymous Visitor"}
+                              </span>
+                              <span className="text-slate-400 font-bold">compared</span>
+                            </div>
+                            <div className="flex items-center gap-1.5 text-slate-700 flex-wrap">
+                              <span className="font-semibold text-blue-700">{log.student1_name} ({log.student1_usn})</span>
+                              <span className="font-bold text-slate-400">vs</span>
+                              <span className="font-semibold text-purple-700">{log.student2_name} ({log.student2_usn})</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px] text-slate-400 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+                            {log.ip_address && (
+                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
+                                IP: {log.ip_address}
+                              </span>
+                            )}
+                            {log.compared_at && (
+                              <span className="font-mono text-[10px]">
+                                {new Date(log.compared_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.compared_at).toLocaleDateString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )
+            ) : logsLoading ? (
               <div className="text-center py-12 text-xs text-slate-400">Loading audit logs...</div>
             ) : !loginLogsData ? (
               <div className="text-center py-12 text-xs text-slate-400">No login logs available.</div>

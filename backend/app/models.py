@@ -95,3 +95,20 @@ class USNDispute(Base):
     admin_notes = Column(String, nullable=True, default="")
 
 
+class ComparisonLog(Base):
+    __tablename__ = "comparison_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    viewer_usn = Column(String, index=True, nullable=True)  # Who initiated comparison
+    viewer_name = Column(String, default="")
+    student1_usn = Column(String, index=True, nullable=False)
+    student1_name = Column(String, default="")
+    student1_branch = Column(String, default="")
+    student2_usn = Column(String, index=True, nullable=False)
+    student2_name = Column(String, default="")
+    student2_branch = Column(String, default="")
+    compared_at = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String, nullable=True, default="")
+
+
+

@@ -19,6 +19,8 @@ import {
   fetchLeaderboard,
   checkBackendHealth,
   AuthSession,
+  logStudentComparison,
+  verifyStudentSession,
 } from "../lib/api";
 import {
   IconSearch,
@@ -96,8 +98,19 @@ export default function Dashboard() {
       const storedSession = sessionStorage.getItem("vtu_student_session");
       if (storedSession) {
         const parsed = JSON.parse(storedSession) as AuthSession;
-        setStudentSession(parsed);
-        setMyUsn(parsed.usn);
+        // Cryptographically verify session validity with backend
+        verifyStudentSession(parsed.token).then((res) => {
+          if (!res.valid) {
+            // Password was changed or ownership transferred -> Kick out imposter immediately
+            sessionStorage.removeItem("vtu_student_token");
+            sessionStorage.removeItem("vtu_student_session");
+            sessionStorage.removeItem("vtu_student_usn");
+            setStudentSession(null);
+          } else {
+            setStudentSession(parsed);
+            setMyUsn(parsed.usn);
+          }
+        });
       } else {
         const saved = localStorage.getItem("vtu_my_usn");
         if (saved) setMyUsn(saved);
@@ -105,6 +118,16 @@ export default function Dashboard() {
     } catch {
       // ignore
     }
+
+    // Active listener: Kick out user immediately if token is invalidated on the server
+    const handleRevocation = () => {
+      setStudentSession(null);
+      loadStudentsData(null);
+      alert("⚠️ Your session has been terminated because ownership of this USN was verified and transferred to another user. Please log in with the new password.");
+    };
+
+    window.addEventListener("vtu:session-revoked", handleRevocation);
+    return () => window.removeEventListener("vtu:session-revoked", handleRevocation);
   }, []);
 
   const handleAuthSuccess = (session: AuthSession) => {
@@ -141,6 +164,18 @@ export default function Dashboard() {
       setCompareStudent2(targetStudent);
       setSelectedUsn(null);
       setIsCompareOpen(true);
+
+      // Log comparison for Admin visibility
+      logStudentComparison({
+        viewer_usn: studentSession?.usn || myUsn || undefined,
+        viewer_name: studentSession?.name || undefined,
+        student1_usn: myProfile.usn,
+        student1_name: myProfile.name,
+        student1_branch: myProfile.branch,
+        student2_usn: targetStudent.usn,
+        student2_name: targetStudent.name,
+        student2_branch: targetStudent.branch,
+      });
     } else {
       alert(`Could not find profile for ${myUsn}. Please ensure your marks have been scraped.`);
     }
@@ -243,6 +278,18 @@ export default function Dashboard() {
       setCompareStudent1(s1);
       setCompareStudent2(s2);
       setIsCompareOpen(true);
+
+      // Log comparison for Admin visibility
+      logStudentComparison({
+        viewer_usn: studentSession?.usn || myUsn || undefined,
+        viewer_name: studentSession?.name || undefined,
+        student1_usn: s1.usn,
+        student1_name: s1.name,
+        student1_branch: s1.branch,
+        student2_usn: s2.usn,
+        student2_name: s2.name,
+        student2_branch: s2.branch,
+      });
     } catch (err) {
       console.error("Failed to fetch students for comparison", err);
     }
