@@ -4,8 +4,16 @@ import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "VTU WhatNow - Semester Results & Branch Analytics",
   description: "Fast, elegant semester results explorer, branch rankings, and subject performance analytics for VTU engineering students.",
+  manifest: "/manifest.json",
+  themeColor: "#08090a",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "VTU WhatNow",
+  },
   icons: {
     icon: "/icon.svg",
+    apple: "/icon.svg",
   },
 };
 

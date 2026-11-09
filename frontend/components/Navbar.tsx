@@ -3,8 +3,8 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { sfx } from "../lib/sfx";
-import { IconDownload } from "./Icons";
-import { downloadResultsCsv } from "../lib/exportUtils";
+import { IconInstallApp } from "./Icons";
+import InstallAppModal from "./InstallAppModal";
 
 interface NavbarProps {
   currentView?: "dashboard" | "topology" | "backlogs";
@@ -20,6 +20,7 @@ export default function Navbar({
   onToggleTheme,
 }: NavbarProps) {
   const [muted, setMuted] = useState(false);
+  const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
 
   useEffect(() => {
     setMuted(sfx.isMuted);
@@ -148,23 +149,23 @@ export default function Navbar({
           </nav>
         )}
 
-        {/* Right Actions: Download + Theme Toggle + SFX Mute + Admin Link */}
+        {/* Right Actions: Download App to Homescreen + Theme Toggle + SFX Mute + Admin Link */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
-          {/* Download Results Option */}
+          {/* Download App to Homescreen for Mobile */}
           <button
             onClick={() => {
               sfx.playMechanicalClick();
-              downloadResultsCsv();
+              setIsInstallModalOpen(true);
             }}
-            title="Download / Export Results (CSV)"
+            title="Download app into homescreen for mobile"
             className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
               isObsidian
                 ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
                 : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <IconDownload className="w-4 h-4 text-blue-500" />
-            <span className="hidden lg:inline text-[11px] font-medium">Export</span>
+            <IconInstallApp className="w-4 h-4 text-cyan-400 stroke-[2.2]" />
+            <span className="hidden sm:inline text-[11px] font-medium">Get App</span>
           </button>
 
           {/* SFX Audio Switch */}
@@ -218,6 +219,12 @@ export default function Navbar({
           </Link>
         </div>
       </div>
+
+      <InstallAppModal
+        isOpen={isInstallModalOpen}
+        onClose={() => setIsInstallModalOpen(false)}
+        isObsidian={isObsidian}
+      />
     </header>
   );
 }

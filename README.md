@@ -99,10 +99,12 @@ Accessing academic marks on the official VTU results portal presents significant
 - **Comprehensive Subject Performance & Backlog Analytics**: Branch-wise backlog tracking, class pass rates, and deadest subject rankings to identify tough coursework papers across the institution.
 - **Interactive HITL Captcha Solving**: Delivers live VTU captcha images directly to the admin interface. Supports 1x/2x/3x image zoom, high-contrast inversion, auto-focus, and instant keyboard submission.
 - **Live Character Breakdown Indicator**: Differentiates ambiguous characters (`c/C`, `v/V`, `w/W`, `s/S`, `o/O`, `x/X`, `z/Z`) with real-time badges (`[s] small`, `[B] CAPS`, `[4] digit`).
-- **Head-to-Head Per-Subject Comparison**: Side-by-side comparison matrix evaluating internal, external, and total marks with visual delta leads (`+6 A`, `+2 B`, or `Tie`).
+- **Head-to-Head Per-Subject Comparison**: Side-by-side comparison matrix evaluating internal, external, and total marks with visual delta leads (`+6 A`, `+2 B`, or `Tie`). Supports seamless cross-branch student pairings without state resets.
+- **Mobile PWA & 1-Tap Homescreen Install**: Built-in Progressive Web App (PWA) support allowing mobile visitors on iOS and Android to install VTU WhatNow directly to their home screen for full-screen offline caching and instantaneous app launch.
 - **Procedural USN Identicons**: Deterministic identicon avatars procedurally rendered from student USN hashes with status rings and no external avatar dependencies.
 - **Synthesized Web Audio Haptic SFX**: Tactile mechanical clicks, Geiger-counter ticks during scraping, and ethereal sonar chimes synthesized live via the Web Audio API.
 - **Strict Role-Based Access Control**: Public visitors have strictly read-only and compare-only access; scraping, link configuration, student deletion, and profile management are protected by password authentication.
+- **Fully Responsive Mobile Admin Interface**: Edge-to-edge touch-friendly control panel with responsive card stacking, touch-optimized inputs, and diagnostics.
 
 ---
 
