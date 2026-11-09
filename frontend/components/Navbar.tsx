@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { sfx } from "../lib/sfx";
+import { IconDownload } from "./Icons";
+import { downloadResultsCsv } from "../lib/exportUtils";
 
 interface NavbarProps {
   currentView?: "dashboard" | "topology" | "backlogs";
@@ -146,8 +148,25 @@ export default function Navbar({
           </nav>
         )}
 
-        {/* Right Actions: Theme Toggle + SFX Mute + Admin Link */}
+        {/* Right Actions: Download + Theme Toggle + SFX Mute + Admin Link */}
         <div className="flex items-center gap-1.5 sm:gap-2 text-xs">
+          {/* Download Results Option */}
+          <button
+            onClick={() => {
+              sfx.playMechanicalClick();
+              downloadResultsCsv();
+            }}
+            title="Download / Export Results (CSV)"
+            className={`p-2 rounded-xl border transition-all flex items-center gap-1.5 ${
+              isObsidian
+                ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
+                : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            <IconDownload className="w-4 h-4 text-blue-500" />
+            <span className="hidden lg:inline text-[11px] font-medium">Export</span>
+          </button>
+
           {/* SFX Audio Switch */}
           <button
             onClick={handleToggleMute}

@@ -70,6 +70,7 @@ export default function Dashboard() {
   const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [compareStudent1, setCompareStudent1] = useState<Student | null>(null);
   const [compareStudent2, setCompareStudent2] = useState<Student | null>(null);
+  const [allCollegeStudents, setAllCollegeStudents] = useState<Student[]>([]);
 
   // Student Detail Modal state
   const [selectedUsn, setSelectedUsn] = useState<string | null>(null);
@@ -79,6 +80,9 @@ export default function Dashboard() {
   // Load initial branches & backend health
   const loadBranchData = () => {
     checkBackendHealth().then((isUp) => setBackendOnline(isUp));
+    fetchStudents()
+      .then((all) => setAllCollegeStudents(all))
+      .catch(() => {});
     fetchBranches()
       .then((stats) => {
         const map: Record<string, BranchStat> = {};
@@ -514,8 +518,15 @@ export default function Dashboard() {
               <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
               <div className="text-xs">
                 <span className="font-bold">{compareUsns.length} / 2</span> Selected
-                <p className="text-[10px] opacity-60 truncate max-w-[170px] font-mono">
-                  {compareUsns.join(" vs ")}
+                <p className="text-[10px] opacity-70 truncate max-w-[210px] sm:max-w-xs font-mono">
+                  {compareUsns
+                    .map((u) => {
+                      const found = (allCollegeStudents.length > 0 ? allCollegeStudents : students).find(
+                        (s) => s.usn === u
+                      );
+                      return found ? `${found.name} (${found.branch})` : u;
+                    })
+                    .join(" vs ")}
                 </p>
               </div>
             </div>
@@ -552,7 +563,7 @@ export default function Dashboard() {
         <CompareModal
           student1={compareStudent1}
           student2={compareStudent2}
-          allStudents={students}
+          allStudents={allCollegeStudents.length > 0 ? allCollegeStudents : students}
           onClose={() => setIsCompareOpen(false)}
         />
       )}

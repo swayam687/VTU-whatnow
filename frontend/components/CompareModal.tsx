@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { Student, Mark } from "../lib/api";
+import React, { useState, useMemo } from "react";
+import { Student, Mark, fetchStudent } from "../lib/api";
 import { IconClose, IconCompare, IconCheck } from "./Icons";
 import Identicon from "./Identicon";
 import { sfx } from "../lib/sfx";
@@ -21,11 +21,56 @@ export default function CompareModal({
   allStudents = [],
   onClose,
 }: CompareModalProps) {
-  const [s1Usn, setS1Usn] = useState(initialS1.usn);
-  const [s2Usn, setS2Usn] = useState(initialS2.usn);
+  // Direct student states guaranteed to preserve cross-branch selections
+  const [s1, setS1] = useState<Student>(initialS1);
+  const [s2, setS2] = useState<Student>(initialS2);
 
-  const s1 = allStudents.find((s) => s.usn === s1Usn) || initialS1;
-  const s2 = allStudents.find((s) => s.usn === s2Usn) || initialS2;
+  // Guarantee that initialS1 and initialS2 are always included in the dropdown options
+  const selectableStudents = useMemo(() => {
+    const map = new Map<string, Student>();
+    if (initialS1) map.set(initialS1.usn, initialS1);
+    if (initialS2) map.set(initialS2.usn, initialS2);
+    if (s1) map.set(s1.usn, s1);
+    if (s2) map.set(s2.usn, s2);
+    allStudents.forEach((st) => {
+      if (!map.has(st.usn)) map.set(st.usn, st);
+    });
+    return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allStudents, initialS1, initialS2, s1.usn, s2.usn]);
+
+  const handleSelectS1 = async (usn: string) => {
+    sfx.playMechanicalClick();
+    const found = selectableStudents.find((st) => st.usn === usn);
+    if (found) {
+      if (found.marks && found.marks.length > 0) {
+        setS1(found);
+      } else {
+        try {
+          const full = await fetchStudent(usn);
+          setS1(full);
+        } catch {
+          setS1(found);
+        }
+      }
+    }
+  };
+
+  const handleSelectS2 = async (usn: string) => {
+    sfx.playMechanicalClick();
+    const found = selectableStudents.find((st) => st.usn === usn);
+    if (found) {
+      if (found.marks && found.marks.length > 0) {
+        setS2(found);
+      } else {
+        try {
+          const full = await fetchStudent(usn);
+          setS2(full);
+        } catch {
+          setS2(found);
+        }
+      }
+    }
+  };
 
   // Build combined subject map
   const s1MarksMap = new Map<string, Mark>();
@@ -82,18 +127,15 @@ export default function CompareModal({
                   <span className="text-[10px] font-bold uppercase tracking-wider text-blue-600 px-2 py-0.5 rounded-full bg-blue-100">
                     Student A
                   </span>
-                  {allStudents.length > 0 ? (
+                  {selectableStudents.length > 0 ? (
                     <select
-                      value={s1Usn}
-                      onChange={(e) => {
-                        sfx.playMechanicalClick();
-                        setS1Usn(e.target.value);
-                      }}
-                      className="mt-2 block w-full text-sm font-bold text-slate-900 bg-white border border-slate-200 rounded-xl p-2 focus:ring-2 focus:ring-blue-500 font-mono"
+                      value={s1.usn}
+                      onChange={(e) => handleSelectS1(e.target.value)}
+                      className="mt-2 block w-full text-xs sm:text-sm font-bold text-slate-900 bg-white border border-slate-200 rounded-xl p-2 focus:ring-2 focus:ring-blue-500 font-mono"
                     >
-                      {allStudents.map((s) => (
-                        <option key={s.usn} value={s.usn}>
-                          {s.name} ({s.usn})
+                      {selectableStudents.map((st) => (
+                        <option key={st.usn} value={st.usn}>
+                          {st.name} ({st.branch} • {st.usn})
                         </option>
                       ))}
                     </select>
@@ -135,18 +177,15 @@ export default function CompareModal({
                   <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 px-2 py-0.5 rounded-full bg-indigo-100">
                     Student B
                   </span>
-                  {allStudents.length > 0 ? (
+                  {selectableStudents.length > 0 ? (
                     <select
-                      value={s2Usn}
-                      onChange={(e) => {
-                        sfx.playMechanicalClick();
-                        setS2Usn(e.target.value);
-                      }}
-                      className="mt-2 block w-full text-sm font-bold text-slate-900 bg-white border border-slate-200 rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 font-mono"
+                      value={s2.usn}
+                      onChange={(e) => handleSelectS2(e.target.value)}
+                      className="mt-2 block w-full text-xs sm:text-sm font-bold text-slate-900 bg-white border border-slate-200 rounded-xl p-2 focus:ring-2 focus:ring-indigo-500 font-mono"
                     >
-                      {allStudents.map((s) => (
-                        <option key={s.usn} value={s.usn}>
-                          {s.name} ({s.usn})
+                      {selectableStudents.map((st) => (
+                        <option key={st.usn} value={st.usn}>
+                          {st.name} ({st.branch} • {st.usn})
                         </option>
                       ))}
                     </select>

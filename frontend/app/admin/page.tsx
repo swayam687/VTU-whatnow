@@ -30,7 +30,9 @@ import {
   IconExternalLink,
   IconGitHub,
   IconLinkedIn,
+  IconDownload,
 } from "../../components/Icons";
+import { downloadResultsCsv } from "../../lib/exportUtils";
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";
 
@@ -571,6 +573,20 @@ export default function AdminPanel() {
           >
             <span>{browserStatus?.status === "ready" ? "Browser Ready ✅" : "Browser Check ⚠️"}</span>
           </div>
+
+          {/* Export / Download CSV */}
+          <button
+            type="button"
+            onClick={() => {
+              sfx.playClick();
+              downloadResultsCsv();
+            }}
+            title="Download / Export Results (CSV)"
+            className="text-xs font-semibold text-slate-700 hover:text-slate-900 px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition-colors shadow-xs flex items-center gap-1.5"
+          >
+            <IconDownload className="w-3.5 h-3.5 text-blue-600" />
+            <span className="hidden sm:inline">Export</span>
+          </button>
 
           {/* Sign Out Button */}
           <button
@@ -1297,9 +1313,9 @@ export default function AdminPanel() {
               {filteredStoredStudents.map((s) => (
                 <div
                   key={s.usn}
-                  className="p-3.5 flex items-center justify-between gap-3 hover:bg-slate-50/60 transition-colors"
+                  className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50/60 transition-colors"
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
                     <Identicon
                       usn={s.usn}
                       percentage={s.percentage}
@@ -1307,13 +1323,13 @@ export default function AdminPanel() {
                       size={36}
                     />
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                         <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
                         <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.2 rounded bg-slate-100 uppercase">
                           {s.branch}
                         </span>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5">
+                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="font-mono text-xs text-slate-400">{s.usn}</span>
                         {s.github_url && (
                           <span className="text-[10px] text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded font-mono">
@@ -1329,37 +1345,39 @@ export default function AdminPanel() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-                    <div className="text-right hidden sm:block">
+                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
+                    <div className="text-left sm:text-right">
                       <span className="font-bold text-xs text-slate-900">{s.percentage.toFixed(1)}%</span>
-                      <span className="text-[10px] text-slate-400 block">{s.total_marks} marks</span>
+                      <span className="text-[10px] text-slate-400 block sm:inline sm:ml-1">({s.total_marks} pts)</span>
                     </div>
 
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        s.total_backlogs > 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
-                      }`}
-                    >
-                      {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                          s.total_backlogs > 0 ? "bg-rose-100 text-rose-700" : "bg-emerald-100 text-emerald-700"
+                        }`}
+                      >
+                        {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
+                      </span>
 
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEditSocials(s)}
-                      title={`Edit Socials for ${s.name}`}
-                      className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
-                    >
-                      Socials
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditSocials(s)}
+                        title={`Edit Socials for ${s.name}`}
+                        className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 transition-colors"
+                      >
+                        Socials
+                      </button>
 
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteStudent(s.usn)}
-                      title={`Delete ${s.name} (${s.usn})`}
-                      className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors"
-                    >
-                      <IconTrash className="w-3.5 h-3.5" />
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteStudent(s.usn)}
+                        title={`Delete ${s.name} (${s.usn})`}
+                        className="p-1.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 transition-colors"
+                      >
+                        <IconTrash className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
