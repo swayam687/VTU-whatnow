@@ -7,9 +7,17 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from typing import List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 import hashlib
 import secrets
+
+def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
+    """Ensures datetime is explicitly marked with timezone UTC (+00:00) so client browsers accurately convert to local time."""
+    if not dt:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc).isoformat()
 from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -464,7 +472,7 @@ def get_admin_login_logs(db: Session = Depends(get_db)):
             "name": row[1],
             "branch": row[2],
             "login_count": row[3],
-            "last_login": row[4].isoformat() if row[4] else None,
+            "last_login": to_utc_iso(row[4]),
         }
         for row in frequency
     ]
@@ -479,7 +487,7 @@ def get_admin_login_logs(db: Session = Depends(get_db)):
                 "usn": l.usn,
                 "name": l.name,
                 "branch": l.branch,
-                "login_at": l.login_at.isoformat() if l.login_at else None,
+                "login_at": to_utc_iso(l.login_at),
                 "ip_address": l.ip_address,
             }
             for l in logs
@@ -837,7 +845,7 @@ def get_admin_compare_logs(db: Session = Depends(get_db)):
                 "student2_usn": c.student2_usn,
                 "student2_name": c.student2_name,
                 "student2_branch": c.student2_branch,
-                "compared_at": c.compared_at.isoformat() if c.compared_at else None,
+                "compared_at": to_utc_iso(c.compared_at),
                 "ip_address": c.ip_address,
             }
             for c in recent

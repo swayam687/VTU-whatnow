@@ -53,6 +53,25 @@ const QUICK_BRANCHES = [
   { code: "CV", name: "CIVIL" },
 ];
 
+function formatDateTime(isoString?: string | null): { date: string; time: string; full: string } {
+  if (!isoString) return { date: "-", time: "-", full: "-" };
+  let normalized = isoString.trim();
+  if (!normalized.includes("T")) {
+    normalized = normalized.replace(" ", "T");
+  }
+  // If no timezone offset (+HH:MM or Z), treat as UTC by appending Z so browser converts to local time
+  if (!normalized.endsWith("Z") && !normalized.includes("+") && !/-\d\d:\d\d$/.test(normalized)) {
+    normalized = `${normalized}Z`;
+  }
+  const d = new Date(normalized);
+  if (isNaN(d.getTime())) return { date: isoString, time: "", full: isoString };
+  return {
+    date: d.toLocaleDateString(),
+    time: d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }),
+    full: `${d.toLocaleDateString()} ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`,
+  };
+}
+
 export default function AdminPanel() {
   // Authentication state
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
@@ -1603,7 +1622,7 @@ export default function AdminPanel() {
                         <h3 className="font-bold text-sm text-slate-900 mt-1">{d.name}</h3>
                         {d.created_at && (
                           <p className="text-[10px] text-slate-400 mt-0.5">
-                            Submitted: {new Date(d.created_at).toLocaleString()}
+                            Submitted: {formatDateTime(d.created_at).full}
                           </p>
                         )}
                       </div>
@@ -1676,7 +1695,7 @@ export default function AdminPanel() {
                     ) : (
                       <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
                         <span>
-                          Reviewed: {d.reviewed_at ? new Date(d.reviewed_at).toLocaleDateString() : "Done"}
+                          Reviewed: {d.reviewed_at ? formatDateTime(d.reviewed_at).date : "Done"}
                         </span>
                         {d.admin_notes && (
                           <span className="text-slate-400 italic">Note: {d.admin_notes}</span>
@@ -1878,9 +1897,9 @@ export default function AdminPanel() {
                           <div className="flex items-center justify-between sm:justify-end gap-2.5 text-[11px] text-slate-500 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                             {log.compared_at && (
                               <div className="flex items-center gap-1.5 font-mono text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                                <span>📅 {new Date(log.compared_at).toLocaleDateString()}</span>
+                                <span>📅 {formatDateTime(log.compared_at).date}</span>
                                 <span className="text-slate-300">•</span>
-                                <span>⏰ {new Date(log.compared_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+                                <span>⏰ {formatDateTime(log.compared_at).time}</span>
                               </div>
                             )}
                             {log.ip_address && (
@@ -1956,7 +1975,7 @@ export default function AdminPanel() {
                             </span>
                             {item.last_login && (
                               <span className="text-[10px] text-slate-400 hidden sm:inline">
-                                {new Date(item.last_login).toLocaleDateString()}
+                                {formatDateTime(item.last_login).date}
                               </span>
                             )}
                           </div>
@@ -1993,7 +2012,7 @@ export default function AdminPanel() {
                               </span>
                             )}
                             <span className="text-slate-400 font-mono text-[10px]">
-                              {new Date(log.login_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.login_at).toLocaleDateString()}
+                              {formatDateTime(log.login_at).time} • {formatDateTime(log.login_at).date}
                             </span>
                           </div>
                         </div>
