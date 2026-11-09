@@ -50,3 +50,4 @@ export async function downloadResultsCsv(): Promise<void> {
     alert("Failed to export results.");
   }
 }
+
