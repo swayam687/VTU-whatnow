@@ -455,7 +455,7 @@ export default function StudentAuthModal({
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/20 active:scale-[0.99] transition-all disabled:opacity-50"
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.99] transition-all disabled:opacity-50"
                   >
                     {loading
                       ? "Authenticating..."
@@ -574,7 +574,7 @@ export default function StudentAuthModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg shadow-amber-500/20 active:scale-[0.99] transition-all disabled:opacity-50"
+                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-[0.99] transition-all disabled:opacity-50"
               >
                 {loading ? "Submitting..." : "Submit Verification to Admin"}
               </button>

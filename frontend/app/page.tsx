@@ -29,6 +29,14 @@ import {
   IconGitHub,
   IconLinkedIn,
   IconInstallApp,
+  IconShield,
+  IconKey,
+  IconLock,
+  IconBolt,
+  IconTrophy,
+  IconArrowRight,
+  IconGraduationCap,
+  IconFileText,
 } from "../components/Icons";
 import InstallAppModal from "../components/InstallAppModal";
 import StudentAuthModal from "../components/StudentAuthModal";
@@ -440,42 +448,53 @@ export default function Dashboard() {
             {/* Student Auth / Public Mode Notice Banner */}
             {studentSession ? (
               <div
-                className={`rounded-3xl p-4.5 sm:p-5 border transition-all relative overflow-hidden ${
+                className={`rounded-2xl p-4 sm:p-5 border transition-all ${
                   isObsidian
-                    ? "bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-[#0c0e12] border-emerald-500/30 text-white shadow-lg shadow-emerald-950/20"
-                    : "bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white border-emerald-200 text-emerald-950 shadow-sm"
+                    ? "bg-[#0d1117] border-white/10 text-slate-100"
+                    : "bg-white border-slate-200/90 text-slate-900 shadow-xs"
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 border border-emerald-400/40 flex items-center justify-center text-2xl shrink-0 shadow-md shadow-emerald-500/20 text-white">
-                      🎉
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isObsidian ? "bg-white/5 border-white/10 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                    }`}>
+                      <IconGraduationCap className="w-5 h-5" />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-bold font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                        <span className={`text-xs font-semibold font-mono px-2 py-0.5 rounded-md border ${
+                          isObsidian
+                            ? "bg-white/5 border-white/10 text-emerald-400"
+                            : "bg-slate-100 border-slate-200 text-slate-800"
+                        }`}>
                           {studentSession.usn}
                         </span>
-                        <span className="text-xs opacity-75 font-semibold">• {studentSession.branch}</span>
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                          ✨ Full Access Unlocked
+                        <span className="text-xs opacity-60 font-medium">• {studentSession.branch}</span>
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          isObsidian
+                            ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/40"
+                            : "bg-emerald-50 text-emerald-800 border-emerald-200/70"
+                        }`}>
+                          Verified Ownership
                         </span>
                       </div>
-                      <h2 className="font-extrabold text-base sm:text-lg tracking-tight">
-                        Welcome back, {studentSession.name}!
+                      <h2 className="font-bold text-base sm:text-lg tracking-tight">
+                        Welcome back, {studentSession.name}
                       </h2>
-                      <p className="text-xs opacity-80">
+                      <p className="text-xs opacity-65">
                         Your complete marksheet, percentile, and branch standings are fully unlocked.
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-500/10">
+                  <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                     <button
                       onClick={() => handleOpenDetail(studentSession.usn)}
-                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5"
+                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white shadow-xs dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
                     >
-                      <span>📄 View My Marksheet</span>
+                      <IconFileText className="w-3.5 h-3.5" />
+                      <span>View Marksheet</span>
                     </button>
                     {students.length > 0 && (
                       <button
@@ -485,9 +504,14 @@ export default function Dashboard() {
                             handleCompareWithMe(topper);
                           }
                         }}
-                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-600/90 hover:bg-cyan-500 active:scale-95 text-white transition-all flex items-center justify-center gap-1"
+                        className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+                          isObsidian
+                            ? "border-white/10 hover:bg-white/5 text-slate-200"
+                            : "border-slate-200 hover:bg-slate-50 text-slate-700"
+                        }`}
                       >
-                        <span>⚔️ Compare Topper</span>
+                        <IconCompare className="w-3.5 h-3.5" />
+                        <span>Compare Topper</span>
                       </button>
                     )}
                     <button
@@ -505,31 +529,37 @@ export default function Dashboard() {
               </div>
             ) : (
               <div
-                className={`rounded-3xl p-4.5 sm:p-5 border transition-all relative overflow-hidden ${
+                className={`rounded-2xl p-4 sm:p-5 border transition-all ${
                   isObsidian
-                    ? "bg-gradient-to-r from-cyan-950/40 via-blue-950/20 to-[#0c0e12] border-cyan-500/30 text-white shadow-lg shadow-cyan-950/20"
-                    : "bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-white border-blue-200 text-blue-950 shadow-sm"
+                    ? "bg-[#0d1117] border-white/10 text-slate-100"
+                    : "bg-white border-slate-200/90 text-slate-900 shadow-xs"
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-3.5">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 border border-cyan-400/40 flex items-center justify-center text-2xl shrink-0 shadow-md shadow-cyan-500/20 text-white">
-                      🏆
+                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
+                      isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"
+                    }`}>
+                      <IconTrophy className="w-5 h-5" />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                          Public Preview Mode
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          isObsidian
+                            ? "bg-white/5 border-white/10 text-slate-300"
+                            : "bg-slate-100 text-slate-700 border-slate-200"
+                        }`}>
+                          Public Preview
                         </span>
-                        <span className="text-xs opacity-75">
-                          Showing Top 3 in branch &amp; Top 5 campus
+                        <span className="text-xs opacity-60">
+                          Showing top branch standings
                         </span>
                       </div>
-                      <h2 className="font-extrabold text-base sm:text-lg tracking-tight">
-                        Curious where you rank in your branch?
+                      <h2 className="font-bold text-base sm:text-lg tracking-tight">
+                        Check your branch ranking and scores
                       </h2>
-                      <p className="text-xs opacity-80 max-w-xl">
-                        Log in with your USN to unlock your exact campus rank, detailed semester marks, and private peer comparisons.
+                      <p className="text-xs opacity-65 max-w-xl">
+                        Sign in with your USN to unlock your campus rank, complete subject breakdown, and private peer comparisons.
                       </p>
                     </div>
                   </div>
@@ -540,9 +570,11 @@ export default function Dashboard() {
                         sfx.playMechanicalClick();
                         setIsAuthModalOpen(true);
                       }}
-                      className="w-full sm:w-auto px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-slate-950 shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-medium text-xs sm:text-sm bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 active:scale-[0.98] shadow-xs transition-all flex items-center justify-center gap-2"
                     >
-                      <span>✨ Check My Rank &amp; Results</span>
+                      <IconKey className="w-3.5 h-3.5" />
+                      <span>Sign In with USN</span>
+                      <IconArrowRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -650,37 +682,33 @@ export default function Dashboard() {
 
               {loading ? (
                 <div className="space-y-4 py-2">
-                  {/* Aesthetic Render Server Warmup Card */}
+                  {/* Clean Server Warmup Card */}
                   <div
-                    className={`p-6 sm:p-8 rounded-3xl border text-center relative overflow-hidden transition-all ${
+                    className={`p-6 sm:p-8 rounded-2xl border text-center transition-all ${
                       isObsidian
-                        ? "bg-gradient-to-b from-[#0e121a] to-[#090b0e] border-cyan-800/30 text-white shadow-xl shadow-cyan-950/20"
-                        : "bg-gradient-to-b from-blue-50/70 to-white border-blue-200 text-slate-900 shadow-sm"
+                        ? "bg-[#0d1117] border-white/10 text-slate-100"
+                        : "bg-white border-slate-200/90 text-slate-900 shadow-xs"
                     }`}
                   >
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent pointer-events-none" />
-                    
-                    <div className="relative z-10 flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
-                      {/* Glowing Radar Pulse Orb */}
-                      <div className="relative flex items-center justify-center w-14 h-14">
-                        <span className="absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-20 animate-ping" />
-                        <div className="relative inline-flex rounded-2xl w-12 h-12 bg-gradient-to-tr from-cyan-500 to-blue-600 items-center justify-center text-xl text-white shadow-lg shadow-cyan-500/30">
-                          ⚡️
-                        </div>
+                    <div className="flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center border ${
+                        isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"
+                      }`}>
+                        <IconBolt className="w-5 h-5 animate-pulse" />
                       </div>
 
                       <div>
-                        <h3 className="text-base sm:text-lg font-bold tracking-tight">
-                          Please wait a minute — warming up results
+                        <h3 className="text-sm sm:text-base font-bold tracking-tight">
+                          Connecting to server and compiling ranks
                         </h3>
-                        <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
-                          Our cloud server is spinning up and compiling your semester ranks. It will appear right here in just a moment!
+                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                          Initial cloud spin-up can take up to 20 seconds. Standings will appear immediately once connected.
                         </p>
                       </div>
 
-                      {/* Shimmering Progress Bar */}
-                      <div className="w-48 h-1.5 bg-slate-800/40 rounded-full overflow-hidden relative">
-                        <div className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
+                      {/* Hairline Progress Indicator */}
+                      <div className="w-36 h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden relative">
+                        <div className="h-full bg-slate-900 dark:bg-white w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
                       </div>
                     </div>
                   </div>
@@ -691,19 +719,19 @@ export default function Dashboard() {
                       <div
                         key={i}
                         className={`h-40 rounded-2xl p-4 border animate-pulse flex flex-col justify-between ${
-                          isObsidian ? "bg-slate-900/30 border-slate-800/40" : "bg-slate-50 border-slate-200"
+                          isObsidian ? "bg-white/[0.02] border-white/5" : "bg-white border-slate-200/70"
                         }`}
                       >
                         <div className="flex items-center gap-3">
-                          <div className={`w-10 h-10 rounded-xl ${isObsidian ? "bg-slate-800" : "bg-slate-200"}`} />
+                          <div className={`w-10 h-10 rounded-xl ${isObsidian ? "bg-white/5" : "bg-slate-100"}`} />
                           <div className="space-y-1.5 flex-1">
-                            <div className={`h-3.5 w-28 rounded-md ${isObsidian ? "bg-slate-800" : "bg-slate-200"}`} />
-                            <div className={`h-2.5 w-16 rounded-md ${isObsidian ? "bg-slate-800/60" : "bg-slate-200/60"}`} />
+                            <div className={`h-3.5 w-28 rounded-md ${isObsidian ? "bg-white/5" : "bg-slate-100"}`} />
+                            <div className={`h-2.5 w-16 rounded-md ${isObsidian ? "bg-white/5" : "bg-slate-100"}`} />
                           </div>
                         </div>
                         <div className="space-y-2">
-                          <div className={`h-3 w-full rounded-md ${isObsidian ? "bg-slate-800" : "bg-slate-200"}`} />
-                          <div className={`h-2 w-20 rounded-md ${isObsidian ? "bg-slate-800/50" : "bg-slate-200/50"}`} />
+                          <div className={`h-3 w-full rounded-md ${isObsidian ? "bg-white/5" : "bg-slate-100"}`} />
+                          <div className={`h-2 w-20 rounded-md ${isObsidian ? "bg-white/5" : "bg-slate-100"}`} />
                         </div>
                       </div>
                     ))}
@@ -713,14 +741,14 @@ export default function Dashboard() {
                 <div
                   className={`text-center py-14 rounded-2xl border ${
                     isObsidian
-                      ? "bg-[#090b0e] border-slate-800 text-slate-400"
+                      ? "bg-[#0d1117] border-white/10 text-slate-400"
                       : "bg-white border-slate-200 text-slate-500"
                   }`}
                 >
-                  <p className="text-2xl mb-1.5">🔍</p>
-                  <p className="font-bold text-sm">No students found</p>
+                  <IconSearch className="w-6 h-6 mx-auto text-slate-400 mb-2" />
+                  <p className="font-bold text-sm text-slate-900 dark:text-slate-100">No students found</p>
                   <p className="text-xs opacity-60 mt-0.5">
-                    No results match &quot;{search}&quot;. Add or scrape students in the Admin Room.
+                    No results match &quot;{search}&quot;. Verify your query or scrape USNs in the Admin portal.
                   </p>
                 </div>
               ) : (
@@ -745,27 +773,30 @@ export default function Dashboard() {
                         sfx.playMechanicalClick();
                         setIsAuthModalOpen(true);
                       }}
-                      className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:scale-[1.008] active:scale-[0.99] ${
+                      className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
                         isObsidian
-                          ? "bg-slate-900/30 border-cyan-500/40 hover:bg-slate-900/60 text-white shadow-lg shadow-black/20"
-                          : "bg-blue-50/50 border-blue-300 hover:bg-blue-50/80 text-slate-800 shadow-sm"
+                          ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
+                          : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
                       }`}
                     >
-                      <div className="w-11 h-11 mx-auto rounded-2xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-xl">
-                        🔐
+                      <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border ${
+                        isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-white border-slate-200 text-slate-700"
+                      }`}>
+                        <IconLock className="w-4 h-4" />
                       </div>
-                      <h3 className="font-bold text-sm sm:text-base">
-                        Unlock Full Batch Results &amp; Ranking
+                      <h3 className="font-bold text-sm sm:text-base tracking-tight">
+                        Unlock Full Batch Results &amp; Rankings
                       </h3>
-                      <p className="text-xs opacity-75 max-w-md mx-auto leading-relaxed">
-                        In public mode, only the Top 3 students per department are visible. Enter your USN to unlock the full campus directory, see all scores, and view your personal marksheet.
+                      <p className="text-xs opacity-65 max-w-md mx-auto leading-relaxed">
+                        Public preview displays top departmental ranks. Sign in with your USN to view the full directory, detailed marksheet, and subject-level percentiles.
                       </p>
                       <div className="pt-1">
                         <button
                           type="button"
-                          className="px-4 py-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-md shadow-emerald-500/20"
+                          className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs inline-flex items-center gap-1.5"
                         >
-                          🔑 Login / Claim Your USN →
+                          <IconKey className="w-3.5 h-3.5" />
+                          <span>Sign In / Claim Your USN</span>
                         </button>
                       </div>
                     </div>
@@ -967,13 +998,14 @@ export default function Dashboard() {
                   <div
                     className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${
                       isObsidian
-                        ? "bg-gradient-to-r from-cyan-950/30 to-blue-950/20 border-cyan-800/40"
-                        : "bg-gradient-to-r from-blue-50 to-indigo-50/50 border-blue-200"
+                        ? "bg-white/[0.03] border-white/10"
+                        : "bg-slate-50 border-slate-200/80"
                     }`}
                   >
                     <div className="text-left w-full sm:w-auto">
                       <div className="flex items-center gap-1.5 text-xs font-bold">
-                        <span>⚡️ Head-to-Head</span>
+                        <IconCompare className="w-3.5 h-3.5 text-slate-500" />
+                        <span>Direct Comparison</span>
                         {myUsn && myUsn.toUpperCase() !== selectedUsn.toUpperCase() && (
                           <span className="text-[10px] opacity-70 font-mono">vs You ({myUsn})</span>
                         )}
@@ -982,22 +1014,22 @@ export default function Dashboard() {
                         {myUsn && selectedUsn.toUpperCase() === myUsn.toUpperCase()
                           ? "This is your verified personal marksheet."
                           : myUsn
-                          ? "Instantly evaluate subject marks and leads side-by-side."
-                          : "Log in with your USN to compare marks side-by-side."}
+                          ? "Evaluate subject marks and leads side-by-side."
+                          : "Sign in with your USN to compare marks side-by-side."}
                       </p>
                     </div>
 
                     <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
                       {myUsn && selectedUsn.toUpperCase() === myUsn.toUpperCase() ? (
-                        <span className="text-xs font-bold text-amber-400 flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/20">
-                          <span>⭐️ Your Profile</span>
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-slate-800 dark:text-slate-200">
+                          Your Marksheet
                         </span>
                       ) : myUsn ? (
                         <button
                           onClick={() => handleCompareWithMe(detailStudent)}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-md shadow-cyan-500/20 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
                         >
-                          <IconCompare className="w-3.5 h-3.5 stroke-[2.5]" />
+                          <IconCompare className="w-3.5 h-3.5" />
                           <span>Compare with Me</span>
                         </button>
                       ) : (
@@ -1006,9 +1038,10 @@ export default function Dashboard() {
                             sfx.playMechanicalClick();
                             setIsAuthModalOpen(true);
                           }}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20 flex items-center justify-center gap-1.5 transition-transform active:scale-95"
+                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
                         >
-                          <span>🔑 Log In to Compare</span>
+                          <IconKey className="w-3.5 h-3.5" />
+                          <span>Sign In to Compare</span>
                         </button>
                       )}
                     </div>

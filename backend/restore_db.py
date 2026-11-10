@@ -85,3 +85,4 @@ if __name__ == "__main__":
     is_dry = not args.confirm
 
     restore_backup(file_path, dry_run=is_dry)
+

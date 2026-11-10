@@ -88,8 +88,8 @@ export default function InstallAppModal({
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800/40">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/25">
-              <IconInstallApp className="w-5 h-5 text-slate-950 stroke-[2.2]" />
+            <div className="w-10 h-10 rounded-xl bg-slate-900 border border-white/10 flex items-center justify-center text-white shadow-xs">
+              <IconInstallApp className="w-5 h-5 text-white stroke-[2]" />
             </div>
             <div>
               <h3 className="font-bold text-base sm:text-lg leading-tight">
@@ -195,7 +195,7 @@ export default function InstallAppModal({
               {deferredPrompt ? (
                 <button
                   onClick={handleInstallClick}
-                  className="w-full py-3 px-4 rounded-2xl font-bold text-sm bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
+                  className="w-full py-3 px-4 rounded-xl font-medium text-sm bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
                 >
                   <IconInstallApp className="w-4 h-4 stroke-[2.5]" />
                   <span>Install App to Home Screen</span>

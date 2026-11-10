@@ -898,3 +898,133 @@ CREATE POLICY "Service role full access on login logs" ON login_logs FOR ALL TO 
 
 DROP POLICY IF EXISTS "Service role full access on missing reports" ON missing_usn_reports;
 CREATE POLICY "Service role full access on missing reports" ON missing_usn_reports FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+
+-- =============================================
+-- Additional Schema Migrations & Security
+-- =============================================
+
+-- Add authentication and tracking columns to students
+ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR DEFAULT NULL;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS is_claimed BOOLEAN DEFAULT FALSE;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS login_count INTEGER DEFAULT 0;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NULL;
+
+-- Semester Links table for multi-semester results portal links
+CREATE TABLE IF NOT EXISTS semester_links (
+    id SERIAL PRIMARY KEY,
+    semester VARCHAR NOT NULL,
+    scheme VARCHAR DEFAULT '2022',
+    name VARCHAR NOT NULL,
+    base_url VARCHAR NOT NULL,
+    is_active BOOLEAN DEFAULT TRUE,
+    is_default BOOLEAN DEFAULT FALSE,
+    display_order INTEGER DEFAULT 0,
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc')
+);
+
+-- Seed default semester link if table is empty
+INSERT INTO semester_links (semester, scheme, name, base_url, is_active, is_default, display_order)
+SELECT '1', '2022', '1st Semester (2022 Scheme)', 'https://results.vtu.ac.in/FMEB24/index.php', TRUE, TRUE, 1
+WHERE NOT EXISTS (SELECT 1 FROM semester_links WHERE semester = '1');
+
+-- Student Login Logs Table
+CREATE TABLE IF NOT EXISTS login_logs (
+    id SERIAL PRIMARY KEY,
+    usn VARCHAR NOT NULL,
+    name VARCHAR DEFAULT '',
+    branch VARCHAR DEFAULT '',
+    login_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
+    ip_address VARCHAR DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS ix_login_logs_usn ON login_logs(usn);
+CREATE INDEX IF NOT EXISTS ix_login_logs_login_at ON login_logs(login_at);
+
+-- USN Disputes & Account Claims (Contains Verification Selfie Photo)
+CREATE TABLE IF NOT EXISTS usn_disputes (
+    id SERIAL PRIMARY KEY,
+    usn VARCHAR NOT NULL,
+    name VARCHAR DEFAULT '',
+    branch VARCHAR DEFAULT '',
+    selfie_base64 TEXT NOT NULL,
+    new_password_hash VARCHAR NOT NULL,
+    status VARCHAR DEFAULT 'pending',
+    admin_notes VARCHAR DEFAULT '',
+    created_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
+    reviewed_at TIMESTAMP WITHOUT TIME ZONE DEFAULT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_usn_disputes_usn ON usn_disputes(usn);
+CREATE INDEX IF NOT EXISTS ix_usn_disputes_status ON usn_disputes(status);
+
+-- Student Peer Comparison Tracker
+CREATE TABLE IF NOT EXISTS comparison_logs (
+    id SERIAL PRIMARY KEY,
+    viewer_usn VARCHAR,
+    viewer_name VARCHAR DEFAULT '',
+    student1_usn VARCHAR NOT NULL,
+    student1_name VARCHAR DEFAULT '',
+    student1_branch VARCHAR DEFAULT '',
+    student2_usn VARCHAR NOT NULL,
+    student2_name VARCHAR DEFAULT '',
+    student2_branch VARCHAR DEFAULT '',
+    compared_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
+    ip_address VARCHAR DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS ix_comparison_logs_viewer_usn ON comparison_logs(viewer_usn);
+CREATE INDEX IF NOT EXISTS ix_comparison_logs_compared_at ON comparison_logs(compared_at);
+
+-- Missing USN Scrape Requests & Notices
+CREATE TABLE IF NOT EXISTS missing_usn_reports (
+    id SERIAL PRIMARY KEY,
+    usn VARCHAR NOT NULL,
+    name VARCHAR DEFAULT '',
+    branch VARCHAR DEFAULT '',
+    message VARCHAR DEFAULT '',
+    status VARCHAR DEFAULT 'pending',
+    reported_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
+    ip_address VARCHAR DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS ix_missing_usn_reports_usn ON missing_usn_reports(usn);
+CREATE INDEX IF NOT EXISTS ix_missing_usn_reports_status ON missing_usn_reports(status);
+
+-- =============================================
+-- ROW LEVEL SECURITY (RLS) POLICIES
+-- =============================================
+
+-- Enable RLS across all tables
+ALTER TABLE students ENABLE ROW LEVEL SECURITY;
+ALTER TABLE subjects ENABLE ROW LEVEL SECURITY;
+ALTER TABLE marks ENABLE ROW LEVEL SECURITY;
+ALTER TABLE semester_links ENABLE ROW LEVEL SECURITY;
+ALTER TABLE login_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE usn_disputes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE comparison_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE missing_usn_reports ENABLE ROW LEVEL SECURITY;
+
+-- 1. Public Read Tables: students, subjects, marks, semester_links
+DROP POLICY IF EXISTS "Public can view students" ON students;
+CREATE POLICY "Public can view students" ON students FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public can view subjects" ON subjects;
+CREATE POLICY "Public can view subjects" ON subjects FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public can view marks" ON marks;
+CREATE POLICY "Public can view marks" ON marks FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Public can view semester links" ON semester_links;
+CREATE POLICY "Public can view semester links" ON semester_links FOR SELECT USING (true);
+
+-- 2. Sensitive Tables Protected from Direct Public Access:
+-- Only backend service_role can access usn_disputes (verification selfies),
+-- comparison_logs, login_logs, and missing_usn_reports.
+DROP POLICY IF EXISTS "Service role full access on disputes" ON usn_disputes;
+CREATE POLICY "Service role full access on disputes" ON usn_disputes FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service role full access on comparisons" ON comparison_logs;
+CREATE POLICY "Service role full access on comparisons" ON comparison_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service role full access on login logs" ON login_logs;
+CREATE POLICY "Service role full access on login logs" ON login_logs FOR ALL TO service_role USING (true) WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Service role full access on missing reports" ON missing_usn_reports;
+CREATE POLICY "Service role full access on missing reports" ON missing_usn_reports FOR ALL TO service_role USING (true) WITH CHECK (true);

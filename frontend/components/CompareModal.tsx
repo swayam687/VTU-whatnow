@@ -144,7 +144,7 @@ export default function CompareModal({
           }`}
         >
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 text-slate-950 flex items-center justify-center shadow-sm font-bold">
+            <div className="w-8 h-8 rounded-xl bg-slate-900 border border-white/10 text-white flex items-center justify-center shadow-xs font-bold">
               <IconCompare className="w-4 h-4" />
             </div>
             <div>
@@ -526,7 +526,7 @@ export default function CompareModal({
               sfx.playMechanicalClick();
               onClose();
             }}
-            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-xs shadow-sm transition-all"
+            className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 font-medium text-xs shadow-xs transition-all active:scale-[0.98]"
           >
             Close Comparison
           </button>

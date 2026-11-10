@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { sfx } from "../lib/sfx";
-import { IconInstallApp } from "./Icons";
+import { IconInstallApp, IconKey, IconShield } from "./Icons";
 import InstallAppModal from "./InstallAppModal";
 import { AuthSession } from "../lib/api";
 
@@ -54,10 +54,10 @@ export default function Navbar({
           className="flex items-center gap-2 group shrink-0"
         >
           <div
-            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-sm transition-transform group-hover:scale-105 overflow-hidden relative shrink-0 ${
+            className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center font-bold text-sm shadow-xs transition-transform group-hover:scale-105 overflow-hidden relative shrink-0 ${
               isObsidian
-                ? "bg-gradient-to-br from-cyan-500 to-blue-600 text-slate-950 shadow-cyan-500/20"
-                : "bg-blue-600 text-white"
+                ? "bg-slate-900 border border-white/15 text-white"
+                : "bg-slate-900 text-white"
             }`}
           >
             <img
@@ -259,9 +259,9 @@ export default function Navbar({
                 sfx.playMechanicalClick();
                 onOpenAuth?.();
               }}
-              className="flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-sm shadow-emerald-500/20 active:scale-95 transition-all shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-medium text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs active:scale-[0.98] transition-all shrink-0"
             >
-              <span>🔑</span>
+              <IconKey className="w-3.5 h-3.5" />
               <span className="text-[11px] sm:text-xs">Login</span>
             </button>
           )}
@@ -270,13 +270,13 @@ export default function Navbar({
           <Link
             href="/admin"
             onClick={() => sfx.playMechanicalClick()}
-            className={`flex items-center gap-1 px-2.5 sm:px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl transition-all shadow-sm shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-medium text-xs rounded-xl transition-all shadow-xs shrink-0 ${
               isObsidian
-                ? "bg-slate-800 hover:bg-slate-700 text-white border border-slate-700"
+                ? "bg-slate-900 hover:bg-slate-800 text-slate-100 border border-white/10"
                 : "bg-slate-900 hover:bg-slate-800 text-white"
             }`}
           >
-            <span>🛡️</span>
+            <IconShield className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Admin</span>
           </Link>
         </div>
