@@ -21,7 +21,7 @@ def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
 from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, desc, func, distinct
+from sqlalchemy import text, desc, func, distinct, inspect
 
 from .config import settings
 from .database import engine, get_db
@@ -138,28 +138,55 @@ def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
 def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"), db: Session = Depends(get_db)) -> Optional[str]:
     return verify_session_token(x_student_token, db)
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    # Run DB table verification in a background thread so port binds immediately (<1s)
-    def init_db():
+def init_db():
+    try:
+        # 1. Create missing tables registered in metadata
+        models.Base.metadata.create_all(bind=engine)
+
+        # 2. Inspect existing columns to prevent executing failing ALTER statements
         try:
-            models.Base.metadata.create_all(bind=engine)
-            # Safely add columns to existing students table in Supabase PostgreSQL & SQLite
-            with engine.connect() as conn:
-                for col_stmt in [
-                    "ALTER TABLE students ADD COLUMN password_hash VARCHAR;",
-                    "ALTER TABLE students ADD COLUMN is_claimed BOOLEAN DEFAULT FALSE;",
-                    "ALTER TABLE students ADD COLUMN login_count INTEGER DEFAULT 0;",
-                    "ALTER TABLE students ADD COLUMN last_login_at TIMESTAMP;",
-                    "ALTER TABLE students ADD COLUMN avatar_pixel_art VARCHAR DEFAULT '';",
+            insp = inspect(engine)
+            existing_tables = set(insp.get_table_names())
+            if "students" in existing_tables:
+                existing_cols = {c["name"] for c in insp.get_columns("students")}
+                columns_to_ensure = [
+                    ("password_hash", "ALTER TABLE students ADD COLUMN password_hash VARCHAR;"),
+                    ("is_claimed", "ALTER TABLE students ADD COLUMN is_claimed BOOLEAN DEFAULT FALSE;"),
+                    ("login_count", "ALTER TABLE students ADD COLUMN login_count INTEGER DEFAULT 0;"),
+                    ("last_login_at", "ALTER TABLE students ADD COLUMN last_login_at TIMESTAMP;"),
+                    ("avatar_pixel_art", "ALTER TABLE students ADD COLUMN avatar_pixel_art VARCHAR DEFAULT '';"),
+                ]
+                for col_name, sql_stmt in columns_to_ensure:
+                    if col_name not in existing_cols:
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(text(sql_stmt))
+                            print(f"✅ Added column '{col_name}' to students table.")
+                        except Exception as col_err:
+                            print(f"⚠️ Could not add column '{col_name}': {col_err}")
+
+            # 3. For PostgreSQL (e.g. Supabase on Render), guarantee idempotency with IF NOT EXISTS
+            if engine.dialect.name == "postgresql":
+                for col_name, col_def in [
+                    ("password_hash", "VARCHAR"),
+                    ("is_claimed", "BOOLEAN DEFAULT FALSE"),
+                    ("login_count", "INTEGER DEFAULT 0"),
+                    ("last_login_at", "TIMESTAMP"),
+                    ("avatar_pixel_art", "VARCHAR DEFAULT ''"),
                 ]:
                     try:
-                        conn.execute(text(col_stmt))
+                        with engine.begin() as conn:
+                            conn.execute(text(f"ALTER TABLE students ADD COLUMN IF NOT EXISTS {col_name} {col_def};"))
                     except Exception:
                         pass
+        except Exception as insp_err:
+            print(f"⚠️ Column inspection notice: {insp_err}")
 
-                # Explicitly guarantee comparison_logs table exists
-                try:
+        # 4. Explicitly guarantee auxiliary tables exist in their own dedicated transactions
+        # comparison_logs
+        try:
+            with engine.begin() as conn:
+                if engine.dialect.name == "postgresql":
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS comparison_logs (
                             id SERIAL PRIMARY KEY,
@@ -175,27 +202,29 @@ async def lifespan(app: FastAPI):
                             ip_address VARCHAR DEFAULT ''
                         );
                     """))
-                except Exception:
-                    try:
-                        conn.execute(text("""
-                            CREATE TABLE IF NOT EXISTS comparison_logs (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                viewer_usn TEXT,
-                                viewer_name TEXT DEFAULT '',
-                                student1_usn TEXT NOT NULL,
-                                student1_name TEXT DEFAULT '',
-                                student1_branch TEXT DEFAULT '',
-                                student2_usn TEXT NOT NULL,
-                                student2_name TEXT DEFAULT '',
-                                student2_branch TEXT DEFAULT '',
-                                compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                ip_address TEXT DEFAULT ''
-                            );
-                        """))
-                    except Exception:
-                        pass
-                # Explicitly guarantee missing_usn_reports table exists
-                try:
+                else:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS comparison_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            viewer_usn TEXT,
+                            viewer_name TEXT DEFAULT '',
+                            student1_usn TEXT NOT NULL,
+                            student1_name TEXT DEFAULT '',
+                            student1_branch TEXT DEFAULT '',
+                            student2_usn TEXT NOT NULL,
+                            student2_name TEXT DEFAULT '',
+                            student2_branch TEXT DEFAULT '',
+                            compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address TEXT DEFAULT ''
+                        );
+                    """))
+        except Exception as e:
+            print(f"⚠️ comparison_logs init notice: {e}")
+
+        # missing_usn_reports
+        try:
+            with engine.begin() as conn:
+                if engine.dialect.name == "postgresql":
                     conn.execute(text("""
                         CREATE TABLE IF NOT EXISTS missing_usn_reports (
                             id SERIAL PRIMARY KEY,
@@ -208,28 +237,31 @@ async def lifespan(app: FastAPI):
                             ip_address VARCHAR DEFAULT ''
                         );
                     """))
-                except Exception:
-                    try:
-                        conn.execute(text("""
-                            CREATE TABLE IF NOT EXISTS missing_usn_reports (
-                                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                                usn TEXT NOT NULL,
-                                name TEXT DEFAULT '',
-                                branch TEXT DEFAULT '',
-                                message TEXT DEFAULT '',
-                                status TEXT DEFAULT 'pending',
-                                reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                ip_address TEXT DEFAULT ''
-                            );
-                        """))
-                    except Exception:
-                        pass
-                conn.commit()
-            print("✅ Database schema initialized/verified.")
+                else:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS missing_usn_reports (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            usn TEXT NOT NULL,
+                            name TEXT DEFAULT '',
+                            branch TEXT DEFAULT '',
+                            message TEXT DEFAULT '',
+                            status TEXT DEFAULT 'pending',
+                            reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address TEXT DEFAULT ''
+                        );
+                    """))
         except Exception as e:
-            print(f"⚠️ Notice: DB connection check ({e}). Web service remains live.")
+            print(f"⚠️ missing_usn_reports init notice: {e}")
 
-    threading.Thread(target=init_db, daemon=True).start()
+        print("✅ Database schema initialized and verified.")
+    except Exception as e:
+        print(f"⚠️ Notice: DB connection check ({e}). Web service remains live.")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Execute database schema check synchronously before accepting traffic
+    init_db()
     yield
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)

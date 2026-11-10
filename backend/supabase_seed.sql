@@ -16,8 +16,20 @@ CREATE TABLE IF NOT EXISTS students (
     total_backlogs INTEGER DEFAULT 0,
     github_url VARCHAR DEFAULT '',
     linkedin_url VARCHAR DEFAULT '',
-    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc')
+    updated_at TIMESTAMP WITHOUT TIME ZONE DEFAULT (NOW() AT TIME ZONE 'utc'),
+    password_hash VARCHAR DEFAULT '',
+    is_claimed BOOLEAN DEFAULT FALSE,
+    login_count INTEGER DEFAULT 0,
+    last_login_at TIMESTAMP WITHOUT TIME ZONE,
+    avatar_pixel_art VARCHAR DEFAULT ''
 );
+
+-- Safe migrations for pre-existing tables
+ALTER TABLE students ADD COLUMN IF NOT EXISTS password_hash VARCHAR DEFAULT '';
+ALTER TABLE students ADD COLUMN IF NOT EXISTS is_claimed BOOLEAN DEFAULT FALSE;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS login_count INTEGER DEFAULT 0;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMP WITHOUT TIME ZONE;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS avatar_pixel_art VARCHAR DEFAULT '';
 
 CREATE TABLE IF NOT EXISTS subjects (
     code VARCHAR PRIMARY KEY,
