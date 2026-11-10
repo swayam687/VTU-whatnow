@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { updateStudentAvatar } from "../lib/api";
-import { IconClose, IconCheck, IconRotateCcw, IconPencil } from "./Icons";
+import { IconClose, IconCheck, IconRotateCcw, IconPencil, IconEraser } from "./Icons";
 import { sfx } from "../lib/sfx";
 
 interface PixelAvatarModalProps {
@@ -35,6 +35,51 @@ export const PIXEL_PRESETS: { name: string; icon: string; pattern: string }[] = 
       "0011111100",
   },
   {
+    name: "Wink",
+    icon: "😉",
+    pattern:
+      "0011111100" +
+      "0100000010" +
+      "1010000001" +
+      "1010001111" +
+      "1000000001" +
+      "1010000101" +
+      "1001111001" +
+      "1000000001" +
+      "0100000010" +
+      "0011111100",
+  },
+  {
+    name: "Upside Down",
+    icon: "🙃",
+    pattern:
+      "0011111100" +
+      "0100000010" +
+      "1000000001" +
+      "1001111001" +
+      "1010000101" +
+      "1000000001" +
+      "1010000101" +
+      "1010000101" +
+      "0100000010" +
+      "0011111100",
+  },
+  {
+    name: "Straight",
+    icon: "😑",
+    pattern:
+      "0011111100" +
+      "0100000010" +
+      "1000000001" +
+      "1011001101" +
+      "1000000001" +
+      "1000000001" +
+      "1011111101" +
+      "1000000001" +
+      "0100000010" +
+      "0011111100",
+  },
+  {
     name: "Sad Face",
     icon: "🥺",
     pattern:
@@ -48,6 +93,36 @@ export const PIXEL_PRESETS: { name: string; icon: string; pattern: string }[] = 
       "1000000001" +
       "0100000010" +
       "0011111100",
+  },
+  {
+    name: "Peace",
+    icon: "✌️",
+    pattern:
+      "0011011000" +
+      "0011011000" +
+      "0011011000" +
+      "0011111000" +
+      "0111111100" +
+      "0110001100" +
+      "0111111100" +
+      "0011111000" +
+      "0011111000" +
+      "0001110000",
+  },
+  {
+    name: "Eyes",
+    icon: "👀",
+    pattern:
+      "0000000000" +
+      "0111001110" +
+      "1111011110" +
+      "1101011010" +
+      "1101011010" +
+      "1111011110" +
+      "0111001110" +
+      "0000000000" +
+      "0000000000" +
+      "0000000000",
   },
   {
     name: "Heart",
@@ -65,6 +140,21 @@ export const PIXEL_PRESETS: { name: string; icon: string; pattern: string }[] = 
       "0000000000",
   },
   {
+    name: "Cross",
+    icon: "❌",
+    pattern:
+      "1100000011" +
+      "1110000111" +
+      "0111001110" +
+      "0011111100" +
+      "0001111000" +
+      "0001111000" +
+      "0011111100" +
+      "0111001110" +
+      "1110000111" +
+      "1100000011",
+  },
+  {
     name: "Star",
     icon: "⭐️",
     pattern:
@@ -80,7 +170,7 @@ export const PIXEL_PRESETS: { name: string; icon: string; pattern: string }[] = 
       "0000000000",
   },
   {
-    name: "Arcade Ghost",
+    name: "Ghost",
     icon: "👻",
     pattern:
       "0001111000" +
@@ -95,21 +185,6 @@ export const PIXEL_PRESETS: { name: string; icon: string; pattern: string }[] = 
       "0100100101",
   },
   {
-    name: "Cat",
-    icon: "🐱",
-    pattern:
-      "0110000110" +
-      "1110000111" +
-      "1100000011" +
-      "1111111111" +
-      "1011001101" +
-      "1011001101" +
-      "1111111111" +
-      "0110110110" +
-      "0011111100" +
-      "0001111000",
-  },
-  {
     name: "Robot",
     icon: "🤖",
     pattern:
@@ -122,36 +197,6 @@ export const PIXEL_PRESETS: { name: string; icon: string; pattern: string }[] = 
       "0101010110" +
       "0111111110" +
       "0010000100" +
-      "0011111100",
-  },
-  {
-    name: "Diamond",
-    icon: "💎",
-    pattern:
-      "0001111000" +
-      "0011111100" +
-      "0111111110" +
-      "1111111111" +
-      "0111111110" +
-      "0011111100" +
-      "0001111000" +
-      "0000110000" +
-      "0000000000" +
-      "0000000000",
-  },
-  {
-    name: "Skull",
-    icon: "💀",
-    pattern:
-      "0011111100" +
-      "0111111110" +
-      "1111111111" +
-      "1011111101" +
-      "1001111001" +
-      "1111111111" +
-      "0110110110" +
-      "0011111100" +
-      "0010101010" +
       "0011111100",
   },
   {
@@ -225,11 +270,34 @@ export default function PixelAvatarModal({
 }: PixelAvatarModalProps) {
   const gradeInfo = getGradeColorInfo(percentage, totalBacklogs);
   const [pixels, setPixels] = useState<boolean[]>(Array(100).fill(false));
-  const [isMouseDown, setIsMouseDown] = useState(false);
-  const [drawMode, setDrawMode] = useState<boolean>(true); // true = fill, false = erase
+  const [activeTool, setActiveTool] = useState<"pencil" | "eraser">("pencil");
   const [saving, setSaving] = useState(false);
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
+
+  // Refs for instantaneous synchronous event handling
+  const pixelsRef = useRef<boolean[]>(pixels);
+  pixelsRef.current = pixels;
+
+  const isPaintingRef = useRef(false);
+  const drawTargetValueRef = useRef<boolean>(true);
+  const activeToolRef = useRef<"pencil" | "eraser">(activeTool);
+  activeToolRef.current = activeTool;
+
+  // Global mouseup / touchend listener to guarantee painting stops
+  useEffect(() => {
+    const handleGlobalRelease = () => {
+      isPaintingRef.current = false;
+    };
+    window.addEventListener("mouseup", handleGlobalRelease);
+    window.addEventListener("touchend", handleGlobalRelease);
+    window.addEventListener("touchcancel", handleGlobalRelease);
+    return () => {
+      window.removeEventListener("mouseup", handleGlobalRelease);
+      window.removeEventListener("touchend", handleGlobalRelease);
+      window.removeEventListener("touchcancel", handleGlobalRelease);
+    };
+  }, []);
 
   // Initialize pixels from initialPixelArt, localStorage, or default preset
   useEffect(() => {
@@ -249,36 +317,55 @@ export default function PixelAvatarModal({
     }
   }, [isOpen, initialPixelArt, usn]);
 
-  if (!isOpen) return null;
-
-  const handleCellClick = (index: number) => {
-    sfx.playMechanicalClick();
+  const updateSinglePixel = useCallback((index: number, val: boolean) => {
     setPixels((prev) => {
+      if (prev[index] === val) return prev;
       const next = [...prev];
-      next[index] = !next[index];
+      next[index] = val;
       return next;
     });
+  }, []);
+
+  // Pointer/Mouse Down on a cell
+  const handleCellPointerDown = (index: number, e: React.MouseEvent | React.TouchEvent) => {
+    // Prevent default touch scrolling/gestures on the canvas
+    if (e.cancelable) e.preventDefault();
+    isPaintingRef.current = true;
+
+    let targetVal: boolean;
+    if (activeToolRef.current === "eraser") {
+      targetVal = false;
+    } else {
+      // Toggle current cell state when clicking with pencil
+      targetVal = !pixelsRef.current[index];
+    }
+
+    drawTargetValueRef.current = targetVal;
+    updateSinglePixel(index, targetVal);
+    sfx.playMechanicalClick();
   };
 
+  // Mouse drag enter on a cell (desktop)
   const handleCellMouseEnter = (index: number) => {
-    if (isMouseDown) {
-      setPixels((prev) => {
-        const next = [...prev];
-        next[index] = drawMode;
-        return next;
-      });
+    if (isPaintingRef.current) {
+      updateSinglePixel(index, drawTargetValueRef.current);
     }
   };
 
-  const handleMouseDownOnCell = (index: number) => {
-    setIsMouseDown(true);
-    const newDrawMode = !pixels[index];
-    setDrawMode(newDrawMode);
-    setPixels((prev) => {
-      const next = [...prev];
-      next[index] = newDrawMode;
-      return next;
-    });
+  // Touch drag move over grid (mobile)
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!isPaintingRef.current) return;
+    if (e.touches.length > 0) {
+      const touch = e.touches[0];
+      const elem = document.elementFromPoint(touch.clientX, touch.clientY);
+      const idxAttr = elem?.getAttribute("data-pixel-idx");
+      if (idxAttr !== null && idxAttr !== undefined) {
+        const idx = parseInt(idxAttr, 10);
+        if (!isNaN(idx) && idx >= 0 && idx < 100) {
+          updateSinglePixel(idx, drawTargetValueRef.current);
+        }
+      }
+    }
   };
 
   const handleApplyPreset = (pattern: string) => {
@@ -307,7 +394,7 @@ export default function PixelAvatarModal({
     const patternString = pixels.map((b) => (b ? "1" : "0")).join("");
 
     try {
-      // 1. Save locally for 0ms offline retrieval
+      // 1. Save locally for 0ms offline instant display
       if (typeof window !== "undefined") {
         localStorage.setItem(`vtu_avatar_${usn.toUpperCase()}`, patternString);
         window.dispatchEvent(
@@ -317,7 +404,7 @@ export default function PixelAvatarModal({
         );
       }
 
-      // 2. Persist to backend database for sync across all students
+      // 2. Persist to backend database for synchronization across devices & leaderboards
       await updateStudentAvatar(usn, patternString);
       setSuccessMsg("🎉 Custom avatar saved to your verified student profile!");
       sfx.playSonarChime();
@@ -326,7 +413,7 @@ export default function PixelAvatarModal({
         onClose();
       }, 900);
     } catch (err: any) {
-      console.warn("Avatar save error:", err);
+      console.warn("Avatar save warning:", err);
       // Even if network fails, local storage holds the change
       setSuccessMsg("Saved locally on your device!");
       onAvatarSaved(patternString);
@@ -338,12 +425,16 @@ export default function PixelAvatarModal({
     }
   };
 
+  if (!isOpen) return null;
+
   const filledCount = pixels.filter(Boolean).length;
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto"
-      onMouseUp={() => setIsMouseDown(false)}
+      onMouseUp={() => {
+        isPaintingRef.current = false;
+      }}
     >
       <div
         className={`relative max-w-lg w-full rounded-2xl sm:rounded-3xl border shadow-2xl p-4 sm:p-6 space-y-4 my-auto transition-all ${
@@ -409,21 +500,23 @@ export default function PixelAvatarModal({
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 py-1">
           {/* 10x10 Interactive Grid */}
           <div
-            className="p-2 rounded-2xl border bg-black/40 border-inherit select-none touch-none"
-            onMouseLeave={() => setIsMouseDown(false)}
+            className="p-2.5 rounded-2xl border bg-black/40 border-inherit select-none touch-none"
+            onTouchMove={handleTouchMove}
           >
             <div
-              className="grid grid-cols-10 gap-1"
+              className="grid grid-cols-10 gap-1 select-none"
               style={{ width: "240px", height: "240px" }}
             >
               {pixels.map((isFilled, idx) => (
-                <button
+                <div
                   key={idx}
-                  type="button"
-                  onMouseDown={() => handleMouseDownOnCell(idx)}
+                  data-pixel-idx={idx}
+                  role="button"
+                  tabIndex={0}
+                  onMouseDown={(e) => handleCellPointerDown(idx, e)}
                   onMouseEnter={() => handleCellMouseEnter(idx)}
-                  onClick={() => handleCellClick(idx)}
-                  className="rounded-xs transition-colors duration-75 focus:outline-none"
+                  onTouchStart={(e) => handleCellPointerDown(idx, e)}
+                  className="rounded-xs cursor-pointer select-none transition-colors duration-75 focus:outline-none"
                   style={{
                     backgroundColor: isFilled ? gradeInfo.color : "rgba(255, 255, 255, 0.05)",
                     border: isFilled
@@ -459,12 +552,12 @@ export default function PixelAvatarModal({
                   ))}
                 </div>
               </div>
-              <span className="text-[9px] font-mono opacity-50">Profile Size</span>
+              <span className="text-[9px] font-mono opacity-50">Profile (48px)</span>
             </div>
 
             <div className="text-center space-y-1">
               <div
-                className="w-8 h-8 rounded-lg border flex items-center justify-center overflow-hidden mx-auto shadow-xs"
+                className="w-9 h-9 rounded-lg border flex items-center justify-center overflow-hidden mx-auto shadow-xs"
                 style={{
                   backgroundColor: gradeInfo.bg,
                   borderColor: `${gradeInfo.color}50`,
@@ -482,26 +575,62 @@ export default function PixelAvatarModal({
                   ))}
                 </div>
               </div>
-              <span className="text-[9px] font-mono opacity-50">Row Size</span>
+              <span className="text-[9px] font-mono opacity-50">Table (32px)</span>
             </div>
           </div>
         </div>
 
-        {/* Canvas Tools */}
-        <div className="flex items-center justify-between gap-2 pt-1 border-t border-inherit">
-          <span className="text-[11px] opacity-60 font-medium">Tools:</span>
+        {/* Canvas Tools: Pencil / Eraser / Invert / Clear */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-inherit flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-[11px] opacity-60 font-medium mr-1">Tool:</span>
+            <button
+              type="button"
+              onClick={() => {
+                sfx.playMechanicalClick();
+                setActiveTool("pencil");
+              }}
+              className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition-all ${
+                activeTool === "pencil"
+                  ? "border-amber-500 bg-amber-500/20 text-amber-300 shadow-xs"
+                  : "border-inherit opacity-70 hover:opacity-100 hover:bg-white/5"
+              }`}
+            >
+              <IconPencil className="w-3.5 h-3.5" />
+              <span>Draw</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx.playMechanicalClick();
+                setActiveTool("eraser");
+              }}
+              className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition-all ${
+                activeTool === "eraser"
+                  ? "border-rose-500 bg-rose-500/20 text-rose-300 shadow-xs"
+                  : "border-inherit opacity-70 hover:opacity-100 hover:bg-white/5"
+              }`}
+            >
+              <IconEraser className="w-3.5 h-3.5" />
+              <span>Eraser</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-1.5">
             <button
               type="button"
               onClick={handleInvert}
-              className="px-2.5 py-1 text-xs rounded-lg border border-inherit hover:bg-white/5 transition-colors font-medium"
+              className="px-2.5 py-1 text-xs rounded-lg border border-inherit hover:bg-white/5 transition-colors font-medium flex items-center gap-1"
+              title="Invert all pixels"
             >
-              Invert
+              <IconRotateCcw className="w-3 h-3" />
+              <span>Invert</span>
             </button>
             <button
               type="button"
               onClick={handleClear}
               className="px-2.5 py-1 text-xs rounded-lg border border-inherit text-rose-400 hover:bg-rose-500/10 transition-colors font-medium"
+              title="Clear all pixels to transparent"
             >
               Clear
             </button>
@@ -516,15 +645,16 @@ export default function PixelAvatarModal({
             </label>
             <span className="text-[10px] opacity-50">Click to load &amp; tweak</span>
           </div>
-          <div className="grid grid-cols-5 gap-1.5">
+          <div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5">
             {PIXEL_PRESETS.map((p) => (
               <button
                 key={p.name}
                 type="button"
                 onClick={() => handleApplyPreset(p.pattern)}
-                className="py-1.5 px-1 rounded-xl border border-inherit bg-white/[0.02] hover:bg-white/[0.08] active:scale-95 transition-all flex flex-col items-center justify-center gap-0.5 text-center"
+                className="py-1.5 px-1 rounded-xl border border-inherit bg-white/[0.02] hover:bg-white/[0.08] active:scale-95 transition-all flex flex-col items-center justify-center gap-0.5 text-center group cursor-pointer"
+                title={`Load ${p.name} preset`}
               >
-                <span className="text-base">{p.icon}</span>
+                <span className="text-lg group-hover:scale-110 transition-transform">{p.icon}</span>
                 <span className="text-[9px] font-semibold truncate w-full">{p.name}</span>
               </button>
             ))}
@@ -532,12 +662,12 @@ export default function PixelAvatarModal({
         </div>
 
         {successMsg && (
-          <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl text-center font-medium">
+          <p className="text-xs text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl text-center font-medium animate-in fade-in">
             {successMsg}
           </p>
         )}
         {errorMsg && (
-          <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2 rounded-xl text-center font-medium">
+          <p className="text-xs text-rose-400 bg-rose-500/10 border border-rose-500/20 p-2 rounded-xl text-center font-medium animate-in fade-in">
             {errorMsg}
           </p>
         )}
@@ -555,7 +685,7 @@ export default function PixelAvatarModal({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-1.5"
+            className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
           >
             <IconCheck className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>{saving ? "Saving Avatar..." : "Save My Pixel Art"}</span>
@@ -565,4 +695,3 @@ export default function PixelAvatarModal({
     </div>
   );
 }
-
