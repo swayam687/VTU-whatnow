@@ -37,7 +37,18 @@ import {
   IconArrowRight,
   IconGraduationCap,
   IconFileText,
+  IconGrid,
+  IconTable,
+  IconWifiOff,
 } from "../components/Icons";
+import DenseStudentTable from "../components/DenseStudentTable";
+import {
+  cacheStudent,
+  getCachedStudent,
+  cacheStudentsList,
+  getCachedStudentsList,
+  getCacheAgeString,
+} from "../lib/cache";
 import InstallAppModal from "../components/InstallAppModal";
 import StudentAuthModal from "../components/StudentAuthModal";
 import { sfx } from "../lib/sfx";
@@ -60,6 +71,34 @@ export default function Dashboard() {
 
   // View state: 'dashboard' | 'topology' | 'backlogs'
   const [currentView, setCurrentView] = useState<"dashboard" | "topology" | "backlogs">("dashboard");
+
+  // Display mode: 'grid' (cards) vs 'table' (dense Linear/Notion style)
+  const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
+
+  useEffect(() => {
+    try {
+      const savedView = localStorage.getItem("vtu_view_mode") as "grid" | "table" | null;
+      if (savedView === "grid" || savedView === "table") {
+        setViewMode(savedView);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const handleSetViewMode = (mode: "grid" | "table") => {
+    sfx.playMechanicalClick();
+    setViewMode(mode);
+    try {
+      localStorage.setItem("vtu_view_mode", mode);
+    } catch {
+      // ignore
+    }
+  };
+
+  // Offline / Cache tracking for Student Detail Modal
+  const [isDetailCached, setIsDetailCached] = useState(false);
+  const [cachedAge, setCachedAge] = useState("");
 
   // Art Direction: Obsidian Dark Mode vs Clean Light Mode
   const [isObsidian, setIsObsidian] = useState(true);
@@ -147,6 +186,10 @@ export default function Dashboard() {
     setMyUsn(session.usn);
     // Reload student data with the new auth token
     loadStudentsData(session.token);
+    // Pre-cache authenticated student's full marksheet for 0ms instant offline viewing
+    fetchStudent(session.usn)
+      .then((data) => cacheStudent(data))
+      .catch(() => {});
   };
 
   const handleSignOut = () => {
@@ -215,9 +258,19 @@ export default function Dashboard() {
     loadBranchData();
   }, []);
 
-  // Load students & leaderboard on branch or sort change
+  // Load students & leaderboard on branch or sort change (with 0ms local storage cache)
   const loadStudentsData = (authToken?: string | null) => {
-    setLoading(true);
+    // 0ms Instant Cache Load: Render immediately if local cache exists
+    if (students.length === 0) {
+      const cached = getCachedStudentsList();
+      if (cached && cached.students.length > 0) {
+        setStudents(cached.students);
+        setLoading(false); // Dashboard shows immediately without waiting for server wakeup!
+      }
+    } else {
+      setLoading(true);
+    }
+
     const effectiveToken = authToken !== undefined 
       ? (authToken || undefined) 
       : (studentSession?.token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") || undefined : undefined));
@@ -229,6 +282,9 @@ export default function Dashboard() {
       .then(([studentList, topperList]) => {
         setStudents(studentList);
         setToppers(topperList);
+        if (activeBranch === "ALL" && !sortBy && studentList.length > 0) {
+          cacheStudentsList(studentList);
+        }
       })
       .catch((err) => console.error("Error loading data", err))
       .finally(() => setLoading(false));
@@ -247,15 +303,32 @@ export default function Dashboard() {
     );
   }, [students, search]);
 
-  // Open detail modal and fetch full marks
+  // Open detail modal and fetch full marks (with 0ms instant cached load)
   const handleOpenDetail = async (usn: string) => {
     setSelectedUsn(usn);
-    setDetailLoading(true);
+
+    // Step 1: 0ms Local Cache Check
+    const cached = getCachedStudent(usn);
+    if (cached) {
+      setDetailStudent(cached.student);
+      setIsDetailCached(true);
+      setCachedAge(getCacheAgeString(cached.timestamp));
+      setDetailLoading(false); // Display instantly in 0ms!
+    } else {
+      setDetailLoading(true);
+      setIsDetailCached(false);
+      setCachedAge("");
+    }
+
+    // Step 2: Background network fetch (Stale-While-Revalidate)
     try {
-      const data = await fetchStudent(usn);
-      setDetailStudent(data);
+      const freshData = await fetchStudent(usn);
+      setDetailStudent(freshData);
+      cacheStudent(freshData); // Update cache for next time
+      setIsDetailCached(false);
     } catch (err) {
-      console.error(err);
+      console.warn("Could not fetch fresh student data, offline or server asleep", err);
+      // If we already loaded from cache, user continues browsing seamlessly!
     } finally {
       setDetailLoading(false);
     }
@@ -264,6 +337,8 @@ export default function Dashboard() {
   const handleCloseDetail = () => {
     setSelectedUsn(null);
     setDetailStudent(null);
+    setIsDetailCached(false);
+    setCachedAge("");
   };
 
   // Compare toggle
@@ -642,25 +717,57 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Sort Filter */}
-              <div className="flex items-center gap-1.5 self-end sm:self-auto">
-                <span className="text-[11px] font-medium opacity-60">Sort:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => {
-                    sfx.playMechanicalClick();
-                    setSortBy(e.target.value as any);
-                  }}
-                  className={`text-xs font-semibold rounded-xl border px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    isObsidian
-                      ? "bg-slate-950 border-slate-800 text-slate-200"
-                      : "bg-white border-slate-200 text-slate-700"
-                  }`}
-                >
-                  <option value="percentage">Highest Percentage</option>
-                  <option value="backlogs">Least Backlogs</option>
-                  <option value="usn">USN Sequence</option>
-                </select>
+              {/* Sort Filter & View Mode Toggle */}
+              <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[11px] font-medium opacity-60">Sort:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => {
+                      sfx.playMechanicalClick();
+                      setSortBy(e.target.value as any);
+                    }}
+                    className={`text-xs font-semibold rounded-xl border px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      isObsidian
+                        ? "bg-slate-950 border-slate-800 text-slate-200"
+                        : "bg-white border-slate-200 text-slate-700"
+                    }`}
+                  >
+                    <option value="percentage">Highest Percentage</option>
+                    <option value="backlogs">Least Backlogs</option>
+                    <option value="usn">USN Sequence</option>
+                  </select>
+                </div>
+
+                {/* Linear-style Grid vs Table View Mode Switcher */}
+                <div className="flex items-center bg-slate-100 dark:bg-white/5 p-0.5 rounded-xl border border-slate-200 dark:border-white/10 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => handleSetViewMode("grid")}
+                    title="Card Grid View"
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      viewMode === "grid"
+                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <IconGrid className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Grid</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleSetViewMode("table")}
+                    title="Dense Spreadsheet Table View"
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                      viewMode === "table"
+                        ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                        : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                    }`}
+                  >
+                    <IconTable className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Table</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -751,7 +858,7 @@ export default function Dashboard() {
                     No results match &quot;{search}&quot;. Verify your query or scrape USNs in the Admin portal.
                   </p>
                 </div>
-              ) : (
+              ) : viewMode === "grid" ? (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5">
                   {filteredStudents.map((s, idx) => (
                     <StudentCard
@@ -774,6 +881,53 @@ export default function Dashboard() {
                         setIsAuthModalOpen(true);
                       }}
                       className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
+                        isObsidian
+                          ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
+                          : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
+                      }`}
+                    >
+                      <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border ${
+                        isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-white border-slate-200 text-slate-700"
+                      }`}>
+                        <IconLock className="w-4 h-4" />
+                      </div>
+                      <h3 className="font-bold text-sm sm:text-base tracking-tight">
+                        Unlock Full Batch Results &amp; Rankings
+                      </h3>
+                      <p className="text-xs opacity-65 max-w-md mx-auto leading-relaxed">
+                        Public preview displays top departmental ranks. Sign in with your USN to view the full directory, detailed marksheet, and subject-level percentiles.
+                      </p>
+                      <div className="pt-1">
+                        <button
+                          type="button"
+                          className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs inline-flex items-center gap-1.5"
+                        >
+                          <IconKey className="w-3.5 h-3.5" />
+                          <span>Sign In / Claim Your USN</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <DenseStudentTable
+                    students={filteredStudents}
+                    compareUsns={compareUsns}
+                    onToggleCompare={handleToggleCompare}
+                    onOpenDetail={handleOpenDetail}
+                    myUsn={myUsn}
+                    isObsidian={isObsidian}
+                  />
+
+                  {/* Public Locked Teaser Card */}
+                  {!studentSession && (
+                    <div
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsAuthModalOpen(true);
+                      }}
+                      className={`p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
                         isObsidian
                           ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
                           : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
@@ -898,10 +1052,18 @@ export default function Dashboard() {
                   showFingerprint
                 />
                 <div>
-                  <h2 className="font-bold text-sm sm:text-base leading-tight">
-                    {detailStudent?.name || "Student Marksheet"}
-                  </h2>
-                  <p className="text-xs opacity-60 font-mono">{selectedUsn} • {detailStudent?.branch || "ENG"}</p>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-bold text-sm sm:text-base leading-tight">
+                      {detailStudent?.name || "Student Marksheet"}
+                    </h2>
+                    {isDetailCached && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                        <span>⚡️</span>
+                        <span>0ms Cached ({cachedAge || "saved"})</span>
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs opacity-60 font-mono mt-0.5">{selectedUsn} • {detailStudent?.branch || "ENG"}</p>
                 </div>
               </div>
 
@@ -939,14 +1101,26 @@ export default function Dashboard() {
 
             {/* Modal Body */}
             <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
-              {detailLoading ? (
+              {detailLoading && !detailStudent ? (
                 <div className="space-y-3 py-6">
                   <div className="h-6 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
                   <div className="h-16 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
                   <div className="h-32 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
                 </div>
               ) : !detailStudent ? (
-                <p className="text-center opacity-60 py-6 text-xs">Student record not found.</p>
+                <div className="text-center py-8 space-y-2">
+                  <IconWifiOff className="w-7 h-7 mx-auto text-slate-400" />
+                  <p className="font-semibold text-sm">Marksheet Not Cached</p>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Could not reach server and no offline cache was saved for {selectedUsn}.
+                  </p>
+                  <button
+                    onClick={() => handleOpenDetail(selectedUsn)}
+                    className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900 mt-1"
+                  >
+                    Retry Loading
+                  </button>
+                </div>
               ) : (
                 <>
                   {/* Summary Metric Tiles */}
