@@ -180,6 +180,7 @@ export default function CompareModal({
                   usn={s1.usn}
                   percentage={s1.percentage}
                   totalBacklogs={s1.total_backlogs}
+                  customPixelArt={s1.avatar_pixel_art}
                   size={42}
                 />
                 <div className="min-w-0 flex-1">
@@ -252,6 +253,7 @@ export default function CompareModal({
                   usn={s2.usn}
                   percentage={s2.percentage}
                   totalBacklogs={s2.total_backlogs}
+                  customPixelArt={s2.avatar_pixel_art}
                   size={42}
                 />
                 <div className="min-w-0 flex-1">

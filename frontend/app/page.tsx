@@ -40,6 +40,7 @@ import {
   IconGrid,
   IconTable,
   IconWifiOff,
+  IconPencil,
 } from "../components/Icons";
 import DenseStudentTable from "../components/DenseStudentTable";
 import {
@@ -51,6 +52,7 @@ import {
 } from "../lib/cache";
 import InstallAppModal from "../components/InstallAppModal";
 import StudentAuthModal from "../components/StudentAuthModal";
+import PixelAvatarModal from "../components/PixelAvatarModal";
 import { sfx } from "../lib/sfx";
 
 const ALL_BRANCHES = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
@@ -138,6 +140,14 @@ export default function Dashboard() {
   // User Profile / "This is Me" state
   const [myUsn, setMyUsn] = useState<string>("");
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const [isPixelModalOpen, setIsPixelModalOpen] = useState(false);
+
+  // Authenticated student record
+  const myStudent = useMemo(() => {
+    const targetUsn = (studentSession?.usn || myUsn || "").toUpperCase();
+    if (!targetUsn) return null;
+    return students.find((s) => s.usn.toUpperCase() === targetUsn) || null;
+  }, [students, studentSession, myUsn]);
 
   // Restore authenticated session from sessionStorage on mount (resets on tab/browser close)
   useEffect(() => {
@@ -531,10 +541,24 @@ export default function Dashboard() {
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-start sm:items-center gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
-                      isObsidian ? "bg-white/5 border-white/10 text-emerald-400" : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                    }`}>
-                      <IconGraduationCap className="w-5 h-5" />
+                    <div
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsPixelModalOpen(true);
+                      }}
+                      className="cursor-pointer group relative shrink-0 transition-transform hover:scale-105 active:scale-95"
+                      title="Click to customize your 10x10 pixel art avatar"
+                    >
+                      <Identicon
+                        usn={studentSession.usn}
+                        name={studentSession.name}
+                        percentage={myStudent?.percentage}
+                        totalBacklogs={myStudent?.total_backlogs}
+                        customPixelArt={myStudent?.avatar_pixel_art}
+                        size={46}
+                        isEditable={true}
+                        onEditClick={() => setIsPixelModalOpen(true)}
+                      />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -570,6 +594,21 @@ export default function Dashboard() {
                     >
                       <IconFileText className="w-3.5 h-3.5" />
                       <span>View Marksheet</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsPixelModalOpen(true);
+                      }}
+                      className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+                        isObsidian
+                          ? "border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300"
+                          : "border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-800"
+                      }`}
+                      title="Draw your 10x10 custom pixel art avatar"
+                    >
+                      <IconPencil className="w-3.5 h-3.5" />
+                      <span>Pixel Avatar</span>
                     </button>
                     {students.length > 0 && (
                       <button
@@ -1048,14 +1087,27 @@ export default function Dashboard() {
                   usn={selectedUsn}
                   percentage={detailStudent?.percentage}
                   totalBacklogs={detailStudent?.total_backlogs}
-                  size={40}
+                  customPixelArt={detailStudent?.avatar_pixel_art}
+                  size={42}
                   showFingerprint
+                  isEditable={Boolean(studentSession && selectedUsn.toUpperCase() === studentSession.usn.toUpperCase())}
+                  onEditClick={() => setIsPixelModalOpen(true)}
                 />
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <h2 className="font-bold text-sm sm:text-base leading-tight">
                       {detailStudent?.name || "Student Marksheet"}
                     </h2>
+                    {studentSession && selectedUsn.toUpperCase() === studentSession.usn.toUpperCase() && (
+                      <button
+                        onClick={() => setIsPixelModalOpen(true)}
+                        className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                        title="Edit your 10x10 custom pixel art avatar"
+                      >
+                        <IconPencil className="w-2.5 h-2.5" />
+                        <span>Edit Avatar</span>
+                      </button>
+                    )}
                     {isDetailCached && (
                       <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
                         <span>⚡️</span>
@@ -1444,6 +1496,40 @@ export default function Dashboard() {
         isObsidian={isObsidian}
         initialUsn={myUsn}
       />
+
+      {/* 10x10 Custom Pixel Avatar Studio Modal */}
+      {studentSession && (
+        <PixelAvatarModal
+          isOpen={isPixelModalOpen}
+          onClose={() => setIsPixelModalOpen(false)}
+          usn={studentSession.usn}
+          name={studentSession.name}
+          percentage={myStudent?.percentage ?? detailStudent?.percentage ?? 75}
+          totalBacklogs={myStudent?.total_backlogs ?? detailStudent?.total_backlogs ?? 0}
+          initialPixelArt={
+            myStudent?.avatar_pixel_art ||
+            (typeof window !== "undefined"
+              ? localStorage.getItem(`vtu_avatar_${studentSession.usn.toUpperCase()}`) || ""
+              : "")
+          }
+          isObsidian={isObsidian}
+          onAvatarSaved={(savedArt) => {
+            setStudents((prev) =>
+              prev.map((s) =>
+                s.usn.toUpperCase() === studentSession.usn.toUpperCase()
+                  ? { ...s, avatar_pixel_art: savedArt }
+                  : s
+              )
+            );
+            if (detailStudent && detailStudent.usn.toUpperCase() === studentSession.usn.toUpperCase()) {
+              setDetailStudent((prev) => (prev ? { ...prev, avatar_pixel_art: savedArt } : null));
+            }
+            try {
+              localStorage.setItem(`vtu_avatar_${studentSession.usn.toUpperCase()}`, savedArt);
+            } catch {}
+          }}
+        />
+      )}
     </div>
   );
 }

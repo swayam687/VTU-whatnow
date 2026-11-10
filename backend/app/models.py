@@ -24,6 +24,7 @@ class Student(Base):
     is_claimed = Column(Boolean, default=False)
     login_count = Column(Integer, default=0)
     last_login_at = Column(DateTime, nullable=True)
+    avatar_pixel_art = Column(String, nullable=True, default="")  # 10x10 custom pixel art matrix
 
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")
 

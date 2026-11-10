@@ -61,6 +61,7 @@ export default function StudentCard({
             name={student.name}
             percentage={student.percentage}
             totalBacklogs={student.total_backlogs}
+            customPixelArt={student.avatar_pixel_art}
             size={34}
           />
           <div className="min-w-0 flex-1">
@@ -196,6 +197,7 @@ export default function StudentCard({
                 name={student.name}
                 percentage={student.percentage}
                 totalBacklogs={student.total_backlogs}
+                customPixelArt={student.avatar_pixel_art}
                 size={38}
               />
 

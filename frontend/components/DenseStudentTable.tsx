@@ -242,6 +242,7 @@ export default function DenseStudentTable({
                         name={s.name}
                         percentage={s.percentage}
                         totalBacklogs={s.total_backlogs}
+                        customPixelArt={s.avatar_pixel_art}
                         size={22}
                       />
                       <span className="font-bold text-slate-900 dark:text-slate-100 group-hover:underline">
@@ -345,3 +346,4 @@ export default function DenseStudentTable({
     </div>
   );
 }
+

@@ -29,6 +29,10 @@ class StudentBase(BaseModel):
     total_backlogs: int = 0
     github_url: Optional[str] = ""
     linkedin_url: Optional[str] = ""
+    avatar_pixel_art: Optional[str] = ""
+
+class AvatarUpdateRequest(BaseModel):
+    pixel_art: str
 
 class StudentOut(StudentBase):
     marks: List[MarkOut] = []

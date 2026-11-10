@@ -519,6 +519,7 @@ export default function CampusGraph({
                   usn={hoveredNode.student.usn}
                   percentage={hoveredNode.student.percentage}
                   totalBacklogs={hoveredNode.student.total_backlogs}
+                  customPixelArt={hoveredNode.student.avatar_pixel_art}
                   size={36}
                 />
                 <div className="min-w-0 flex-1">

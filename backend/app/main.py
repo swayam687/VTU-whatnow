@@ -52,6 +52,7 @@ from .schemas import (
     StudentSessionVerifyResponse,
     MissingUSNReportCreate,
     MissingUSNReportOut,
+    AvatarUpdateRequest,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -150,6 +151,7 @@ async def lifespan(app: FastAPI):
                     "ALTER TABLE students ADD COLUMN is_claimed BOOLEAN DEFAULT FALSE;",
                     "ALTER TABLE students ADD COLUMN login_count INTEGER DEFAULT 0;",
                     "ALTER TABLE students ADD COLUMN last_login_at TIMESTAMP;",
+                    "ALTER TABLE students ADD COLUMN avatar_pixel_art VARCHAR DEFAULT '';",
                 ]:
                     try:
                         conn.execute(text(col_stmt))
@@ -1004,6 +1006,30 @@ def update_student_socials(usn: str, data: StudentUpdate, db: Session = Depends(
     
     db.commit()
     return {"message": "Social profiles updated successfully.", "student": student}
+
+
+@app.post("/api/students/{usn}/avatar")
+def update_student_avatar(
+    usn: str,
+    req: AvatarUpdateRequest,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    clean_usn = usn.strip().upper()
+    current_usn = verify_session_token(x_student_token, db)
+    if not current_usn or current_usn != clean_usn:
+        raise HTTPException(
+            status_code=403,
+            detail="Unauthorized: You can only customize the avatar of your own verified student account."
+        )
+
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    student.avatar_pixel_art = req.pixel_art.strip()
+    db.commit()
+    return {"ok": True, "message": "Custom avatar pixel art saved successfully!", "pixel_art": student.avatar_pixel_art}
 
 
 @app.delete("/api/students/{usn}", dependencies=[Depends(require_admin)])

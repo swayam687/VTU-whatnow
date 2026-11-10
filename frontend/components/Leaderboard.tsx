@@ -101,6 +101,7 @@ export default function Leaderboard({
                   usn={s.usn}
                   percentage={s.percentage}
                   totalBacklogs={s.total_backlogs}
+                  customPixelArt={s.avatar_pixel_art}
                   size={34}
                 />
                 <div className="min-w-0 flex-1">

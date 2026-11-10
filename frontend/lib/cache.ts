@@ -97,3 +97,4 @@ export function getCacheAgeString(timestamp: number): string {
   if (diffHours < 24) return `${diffHours}h ago`;
   return `${Math.floor(diffHours / 24)}d ago`;
 }
+

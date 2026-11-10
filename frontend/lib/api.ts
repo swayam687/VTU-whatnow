@@ -24,6 +24,7 @@ export interface Student {
   total_backlogs: number;
   github_url?: string;
   linkedin_url?: string;
+  avatar_pixel_art?: string;
   marks?: Mark[];
 }
 
@@ -184,6 +185,26 @@ export async function updateStudentSocials(
   const resData = await res.json();
   if (!res.ok) throw new Error(resData.detail || "Failed to update profile");
   return resData;
+}
+
+export async function updateStudentAvatar(
+  usn: string,
+  pixelArt: string,
+  token?: string
+): Promise<{ ok: boolean; message: string; pixel_art: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") || "" : "");
+  if (effectiveToken) {
+    headers["X-Student-Token"] = effectiveToken;
+  }
+  const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}/avatar`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ pixel_art: pixelArt }),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.detail || "Failed to update avatar pixel art");
+  return data;
 }
 
 export async function deleteStudent(usn: string, adminKey?: string): Promise<{ message: string }> {
