@@ -45,3 +45,11 @@ pnpm-debug.log*
 *.swo
 .DS_Store
 Thumbs.db
+
+
+# Database Backups & Dumps
+backend/backups/
+*.json.bak
+
+# TypeScript build info
+*.tsbuildinfo

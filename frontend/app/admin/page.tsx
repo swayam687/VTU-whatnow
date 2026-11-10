@@ -27,7 +27,10 @@ import {
   reviewAdminDispute,
   fetchAdminLoginLogs,
   fetchAdminComparisonLogs,
+  fetchAdminMissingUsnReports,
+  resolveAdminMissingUsnReport,
   ComparisonLogsData,
+  MissingUSNReportRecord,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -81,8 +84,8 @@ export default function AdminPanel() {
   const [authError, setAuthError] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'disputes' | 'logs' | 'system'
-  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "disputes" | "logs" | "system">("scraper");
+  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'disputes' | 'missing_usn' | 'logs' | 'system'
+  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "disputes" | "missing_usn" | "logs" | "system">("scraper");
 
   // USN Disputes state
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
@@ -91,6 +94,11 @@ export default function AdminPanel() {
   const [selectedSelfieZoom, setSelectedSelfieZoom] = useState<string | null>(null);
   const [disputeActionMsg, setDisputeActionMsg] = useState<string>("");
   const [processingDisputeId, setProcessingDisputeId] = useState<number | null>(null);
+
+  // Missing USN reports state
+  const [missingReports, setMissingReports] = useState<MissingUSNReportRecord[]>([]);
+  const [missingReportsLoading, setMissingReportsLoading] = useState(false);
+  const [missingFilter, setMissingFilter] = useState<"all" | "pending" | "resolved">("pending");
 
   // Login Logs & Comparison state
   const [loginLogsData, setLoginLogsData] = useState<LoginLogsData | null>(null);
@@ -274,11 +282,47 @@ export default function AdminPanel() {
     }
   };
 
+  const loadMissingReports = async () => {
+    if (!adminKey) return;
+    setMissingReportsLoading(true);
+    try {
+      const data = await fetchAdminMissingUsnReports(adminKey);
+      setMissingReports(data);
+    } catch (err) {
+      console.error("Failed to load missing USN reports", err);
+    } finally {
+      setMissingReportsLoading(false);
+    }
+  };
+
+  const handleResolveMissingReport = async (id: number) => {
+    if (!adminKey) return;
+    sfx.playClick();
+    try {
+      await resolveAdminMissingUsnReport(id, adminKey);
+      await loadMissingReports();
+      sfx.playSonar();
+    } catch (err) {
+      console.error("Failed to resolve missing USN report", err);
+    }
+  };
+
+  const handleScrapeMissingReport = (usn: string) => {
+    sfx.playClick();
+    setMode("single");
+    setSingleUsn(usn);
+    setActiveTab("scraper");
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       loadStudentRecords();
+      loadDisputes();
+      loadMissingReports();
       if (activeTab === "disputes") {
         loadDisputes();
+      } else if (activeTab === "missing_usn") {
+        loadMissingReports();
       } else if (activeTab === "logs") {
         loadLoginLogs();
         loadComparisonLogs();
@@ -721,15 +765,15 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Mobile-First Tab Navigation (Responsive 3-col grid on mobile, flex row on tablet/desktop) */}
-      <div className="grid grid-cols-3 sm:flex items-center gap-1 sm:gap-1.5 bg-slate-100 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
+      {/* Mobile-First Tab Navigation (Smooth touch scroll on mobile, flex row on tablet/desktop) */}
+      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar bg-slate-100 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
         <button
           type="button"
           onClick={() => {
             sfx.playClick();
             setActiveTab("scraper");
           }}
-          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "scraper"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -745,7 +789,7 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("semesters");
           }}
-          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "semesters"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -764,7 +808,7 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("records");
           }}
-          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "records"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -784,7 +828,7 @@ export default function AdminPanel() {
             setActiveTab("disputes");
             loadDisputes();
           }}
-          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "disputes"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -803,10 +847,32 @@ export default function AdminPanel() {
           type="button"
           onClick={() => {
             sfx.playClick();
+            setActiveTab("missing_usn");
+            loadMissingReports();
+          }}
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
+            activeTab === "missing_usn"
+              ? "bg-white text-slate-900 shadow-sm"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <span>📢</span>
+          <span>Requests</span>
+          {missingReports.filter((r) => r.status === "pending").length > 0 && (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-mono animate-pulse font-bold">
+              {missingReports.filter((r) => r.status === "pending").length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
             setActiveTab("logs");
             loadLoginLogs();
           }}
-          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "logs"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -827,7 +893,7 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("system");
           }}
-          className={`py-2 px-1.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all text-center sm:flex-1 flex items-center justify-center gap-1 ${
+          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1 ${
             activeTab === "system"
               ? "bg-white text-slate-900 shadow-sm"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
@@ -1704,6 +1770,178 @@ export default function AdminPanel() {
                     )}
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB: MISSING USN SCRAPE REQUESTS                              */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "missing_usn" && (
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <span>📢 Missing USN Student Requests</span>
+                  {missingReports.filter((r) => r.status === "pending").length > 0 && (
+                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 text-blue-700">
+                      {missingReports.filter((r) => r.status === "pending").length} pending
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Students who tried logging in but their USN was not yet scraped. Scrape their marks with one click.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  loadMissingReports();
+                }}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors self-start sm:self-auto"
+              >
+                ↻ Refresh
+              </button>
+            </div>
+
+            {/* Filter buttons */}
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setMissingFilter("pending");
+                }}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                  missingFilter === "pending"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Pending ({missingReports.filter((r) => r.status === "pending").length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setMissingFilter("resolved");
+                }}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                  missingFilter === "resolved"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                Resolved ({missingReports.filter((r) => r.status === "resolved").length})
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  setMissingFilter("all");
+                }}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                  missingFilter === "all"
+                    ? "bg-slate-900 text-white shadow-xs"
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                All ({missingReports.length})
+              </button>
+            </div>
+
+            {/* Content List */}
+            {missingReportsLoading ? (
+              <div className="py-12 text-center text-xs text-slate-400">Loading requests...</div>
+            ) : missingReports.filter((r) => missingFilter === "all" || r.status === missingFilter).length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">
+                {missingFilter === "pending"
+                  ? "🎉 No pending requests! All requested USNs have been addressed."
+                  : "No requests found for this filter."}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                {missingReports
+                  .filter((r) => missingFilter === "all" || r.status === missingFilter)
+                  .map((r) => (
+                    <div
+                      key={r.id}
+                      className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono font-bold text-sm text-slate-900">{r.usn}</span>
+                            {r.branch && (
+                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
+                                {r.branch}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs font-medium text-slate-700 mt-0.5">{r.name}</p>
+                        </div>
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                            r.status === "pending"
+                              ? "bg-amber-100 text-amber-800 border border-amber-200"
+                              : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                          }`}
+                        >
+                          {r.status}
+                        </span>
+                      </div>
+
+                      {r.message && (
+                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
+                          <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
+                            Student Note:
+                          </p>
+                          <p className="italic">&ldquo;{r.message}&rdquo;</p>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                        <span>
+                          {formatDateTime(r.reported_at).time} • {formatDateTime(r.reported_at).date}
+                        </span>
+                        {r.ip_address && (
+                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                            IP: {r.ip_address}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Action buttons */}
+                      {r.status === "pending" ? (
+                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                          <button
+                            type="button"
+                            onClick={() => handleScrapeMissingReport(r.usn)}
+                            className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-blue-600 hover:bg-blue-700 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5"
+                          >
+                            <span>⚡️</span>
+                            <span>Scrape Now</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleResolveMissingReport(r.id)}
+                            className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center"
+                          >
+                            ✓ Mark Done
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="text-[11px] text-emerald-600 font-semibold pt-1 border-t border-slate-100 flex items-center gap-1">
+                          <span>✓</span>
+                          <span>Resolved</span>
+                        </div>
+                      )}
+                    </div>
+                  ))}
               </div>
             )}
           </div>

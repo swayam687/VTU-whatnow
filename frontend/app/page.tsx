@@ -440,45 +440,59 @@ export default function Dashboard() {
             {/* Student Auth / Public Mode Notice Banner */}
             {studentSession ? (
               <div
-                className={`rounded-2xl p-4 border transition-all ${
+                className={`rounded-3xl p-4.5 sm:p-5 border transition-all relative overflow-hidden ${
                   isObsidian
-                    ? "bg-gradient-to-r from-emerald-950/40 via-teal-950/20 to-transparent border-emerald-500/30 text-white"
-                    : "bg-emerald-50/80 border-emerald-200 text-emerald-900"
+                    ? "bg-gradient-to-r from-emerald-950/40 via-teal-950/30 to-[#0c0e12] border-emerald-500/30 text-white shadow-lg shadow-emerald-950/20"
+                    : "bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white border-emerald-200 text-emerald-950 shadow-sm"
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center text-xl shrink-0">
-                      🎓
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 border border-emerald-400/40 flex items-center justify-center text-2xl shrink-0 shadow-md shadow-emerald-500/20 text-white">
+                      🎉
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold font-mono text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
                           {studentSession.usn}
                         </span>
-                        <span className="text-xs opacity-60">• {studentSession.branch}</span>
-                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300">
-                          Unlocked
+                        <span className="text-xs opacity-75 font-semibold">• {studentSession.branch}</span>
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                          ✨ Full Access Unlocked
                         </span>
                       </div>
-                      <p className="font-bold text-sm sm:text-base mt-0.5">
-                        Logged in as {studentSession.name}
-                      </p>
-                      <p className="text-xs opacity-70">
-                        Full branch rankings &amp; marks unlocked for this session.
+                      <h2 className="font-extrabold text-base sm:text-lg tracking-tight">
+                        Welcome back, {studentSession.name}!
+                      </h2>
+                      <p className="text-xs opacity-80">
+                        Your complete marksheet, percentile, and branch standings are fully unlocked.
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 self-end sm:self-auto">
+
+                  <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-emerald-500/10">
                     <button
                       onClick={() => handleOpenDetail(studentSession.usn)}
-                      className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 text-white shadow-sm transition-all"
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-bold bg-emerald-500 hover:bg-emerald-600 active:scale-95 text-white shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-1.5"
                     >
-                      My Marksheet
+                      <span>📄 View My Marksheet</span>
                     </button>
+                    {students.length > 0 && (
+                      <button
+                        onClick={() => {
+                          const topper = students[0];
+                          if (topper && topper.usn.toUpperCase() !== studentSession.usn.toUpperCase()) {
+                            handleCompareWithMe(topper);
+                          }
+                        }}
+                        className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-bold bg-cyan-600/90 hover:bg-cyan-500 active:scale-95 text-white transition-all flex items-center justify-center gap-1"
+                      >
+                        <span>⚔️ Compare Topper</span>
+                      </button>
+                    )}
                     <button
                       onClick={handleSignOut}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+                      className={`px-3 py-2 rounded-xl text-xs font-medium border transition-colors ${
                         isObsidian
                           ? "bg-white/5 border-white/10 hover:bg-white/10 text-zinc-300"
                           : "bg-white border-zinc-200 hover:bg-zinc-100 text-zinc-700"
@@ -491,43 +505,46 @@ export default function Dashboard() {
               </div>
             ) : (
               <div
-                className={`rounded-2xl p-4 border transition-all ${
+                className={`rounded-3xl p-4.5 sm:p-5 border transition-all relative overflow-hidden ${
                   isObsidian
-                    ? "bg-gradient-to-r from-cyan-950/30 via-slate-900/40 to-transparent border-cyan-500/30 text-white"
-                    : "bg-blue-50/80 border-blue-200 text-blue-950"
+                    ? "bg-gradient-to-r from-cyan-950/40 via-blue-950/20 to-[#0c0e12] border-cyan-500/30 text-white shadow-lg shadow-cyan-950/20"
+                    : "bg-gradient-to-r from-blue-50/90 via-indigo-50/50 to-white border-blue-200 text-blue-950 shadow-sm"
                 }`}
               >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex items-start sm:items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-xl shrink-0">
-                      🔒
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-start sm:items-center gap-3.5">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-cyan-500 to-blue-600 border border-cyan-400/40 flex items-center justify-center text-2xl shrink-0 shadow-md shadow-cyan-500/20 text-white">
+                      🏆
                     </div>
-                    <div>
+                    <div className="space-y-1">
                       <div className="flex items-center gap-2">
-                        <span className="text-[11px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
-                          Public Preview
+                        <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">
+                          Public Preview Mode
                         </span>
                         <span className="text-xs opacity-75">
-                          Viewing Top 3 per branch &amp; Top 5 campus
+                          Showing Top 3 in branch &amp; Top 5 campus
                         </span>
                       </div>
-                      <p className="font-bold text-sm sm:text-base mt-0.5">
-                        Want to see your ranking and full batch results?
-                      </p>
-                      <p className="text-xs opacity-70">
-                        Log in with your USN to unlock your marks, rank in branch, and campus standings.
+                      <h2 className="font-extrabold text-base sm:text-lg tracking-tight">
+                        Curious where you rank in your branch?
+                      </h2>
+                      <p className="text-xs opacity-80 max-w-xl">
+                        Log in with your USN to unlock your exact campus rank, detailed semester marks, and private peer comparisons.
                       </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      sfx.playMechanicalClick();
-                      setIsAuthModalOpen(true);
-                    }}
-                    className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/20 active:scale-95 transition-all self-stretch sm:self-auto text-center"
-                  >
-                    🔑 Login / Claim Your USN
-                  </button>
+
+                  <div className="self-stretch sm:self-auto shrink-0">
+                    <button
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsAuthModalOpen(true);
+                      }}
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-2xl font-bold text-xs sm:text-sm bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 active:scale-95 text-slate-950 shadow-lg shadow-cyan-500/25 transition-all flex items-center justify-center gap-2"
+                    >
+                      <span>✨ Check My Rank &amp; Results</span>
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -632,15 +649,65 @@ export default function Dashboard() {
               </div>
 
               {loading ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {[...Array(6)].map((_, i) => (
-                    <div
-                      key={i}
-                      className={`h-40 rounded-2xl animate-pulse ${
-                        isObsidian ? "bg-slate-900/40" : "bg-slate-100"
-                      }`}
-                    />
-                  ))}
+                <div className="space-y-4 py-2">
+                  {/* Aesthetic Render Server Warmup Card */}
+                  <div
+                    className={`p-6 sm:p-8 rounded-3xl border text-center relative overflow-hidden transition-all ${
+                      isObsidian
+                        ? "bg-gradient-to-b from-[#0e121a] to-[#090b0e] border-cyan-800/30 text-white shadow-xl shadow-cyan-950/20"
+                        : "bg-gradient-to-b from-blue-50/70 to-white border-blue-200 text-slate-900 shadow-sm"
+                    }`}
+                  >
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent pointer-events-none" />
+                    
+                    <div className="relative z-10 flex flex-col items-center justify-center max-w-md mx-auto space-y-3">
+                      {/* Glowing Radar Pulse Orb */}
+                      <div className="relative flex items-center justify-center w-14 h-14">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-20 animate-ping" />
+                        <div className="relative inline-flex rounded-2xl w-12 h-12 bg-gradient-to-tr from-cyan-500 to-blue-600 items-center justify-center text-xl text-white shadow-lg shadow-cyan-500/30">
+                          ⚡️
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-base sm:text-lg font-bold tracking-tight">
+                          Please wait a minute — warming up results
+                        </h3>
+                        <p className="text-xs sm:text-sm text-slate-400 mt-1 leading-relaxed">
+                          Our cloud server is spinning up and compiling your semester ranks. It will appear right here in just a moment!
+                        </p>
+                      </div>
+
+                      {/* Shimmering Progress Bar */}
+                      <div className="w-48 h-1.5 bg-slate-800/40 rounded-full overflow-hidden relative">
+                        <div className="h-full bg-gradient-to-r from-cyan-400 via-blue-500 to-indigo-500 w-1/2 rounded-full animate-[pulse_1.5s_ease-in-out_infinite]" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Shimmering Skeleton Cards Grid */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {[...Array(6)].map((_, i) => (
+                      <div
+                        key={i}
+                        className={`h-40 rounded-2xl p-4 border animate-pulse flex flex-col justify-between ${
+                          isObsidian ? "bg-slate-900/30 border-slate-800/40" : "bg-slate-50 border-slate-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className={`w-10 h-10 rounded-xl ${isObsidian ? "bg-slate-800" : "bg-slate-200"}`} />
+                          <div className="space-y-1.5 flex-1">
+                            <div className={`h-3.5 w-28 rounded-md ${isObsidian ? "bg-slate-800" : "bg-slate-200"}`} />
+                            <div className={`h-2.5 w-16 rounded-md ${isObsidian ? "bg-slate-800/60" : "bg-slate-200/60"}`} />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className={`h-3 w-full rounded-md ${isObsidian ? "bg-slate-800" : "bg-slate-200"}`} />
+                          <div className={`h-2 w-20 rounded-md ${isObsidian ? "bg-slate-800/50" : "bg-slate-200/50"}`} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ) : filteredStudents.length === 0 ? (
                 <div

@@ -6,6 +6,7 @@ import {
   fetchAuthStatus,
   loginOrRegisterStudent,
   submitUsnDispute,
+  reportMissingUsn,
   AuthStatus,
   AuthSession,
 } from "../lib/api";
@@ -41,11 +42,19 @@ export default function StudentAuthModal({
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
+  // Missing USN report & notice state
+  const [reportingMissing, setReportingMissing] = useState(false);
+  const [missingReportSuccess, setMissingReportSuccess] = useState<string | null>(null);
+  const [missingStudentName, setMissingStudentName] = useState("");
+  const [missingStudentBranch, setMissingStudentBranch] = useState("CSE");
+  const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
+
   if (!isOpen) return null;
 
   const resetForm = () => {
     setError(null);
     setDisputeSuccess(null);
+    setMissingReportSuccess(null);
     setPassword("");
     setNewPassword("");
     setSelfieBase64(null);
@@ -59,6 +68,31 @@ export default function StudentAuthModal({
     onClose();
   };
 
+  const handleReportMissingUsn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usn.trim()) {
+      setError("Please enter your USN before submitting a report.");
+      return;
+    }
+    setReportingMissing(true);
+    setError(null);
+    try {
+      const res = await reportMissingUsn({
+        usn: usn.trim().toUpperCase(),
+        name: missingStudentName.trim(),
+        branch: missingStudentBranch,
+        message: `Student reported USN not found. Requesting scraper import for ${usn.trim().toUpperCase()} (${missingStudentBranch}).`,
+      });
+      setMissingReportSuccess(res.message || "Report sent! Admin will scrape your USN shortly.");
+      sfx.playSonar();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to report missing USN";
+      setError(msg);
+    } finally {
+      setReportingMissing(false);
+    }
+  };
+
   // Check USN status on blur or when user finishes typing 10 chars
   const handleCheckUsn = async (candidateUsn: string) => {
     const clean = candidateUsn.trim().toUpperCase();
@@ -69,7 +103,7 @@ export default function StudentAuthModal({
       const status = await fetchAuthStatus(clean);
       setAuthStatus(status);
       if (!status.exists) {
-        setError(`USN '${clean}' not found in database. Please ask your admin to scrape it first.`);
+        setError(null);
       }
     } catch {
       // Offline or network error
@@ -288,23 +322,149 @@ export default function StudentAuthModal({
                   )}
                 </div>
 
-                {authStatus?.exists && (
+                {authStatus?.exists ? (
                   <div className="mt-2 text-xs flex items-center justify-between">
                     <span className={authStatus.is_claimed ? "text-amber-400" : "text-emerald-400"}>
                       {authStatus.name} ({authStatus.branch}) •{" "}
                       {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
                     </span>
                   </div>
-                )}
+                ) : authStatus && !authStatus.exists ? (
+                  <div className="mt-3">
+                    {missingReportSuccess ? (
+                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs space-y-1">
+                        <p className="font-bold">✅ Report Received by Admin</p>
+                        <p className="text-[11px] opacity-90">{missingReportSuccess}</p>
+                      </div>
+                    ) : (
+                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
+                        <div>
+                          <span className="text-xs font-bold text-amber-400 block">⚠️ USN Not Found in College Database</span>
+                          <p className="text-[11px] text-zinc-400 mt-0.5">
+                            Your USN isn&apos;t in the database yet, so you cannot log in. Send a message to the admin below to scrape your results.
+                          </p>
+                        </div>
+
+                        {/* Quick Report to Admin Form */}
+                        <div className="space-y-2 pt-1">
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={missingStudentName}
+                              onChange={(e) => setMissingStudentName(e.target.value)}
+                              placeholder="Your Name (Optional)"
+                              className="px-2.5 py-1.5 text-xs rounded-lg border bg-black/20 border-white/10 text-white outline-none focus:border-amber-400"
+                            />
+                            <select
+                              value={missingStudentBranch}
+                              onChange={(e) => setMissingStudentBranch(e.target.value)}
+                              className="px-2.5 py-1.5 text-xs rounded-lg border bg-black/20 border-white/10 text-white outline-none focus:border-amber-400"
+                            >
+                              <option value="CSE" className="bg-zinc-900">CSE</option>
+                              <option value="DS" className="bg-zinc-900">DS</option>
+                              <option value="AIML" className="bg-zinc-900">AIML</option>
+                              <option value="ISE" className="bg-zinc-900">ISE</option>
+                              <option value="ECE" className="bg-zinc-900">ECE</option>
+                              <option value="MECH" className="bg-zinc-900">MECH</option>
+                              <option value="CIVIL" className="bg-zinc-900">CIVIL</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleReportMissingUsn}
+                            disabled={reportingMissing}
+                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
+                          >
+                            {reportingMissing ? (
+                              <span>Sending Request...</span>
+                            ) : (
+                              <span>📢 Request Admin to Scrape My USN</span>
+                            )}
+                          </button>
+                        </div>
+
+                        {/* Data Transparency & Privacy Notice */}
+                        <div className="pt-2 border-t border-amber-500/10">
+                          <button
+                            type="button"
+                            onClick={() => setShowPrivacyNotice(!showPrivacyNotice)}
+                            className="text-[10px] text-amber-400/80 hover:text-amber-400 underline flex items-center gap-1"
+                          >
+                            <span>{showPrivacyNotice ? "Hide" : "View"} Data Collection & Privacy Notice</span>
+                          </button>
+
+                          {showPrivacyNotice && (
+                            <div className="mt-2 p-2.5 rounded-xl bg-black/30 border border-white/10 text-[10px] text-zinc-300 space-y-1.5 leading-relaxed">
+                              <p><strong>📋 Collected Fields:</strong> University Seat Number (USN), Student Name, Branch, VTU Semester Marks, and encrypted password hash.</p>
+                              <p><strong>🎯 Purpose:</strong> College academic analytics, branch percentiles, and private student-controlled performance comparisons.</p>
+                              <p><strong>👁️ Visibility:</strong> Public preview is strictly limited to Top 3 per branch & Top 5 campus-wide. Complete marksheets and ranking insights require verified student login.</p>
+                              <p><strong>🔒 Data Retention:</strong> Maintained during active academic semesters. Identity selfies used for ownership dispute verification are purged post-approval.</p>
+                              <p><strong>⚖️ Correction & Complaint Route:</strong> To request marks correction, USN unlinking, or profile deletion, students can submit a request through this portal or reach college administration directly.</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
 
-              {/* Password Field */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className={`text-xs font-medium ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                    {authStatus?.is_claimed ? "Password" : "Create Password (to claim USN)"}
-                  </label>
-                  {authStatus?.is_claimed && (
+              {/* Password Field & Submit (Only when USN exists or not yet typed) */}
+              {(!authStatus || authStatus.exists) && (
+                <>
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={`text-xs font-medium ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                        {authStatus?.is_claimed ? "Password" : "Create Password (to claim USN)"}
+                      </label>
+                      {authStatus?.is_claimed && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sfx.playMechanicalClick();
+                            setMode("dispute");
+                            setError(null);
+                          }}
+                          className="text-[11px] text-emerald-400 hover:underline"
+                        >
+                          Not you? Claim USN
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder={
+                        authStatus?.is_claimed
+                          ? "Enter your account password"
+                          : "Create a password (min 4 chars)"
+                      }
+                      minLength={4}
+                      className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${
+                        isObsidian
+                          ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
+                          : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
+                      }`}
+                      required
+                    />
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/20 active:scale-[0.99] transition-all disabled:opacity-50"
+                  >
+                    {loading
+                      ? "Authenticating..."
+                      : authStatus?.is_claimed
+                      ? "Unlock Results & Rankings"
+                      : "Claim USN & Create Password"}
+                  </button>
+
+                  <div className="pt-2 text-center">
                     <button
                       type="button"
                       onClick={() => {
@@ -312,57 +472,13 @@ export default function StudentAuthModal({
                         setMode("dispute");
                         setError(null);
                       }}
-                      className="text-[11px] text-emerald-400 hover:underline"
+                      className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
                     >
-                      Not you? Claim USN
+                      Did someone else take your USN? <span className="text-emerald-400 underline">Send Selfie Verification</span>
                     </button>
-                  )}
-                </div>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder={
-                    authStatus?.is_claimed
-                      ? "Enter your account password"
-                      : "Create a password (min 4 chars)"
-                  }
-                  minLength={4}
-                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${
-                    isObsidian
-                      ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
-                      : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
-                  }`}
-                  required
-                />
-              </div>
-
-              {/* Submit Button */}
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-600 hover:to-teal-600 text-white shadow-lg shadow-emerald-500/20 active:scale-[0.99] transition-all disabled:opacity-50"
-              >
-                {loading
-                  ? "Authenticating..."
-                  : authStatus?.is_claimed
-                  ? "Unlock Results & Rankings"
-                  : "Claim USN & Create Password"}
-              </button>
-
-              <div className="pt-2 text-center">
-                <button
-                  type="button"
-                  onClick={() => {
-                    sfx.playMechanicalClick();
-                    setMode("dispute");
-                    setError(null);
-                  }}
-                  className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                >
-                  Did someone else take your USN? <span className="text-emerald-400 underline">Send Selfie Verification</span>
-                </button>
-              </div>
+                  </div>
+                </>
+              )}
             </form>
           ) : (
             /* Dispute / Ownership Form */

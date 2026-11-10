@@ -206,5 +206,25 @@ class StudentSessionVerifyResponse(BaseModel):
     branch: Optional[str] = None
     message: Optional[str] = ""
 
+class MissingUSNReportCreate(BaseModel):
+    usn: str
+    name: Optional[str] = ""
+    branch: Optional[str] = ""
+    message: Optional[str] = ""
+
+class MissingUSNReportOut(BaseModel):
+    id: int
+    usn: str
+    name: str
+    branch: str
+    message: str
+    status: str
+    reported_at: Optional[str] = None
+    ip_address: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
+
+
 
 

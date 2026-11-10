@@ -78,6 +78,17 @@ export interface DisputeRecord {
   admin_notes?: string;
 }
 
+export interface MissingUSNReportRecord {
+  id: number;
+  usn: string;
+  name: string;
+  branch: string;
+  message: string;
+  status: "pending" | "resolved";
+  reported_at?: string;
+  ip_address?: string;
+}
+
 export interface LoginLogEntry {
   id: number;
   usn: string;
@@ -564,4 +575,39 @@ export async function verifyStudentSession(token?: string): Promise<{
   } catch {
     return { valid: false };
   }
+}
+
+export async function reportMissingUsn(payload: {
+  usn: string;
+  name?: string;
+  branch?: string;
+  message?: string;
+}): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/missing-usn/report`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to submit missing USN report");
+  }
+  return res.json();
+}
+
+export async function fetchAdminMissingUsnReports(adminKey: string): Promise<MissingUSNReportRecord[]> {
+  const res = await fetch(`${API_BASE}/api/admin/missing-usn`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load missing USN reports");
+  return res.json();
+}
+
+export async function resolveAdminMissingUsnReport(id: number, adminKey: string): Promise<void> {
+  const res = await fetch(`${API_BASE}/api/admin/missing-usn/${id}/resolve`, {
+    method: "POST",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) throw new Error("Failed to resolve missing USN report");
 }

@@ -111,4 +111,18 @@ class ComparisonLog(Base):
     ip_address = Column(String, nullable=True, default="")
 
 
+class MissingUSNReport(Base):
+    __tablename__ = "missing_usn_reports"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usn = Column(String, index=True, nullable=False)
+    name = Column(String, default="")
+    branch = Column(String, default="")
+    message = Column(String, default="")
+    status = Column(String, default="pending")  # "pending", "resolved", "rejected"
+    reported_at = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String, nullable=True, default="")
+
+
+
 

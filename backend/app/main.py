@@ -26,7 +26,7 @@ from sqlalchemy import text, desc, func, distinct
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog
+from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -50,6 +50,8 @@ from .schemas import (
     CompareLogCreate,
     CompareLogOut,
     StudentSessionVerifyResponse,
+    MissingUSNReportCreate,
+    MissingUSNReportOut,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -185,6 +187,36 @@ async def lifespan(app: FastAPI):
                                 student2_name TEXT DEFAULT '',
                                 student2_branch TEXT DEFAULT '',
                                 compared_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                ip_address TEXT DEFAULT ''
+                            );
+                        """))
+                    except Exception:
+                        pass
+                # Explicitly guarantee missing_usn_reports table exists
+                try:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS missing_usn_reports (
+                            id SERIAL PRIMARY KEY,
+                            usn VARCHAR NOT NULL,
+                            name VARCHAR DEFAULT '',
+                            branch VARCHAR DEFAULT '',
+                            message VARCHAR DEFAULT '',
+                            status VARCHAR DEFAULT 'pending',
+                            reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address VARCHAR DEFAULT ''
+                        );
+                    """))
+                except Exception:
+                    try:
+                        conn.execute(text("""
+                            CREATE TABLE IF NOT EXISTS missing_usn_reports (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                usn TEXT NOT NULL,
+                                name TEXT DEFAULT '',
+                                branch TEXT DEFAULT '',
+                                message TEXT DEFAULT '',
+                                status TEXT DEFAULT 'pending',
+                                reported_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                                 ip_address TEXT DEFAULT ''
                             );
                         """))
@@ -404,6 +436,74 @@ def submit_usn_dispute(req: DisputeCreateRequest, db: Session = Depends(get_db))
         "ok": True,
         "message": f"Verification submitted for {clean_usn}! The admin will review your selfie and approve your ownership."
     }
+
+
+# -------------------------------------------------------------
+# Missing USN Reports & Notice
+# -------------------------------------------------------------
+
+@app.post("/api/missing-usn/report")
+def report_missing_usn(
+    req: MissingUSNReportCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    clean_usn = req.usn.strip().upper()
+    if not clean_usn or len(clean_usn) < 4:
+        raise HTTPException(status_code=400, detail="Please enter a valid USN.")
+
+    client_ip = request.headers.get("x-forwarded-for")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+
+    entry = MissingUSNReport(
+        usn=clean_usn,
+        name=req.name.strip() if req.name else "",
+        branch=req.branch.strip().upper() if req.branch else "",
+        message=req.message.strip() if req.message else "Student reported USN not found in database.",
+        status="pending",
+        reported_at=datetime.utcnow(),
+        ip_address=client_ip,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+
+    return {
+        "ok": True,
+        "message": f"Report received for USN {clean_usn}! Admin has been notified to scrape and import your semester results.",
+        "id": entry.id
+    }
+
+
+@app.get("/api/admin/missing-usn", dependencies=[Depends(require_admin)])
+def get_admin_missing_usn_reports(db: Session = Depends(get_db)):
+    reports = db.query(MissingUSNReport).order_by(desc(MissingUSNReport.reported_at)).limit(100).all()
+    return [
+        {
+            "id": r.id,
+            "usn": r.usn,
+            "name": r.name,
+            "branch": r.branch,
+            "message": r.message,
+            "status": r.status,
+            "reported_at": to_utc_iso(r.reported_at),
+            "ip_address": r.ip_address,
+        }
+        for r in reports
+    ]
+
+
+@app.post("/api/admin/missing-usn/{report_id}/resolve", dependencies=[Depends(require_admin)])
+def resolve_missing_usn_report(report_id: int, db: Session = Depends(get_db)):
+    report = db.query(MissingUSNReport).filter(MissingUSNReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found.")
+    report.status = "resolved"
+    db.commit()
+    return {"ok": True, "message": f"Report for {report.usn} marked as resolved."}
 
 
 @app.get("/api/admin/disputes", response_model=List[DisputeOut], dependencies=[Depends(require_admin)])
