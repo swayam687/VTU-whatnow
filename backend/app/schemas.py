@@ -230,5 +230,74 @@ class MissingUSNReportOut(BaseModel):
         from_attributes = True
 
 
+class RescrapeRequestCreate(BaseModel):
+    usn: str
+    name: Optional[str] = ""
+    branch: Optional[str] = ""
+    request_type: str = "REVALUATION"  # "REVALUATION", "MISSING_SEMESTER", "RE_EXAM", "CORRECTION"
+    target_semester: str = "1"  # "1", "2", "all"
+    subject_codes: Optional[str] = ""
+    custom_url: Optional[str] = ""
+    message: Optional[str] = ""
+
+
+class RescrapeRequestOut(BaseModel):
+    id: int
+    usn: str
+    name: str
+    branch: str
+    request_type: str
+    target_semester: str
+    subject_codes: Optional[str] = ""
+    custom_url: Optional[str] = ""
+    message: str
+    status: str
+    created_at: Optional[str] = None
+    resolved_at: Optional[str] = None
+    admin_notes: Optional[str] = ""
+    ip_address: Optional[str] = ""
+
+    class Config:
+        from_attributes = True
+
+
+class RescrapeStatusResponse(BaseModel):
+    has_pending: bool
+    pending_request: Optional[RescrapeRequestOut] = None
+    last_request: Optional[RescrapeRequestOut] = None
+
+
+class RescrapeActionRequest(BaseModel):
+    action: str  # "resolve", "reject", "scrape_now"
+    admin_notes: Optional[str] = ""
+
+
+class StudentSemesterAudit(BaseModel):
+    usn: str
+    name: str
+    branch: str
+    batch: Optional[int] = None
+    has_sem1: bool
+    has_sem2: bool
+    semesters_present: List[str]
+    missing_semesters: List[str]
+    total_marks: int
+    max_marks: int
+    percentage: float
+    total_backlogs: int
+    sem1_backlogs: int
+    sem2_backlogs: int
+
+
+class SemesterAuditResponse(BaseModel):
+    total_students: int
+    complete_both_sems: int
+    missing_sem2: int
+    missing_sem1: int
+    no_marks: int
+    students: List[StudentSemesterAudit]
+
+
+
 
 

@@ -31,6 +31,11 @@ import {
   resolveAdminMissingUsnReport,
   ComparisonLogsData,
   MissingUSNReportRecord,
+  RescrapeRequestRecord,
+  SemesterAuditData,
+  fetchAdminRescrapeRequests,
+  actionAdminRescrapeRequest,
+  fetchAdminSemesterAudit,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -93,8 +98,22 @@ export default function AdminPanel() {
   const [authError, setAuthError] = useState<string>("");
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
 
-  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'disputes' | 'missing_usn' | 'logs' | 'system'
-  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "disputes" | "missing_usn" | "logs" | "system">("scraper");
+  // Active top-level tab: 'scraper' | 'semesters' | 'records' | 'disputes' | 'missing_usn' | 'logs' | 'system' | 'audit'
+  const [activeTab, setActiveTab] = useState<"scraper" | "semesters" | "records" | "disputes" | "missing_usn" | "logs" | "system" | "audit">("scraper");
+
+  // Re-scrape / Revaluation Requests state
+  const [rescrapeRequests, setRescrapeRequests] = useState<RescrapeRequestRecord[]>([]);
+  const [rescrapeLoading, setRescrapeLoading] = useState(false);
+  const [rescrapeFilter, setRescrapeFilter] = useState<string>("all");
+  const [requestsSubTab, setRequestsSubTab] = useState<"rescrape" | "missing">("rescrape");
+  const [actionLoadingId, setActionLoadingId] = useState<number | null>(null);
+  const [actionSuccessMsg, setActionSuccessMsg] = useState<string>("");
+
+  // Semester Coverage Audit state
+  const [semesterAudit, setSemesterAudit] = useState<SemesterAuditData | null>(null);
+  const [semesterAuditLoading, setSemesterAuditLoading] = useState(false);
+  const [semesterAuditFilter, setSemesterAuditFilter] = useState<"all" | "missing_sem2" | "missing_sem1" | "complete">("all");
+  const [semesterAuditSearch, setSemesterAuditSearch] = useState<string>("");
 
   // USN Disputes state
   const [disputes, setDisputes] = useState<DisputeRecord[]>([]);
@@ -323,21 +342,89 @@ export default function AdminPanel() {
     setActiveTab("scraper");
   };
 
+  // Load Re-scrape & Revaluation Requests
+  const loadRescrapeRequests = async () => {
+    if (!adminKey) return;
+    setRescrapeLoading(true);
+    try {
+      const data = await fetchAdminRescrapeRequests(
+        adminKey,
+        rescrapeFilter === "all" ? undefined : rescrapeFilter
+      );
+      setRescrapeRequests(data);
+    } catch (err) {
+      console.error("Failed to load rescrape requests", err);
+    } finally {
+      setRescrapeLoading(false);
+    }
+  };
+
+  const handleRescrapeAction = async (
+    id: number,
+    action: "resolve" | "reject" | "scrape_now",
+    notes?: string
+  ) => {
+    if (!adminKey) return;
+    setActionLoadingId(id);
+    setActionSuccessMsg("");
+    sfx.playClick();
+    try {
+      const res = await actionAdminRescrapeRequest(id, action, notes, adminKey);
+      setActionSuccessMsg(res.message);
+      await loadRescrapeRequests();
+      if (action === "scrape_now") {
+        setActiveTab("scraper");
+      }
+      sfx.playSonar();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to execute request action";
+      setActionError(msg);
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
+
+  // Load Semester Coverage Audit
+  const loadSemesterAudit = async () => {
+    if (!adminKey) return;
+    setSemesterAuditLoading(true);
+    try {
+      const data = await fetchAdminSemesterAudit(adminKey);
+      setSemesterAudit(data);
+    } catch (err) {
+      console.error("Failed to load semester audit", err);
+    } finally {
+      setSemesterAuditLoading(false);
+    }
+  };
+
+  const handleQuickScrapeSemester = (usn: string, semester: string) => {
+    sfx.playClick();
+    setMode("single");
+    setSingleUsn(usn);
+    setNewLinkSem(semester);
+    setActiveTab("scraper");
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       loadStudentRecords();
       loadDisputes();
       loadMissingReports();
+      loadRescrapeRequests();
       if (activeTab === "disputes") {
         loadDisputes();
       } else if (activeTab === "missing_usn") {
         loadMissingReports();
+        loadRescrapeRequests();
+      } else if (activeTab === "audit") {
+        loadSemesterAudit();
       } else if (activeTab === "logs") {
         loadLoginLogs();
         loadComparisonLogs();
       }
     }
-  }, [isAuthenticated, activeTab, disputeFilter, logsSubTab]);
+  }, [isAuthenticated, activeTab, disputeFilter, rescrapeFilter, logsSubTab]);
 
   // Status Polling
   useEffect(() => {
@@ -776,6 +863,15 @@ export default function AdminPanel() {
         </div>
       )}
 
+      {actionSuccessMsg && (
+        <div className="p-3 bg-emerald-50/80 border border-emerald-200/80 text-emerald-700 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
+          <span>{actionSuccessMsg}</span>
+          <button onClick={() => setActionSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 text-xs font-bold p-1">
+            <IconClose className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Mobile-First Tab Navigation (Polished horizontally scrollable track) */}
       <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar touch-pan-x bg-slate-100/80 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
         <button
@@ -860,6 +956,7 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("missing_usn");
             loadMissingReports();
+            loadRescrapeRequests();
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "missing_usn"
@@ -869,9 +966,33 @@ export default function AdminPanel() {
         >
           <IconBell className="w-3.5 h-3.5" />
           <span>Requests</span>
-          {missingReports.filter((r) => r.status === "pending").length > 0 && (
+          {rescrapeRequests.filter((r) => r.status === "pending").length +
+            missingReports.filter((r) => r.status === "pending").length > 0 && (
             <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-600 text-white font-mono font-bold">
-              {missingReports.filter((r) => r.status === "pending").length}
+              {rescrapeRequests.filter((r) => r.status === "pending").length +
+                missingReports.filter((r) => r.status === "pending").length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            sfx.playClick();
+            setActiveTab("audit");
+            loadSemesterAudit();
+          }}
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+            activeTab === "audit"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
+              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+          }`}
+        >
+          <IconRotateCcw className="w-3.5 h-3.5" />
+          <span>Audit</span>
+          {semesterAudit && semesterAudit.missing_sem2 > 0 && (
+            <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono font-semibold">
+              -{semesterAudit.missing_sem2} S2
             </span>
           )}
         </button>
@@ -1795,7 +1916,7 @@ export default function AdminPanel() {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* TAB: MISSING USN SCRAPE REQUESTS                              */}
+      {/* TAB: STUDENT UPDATE & SCRAPE REQUESTS                         */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "missing_usn" && (
         <div className="space-y-4 sm:space-y-6">
@@ -1804,15 +1925,17 @@ export default function AdminPanel() {
               <div>
                 <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                   <IconBell className="w-4 h-4 text-slate-700" />
-                  <span>Missing USN Student Requests</span>
-                  {missingReports.filter((r) => r.status === "pending").length > 0 && (
+                  <span>Student Update &amp; Scrape Requests</span>
+                  {rescrapeRequests.filter((r) => r.status === "pending").length +
+                    missingReports.filter((r) => r.status === "pending").length > 0 && (
                     <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 text-blue-700">
-                      {missingReports.filter((r) => r.status === "pending").length} pending
+                      {rescrapeRequests.filter((r) => r.status === "pending").length +
+                        missingReports.filter((r) => r.status === "pending").length} pending
                     </span>
                   )}
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Students who tried logging in but their USN was not yet scraped. Scrape their marks with one click.
+                  Review student requests for revaluation results, missing semester marks, and unindexed USNs.
                 </p>
               </div>
               <button
@@ -1820,146 +1943,603 @@ export default function AdminPanel() {
                 onClick={() => {
                   sfx.playClick();
                   loadMissingReports();
+                  loadRescrapeRequests();
                 }}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
               >
                 <IconRotateCcw className="w-3 h-3" />
                 <span>Refresh</span>
               </button>
             </div>
 
-            {/* Filter buttons */}
+            {/* Sub-tab Switcher: Revaluation/Re-scrape vs Missing USN Reports */}
             <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
               <button
                 type="button"
                 onClick={() => {
                   sfx.playClick();
-                  setMissingFilter("pending");
+                  setRequestsSubTab("rescrape");
+                  loadRescrapeRequests();
                 }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                  missingFilter === "pending"
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                  requestsSubTab === "rescrape"
                     ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:bg-slate-100"
+                    : "bg-slate-100 text-slate-600 hover:text-slate-900"
                 }`}
               >
-                Pending ({missingReports.filter((r) => r.status === "pending").length})
+                <IconRotateCcw className="w-3 h-3" />
+                <span>Revaluation &amp; Re-scrape</span>
+                {rescrapeRequests.filter((r) => r.status === "pending").length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500 text-white font-mono">
+                    {rescrapeRequests.filter((r) => r.status === "pending").length}
+                  </span>
+                )}
               </button>
+
               <button
                 type="button"
                 onClick={() => {
                   sfx.playClick();
-                  setMissingFilter("resolved");
+                  setRequestsSubTab("missing");
+                  loadMissingReports();
                 }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                  missingFilter === "resolved"
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
+                  requestsSubTab === "missing"
                     ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:bg-slate-100"
+                    : "bg-slate-100 text-slate-600 hover:text-slate-900"
                 }`}
               >
-                Resolved ({missingReports.filter((r) => r.status === "resolved").length})
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  sfx.playClick();
-                  setMissingFilter("all");
-                }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                  missingFilter === "all"
-                    ? "bg-slate-900 text-white shadow-xs"
-                    : "text-slate-600 hover:bg-slate-100"
-                }`}
-              >
-                All ({missingReports.length})
+                <IconUsers className="w-3 h-3" />
+                <span>Unindexed USN Reports</span>
+                {missingReports.filter((r) => r.status === "pending").length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-600 text-white font-mono">
+                    {missingReports.filter((r) => r.status === "pending").length}
+                  </span>
+                )}
               </button>
             </div>
 
-            {/* Content List */}
-            {missingReportsLoading ? (
-              <div className="py-12 text-center text-xs text-slate-400">Loading requests...</div>
-            ) : missingReports.filter((r) => missingFilter === "all" || r.status === missingFilter).length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
-                {missingFilter === "pending"
-                  ? "🎉 No pending requests! All requested USNs have been addressed."
-                  : "No requests found for this filter."}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-                {missingReports
-                  .filter((r) => missingFilter === "all" || r.status === missingFilter)
-                  .map((r) => (
-                    <div
-                      key={r.id}
-                      className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
+            {/* Sub-tab 1: Re-scrape & Revaluation Requests */}
+            {requestsSubTab === "rescrape" && (
+              <div className="space-y-4">
+                {/* Filter Pills */}
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {["pending", "in_progress", "resolved", "rejected", "all"].map((f) => (
+                    <button
+                      key={f}
+                      type="button"
+                      onClick={() => {
+                        sfx.playClick();
+                        setRescrapeFilter(f);
+                      }}
+                      className={`py-1 px-2.5 text-[11px] font-semibold rounded-lg capitalize transition-colors ${
+                        rescrapeFilter === f
+                          ? "bg-slate-900 text-white"
+                          : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                     >
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono font-bold text-sm text-slate-900">{r.usn}</span>
-                            {r.branch && (
-                              <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
-                                {r.branch}
+                      {f === "in_progress" ? "In Progress" : f} (
+                      {f === "all"
+                        ? rescrapeRequests.length
+                        : rescrapeRequests.filter((r) => r.status === f).length}
+                      )
+                    </button>
+                  ))}
+                </div>
+
+                {rescrapeLoading ? (
+                  <div className="py-12 text-center text-xs text-slate-400">Loading student re-scrape requests...</div>
+                ) : rescrapeRequests.filter((r) => rescrapeFilter === "all" || r.status === rescrapeFilter).length === 0 ? (
+                  <div className="py-12 text-center text-xs text-slate-400">
+                    {rescrapeFilter === "pending"
+                      ? "No pending student re-scrape or revaluation requests."
+                      : "No requests found matching this filter."}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {rescrapeRequests
+                      .filter((r) => rescrapeFilter === "all" || r.status === rescrapeFilter)
+                      .map((r) => (
+                        <div
+                          key={r.id}
+                          className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-sm text-slate-900">{r.usn}</span>
+                                {r.branch && (
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
+                                    {r.branch}
+                                  </span>
+                                )}
+                                <span className="px-2 py-0.5 rounded-md bg-cyan-50 border border-cyan-200 text-cyan-800 text-[10px] font-bold">
+                                  Sem {r.target_semester}
+                                </span>
+                              </div>
+                              <p className="text-xs font-medium text-slate-700 mt-0.5">{r.name}</p>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                                r.status === "pending"
+                                  ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                  : r.status === "in_progress"
+                                  ? "bg-blue-100 text-blue-800 border border-blue-200"
+                                  : r.status === "resolved"
+                                  ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                  : "bg-slate-100 text-slate-600 border border-slate-200"
+                              }`}
+                            >
+                              {r.status === "in_progress" ? "Scraping" : r.status}
+                            </span>
+                          </div>
+
+                          {/* Request Reason & Subject Code */}
+                          <div className="flex items-center gap-2 flex-wrap text-xs">
+                            <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
+                              {r.request_type === "REVALUATION"
+                                ? "Revaluation Passed"
+                                : r.request_type === "MISSING_SEMESTER"
+                                ? "Missing Semester"
+                                : r.request_type === "RE_EXAM"
+                                ? "Makeup Exam"
+                                : "Correction"}
+                            </span>
+                            {r.subject_codes && (
+                              <span className="font-mono text-slate-600 text-[11px]">
+                                Subjects: <strong>{r.subject_codes}</strong>
                               </span>
                             )}
                           </div>
-                          <p className="text-xs font-medium text-slate-700 mt-0.5">{r.name}</p>
+
+                          {/* Custom URL if provided */}
+                          {r.custom_url && (
+                            <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                              <span className="text-[11px] font-mono text-slate-600 truncate max-w-[220px]">
+                                {r.custom_url}
+                              </span>
+                              <a
+                                href={r.custom_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 shrink-0"
+                              >
+                                <span>Open</span>
+                                <IconExternalLink className="w-3 h-3" />
+                              </a>
+                            </div>
+                          )}
+
+                          {/* Student Note */}
+                          {r.message && (
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
+                              <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
+                                Student Message:
+                              </p>
+                              <p className="italic">&ldquo;{r.message}&rdquo;</p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                            <span>
+                              {formatDateTime(r.created_at).time} • {formatDateTime(r.created_at).date}
+                            </span>
+                            {r.ip_address && (
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                IP: {r.ip_address}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Action Buttons */}
+                          {r.status === "pending" || r.status === "in_progress" ? (
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === r.id}
+                                onClick={() => handleRescrapeAction(r.id, "scrape_now")}
+                                className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                              >
+                                <IconBolt className="w-3.5 h-3.5" />
+                                <span>{actionLoadingId === r.id ? "Launching..." : "Scrape Now"}</span>
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === r.id}
+                                onClick={() => handleRescrapeAction(r.id, "resolve")}
+                                className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
+                              >
+                                ✓ Done
+                              </button>
+
+                              <button
+                                type="button"
+                                disabled={actionLoadingId === r.id}
+                                onClick={() => handleRescrapeAction(r.id, "reject")}
+                                className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                                title="Dismiss / Reject request"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-slate-500 font-medium pt-1 border-t border-slate-100 flex items-center justify-between">
+                              <span className={r.status === "resolved" ? "text-emerald-600 font-semibold" : "text-slate-400"}>
+                                {r.status === "resolved" ? "✓ Resolved" : "✕ Rejected"}
+                              </span>
+                              {r.resolved_at && (
+                                <span className="font-mono text-[10px] text-slate-400">
+                                  {formatDateTime(r.resolved_at).date}
+                                </span>
+                              )}
+                            </div>
+                          )}
                         </div>
-                        <span
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                            r.status === "pending"
-                              ? "bg-amber-100 text-amber-800 border border-amber-200"
-                              : "bg-emerald-100 text-emerald-800 border border-emerald-200"
-                          }`}
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sub-tab 2: Missing USN Reports */}
+            {requestsSubTab === "missing" && (
+              <div className="space-y-4">
+                {/* Filter buttons */}
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playClick();
+                      setMissingFilter("pending");
+                    }}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                      missingFilter === "pending"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Pending ({missingReports.filter((r) => r.status === "pending").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playClick();
+                      setMissingFilter("resolved");
+                    }}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                      missingFilter === "resolved"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    Resolved ({missingReports.filter((r) => r.status === "resolved").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playClick();
+                      setMissingFilter("all");
+                    }}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
+                      missingFilter === "all"
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                  >
+                    All ({missingReports.length})
+                  </button>
+                </div>
+
+                {/* Content List */}
+                {missingReportsLoading ? (
+                  <div className="py-12 text-center text-xs text-slate-400">Loading requests...</div>
+                ) : missingReports.filter((r) => missingFilter === "all" || r.status === missingFilter).length === 0 ? (
+                  <div className="py-12 text-center text-xs text-slate-400">
+                    {missingFilter === "pending"
+                      ? "No pending unindexed USN requests. All submitted USNs have been scraped."
+                      : "No requests found for this filter."}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                    {missingReports
+                      .filter((r) => missingFilter === "all" || r.status === missingFilter)
+                      .map((r) => (
+                        <div
+                          key={r.id}
+                          className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
                         >
-                          {r.status}
-                        </span>
+                          <div className="flex items-start justify-between gap-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono font-bold text-sm text-slate-900">{r.usn}</span>
+                                {r.branch && (
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
+                                    {r.branch}
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs font-medium text-slate-700 mt-0.5">{r.name}</p>
+                            </div>
+                            <span
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
+                                r.status === "pending"
+                                  ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                  : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                              }`}
+                            >
+                              {r.status}
+                            </span>
+                          </div>
+
+                          {r.message && (
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
+                              <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
+                                Student Note:
+                              </p>
+                              <p className="italic">&ldquo;{r.message}&rdquo;</p>
+                            </div>
+                          )}
+
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+                            <span>
+                              {formatDateTime(r.reported_at).time} • {formatDateTime(r.reported_at).date}
+                            </span>
+                            {r.ip_address && (
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
+                                IP: {r.ip_address}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Action buttons */}
+                          {r.status === "pending" ? (
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
+                              <button
+                                type="button"
+                                onClick={() => handleScrapeMissingReport(r.usn)}
+                                className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                              >
+                                <IconBolt className="w-3.5 h-3.5" />
+                                <span>Scrape Now</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleResolveMissingReport(r.id)}
+                                className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
+                              >
+                                ✓ Mark Done
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="text-[11px] text-emerald-600 font-semibold pt-1 border-t border-slate-100 flex items-center gap-1">
+                              <span>✓</span>
+                              <span>Resolved</span>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ------------------------------------------------------------- */}
+      {/* TAB: SEMESTER COVERAGE AUDIT (SEM-1 VS SEM-2)                 */}
+      {/* ------------------------------------------------------------- */}
+      {activeTab === "audit" && (
+        <div className="space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <IconRotateCcw className="w-4 h-4 text-slate-700" />
+                  <span>Semester Coverage Audit</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Real-time detection of Sem 1 vs Sem 2 coverage. Instantly identify missing semester marks and trigger scrapes.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  sfx.playClick();
+                  loadSemesterAudit();
+                }}
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
+              >
+                <IconRotateCcw className="w-3 h-3" />
+                <span>Refresh Audit</span>
+              </button>
+            </div>
+
+            {/* Summary Metric Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+              <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Students</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-slate-900 mt-1">
+                  {semesterAudit?.total_students || 0}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Registered in database</p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40">
+                <p className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Both Sems (1 &amp; 2)</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-emerald-800 mt-1">
+                  {semesterAudit?.complete_both_sems || 0}
+                </p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Complete records</p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-2xl border border-amber-200 bg-amber-50/50">
+                <p className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">Missing Sem 2</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-amber-900 mt-1">
+                  {semesterAudit?.missing_sem2 || 0}
+                </p>
+                <p className="text-[10px] text-amber-700 mt-0.5">Sem 1 scraped only</p>
+              </div>
+
+              <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Missing Sem 1</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-slate-800 mt-1">
+                  {semesterAudit?.missing_sem1 || 0}
+                </p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Sem 2 scraped only</p>
+              </div>
+            </div>
+
+            {/* Controls: Search & Filter Tabs */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {[
+                  { id: "all", label: "All Students", count: semesterAudit?.total_students || 0 },
+                  { id: "missing_sem2", label: "Missing Sem 2", count: semesterAudit?.missing_sem2 || 0 },
+                  { id: "missing_sem1", label: "Missing Sem 1", count: semesterAudit?.missing_sem1 || 0 },
+                  { id: "complete", label: "Complete (Both Sems)", count: semesterAudit?.complete_both_sems || 0 },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      sfx.playClick();
+                      setSemesterAuditFilter(tab.id as "all" | "missing_sem2" | "missing_sem1" | "complete");
+                    }}
+                    className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${
+                      semesterAuditFilter === tab.id
+                        ? "bg-slate-900 text-white shadow-xs"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    <span className="ml-1.5 font-mono text-[10px] opacity-75">({tab.count})</span>
+                  </button>
+                ))}
+              </div>
+
+              <div className="relative w-full sm:w-60">
+                <input
+                  type="text"
+                  value={semesterAuditSearch}
+                  onChange={(e) => setSemesterAuditSearch(e.target.value)}
+                  placeholder="Search USN, name, or branch..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900"
+                />
+                <span className="absolute left-2.5 top-2 text-slate-400">
+                  <IconSearch className="w-3.5 h-3.5" />
+                </span>
+              </div>
+            </div>
+
+            {/* Audit List Table */}
+            {semesterAuditLoading ? (
+              <div className="py-12 text-center text-xs text-slate-400">Analyzing semester coverage...</div>
+            ) : !semesterAudit || semesterAudit.students.length === 0 ? (
+              <div className="py-12 text-center text-xs text-slate-400">No student records to audit.</div>
+            ) : (
+              <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-[550px] overflow-y-auto">
+                {semesterAudit.students
+                  .filter((s) => {
+                    if (semesterAuditFilter === "missing_sem2") return !s.has_sem2;
+                    if (semesterAuditFilter === "missing_sem1") return !s.has_sem1;
+                    if (semesterAuditFilter === "complete") return s.has_sem1 && s.has_sem2;
+                    return true;
+                  })
+                  .filter((s) => {
+                    if (!semesterAuditSearch.trim()) return true;
+                    const q = semesterAuditSearch.toLowerCase().trim();
+                    return s.usn.toLowerCase().includes(q) || s.name.toLowerCase().includes(q) || s.branch.toLowerCase().includes(q);
+                  })
+                  .map((s) => (
+                    <div
+                      key={s.usn}
+                      className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <Identicon
+                          usn={s.usn}
+                          percentage={s.percentage}
+                          totalBacklogs={s.total_backlogs}
+                          size={36}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
+                            <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 uppercase">
+                              {s.branch}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                            <span className="font-mono text-xs text-slate-400">{s.usn}</span>
+
+                            {/* Semester Status Indicators */}
+                            <span
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                                s.has_sem1
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-rose-50 text-rose-700 border border-rose-200"
+                              }`}
+                            >
+                              <span>{s.has_sem1 ? "✓" : "✕"}</span>
+                              <span>Sem 1</span>
+                            </span>
+
+                            <span
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
+                                s.has_sem2
+                                  ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                  : "bg-amber-50 text-amber-800 border border-amber-200"
+                              }`}
+                            >
+                              <span>{s.has_sem2 ? "✓" : "✕"}</span>
+                              <span>Sem 2 {s.has_sem2 ? "" : "(Missing)"}</span>
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      {r.message && (
-                        <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
-                          <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
-                            Student Note:
-                          </p>
-                          <p className="italic">&ldquo;{r.message}&rdquo;</p>
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
+                        <div className="text-left sm:text-right font-mono text-xs">
+                          <span className="font-bold text-slate-900">{s.percentage.toFixed(1)}%</span>
+                          <span className="text-[11px] text-slate-400 ml-1">({s.total_marks} pts)</span>
+                          <div className="text-[10px] mt-0.5">
+                            {s.total_backlogs > 0 ? (
+                              <span className="text-rose-600 font-bold">{s.total_backlogs} BL</span>
+                            ) : (
+                              <span className="text-emerald-600 font-medium">0 Backlogs</span>
+                            )}
+                          </div>
                         </div>
-                      )}
 
-                      <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
-                        <span>
-                          {formatDateTime(r.reported_at).time} • {formatDateTime(r.reported_at).date}
-                        </span>
-                        {r.ip_address && (
-                          <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
-                            IP: {r.ip_address}
+                        {/* One-click Action to Scrape Missing Semester */}
+                        {!s.has_sem2 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickScrapeSemester(s.usn, "2")}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white shadow-xs flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer"
+                          >
+                            <IconBolt className="w-3.5 h-3.5" />
+                            <span>Scrape Sem 2</span>
+                          </button>
+                        ) : !s.has_sem1 ? (
+                          <button
+                            type="button"
+                            onClick={() => handleQuickScrapeSemester(s.usn, "1")}
+                            className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-500 hover:bg-rose-600 text-white shadow-xs flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer"
+                          >
+                            <IconBolt className="w-3.5 h-3.5" />
+                            <span>Scrape Sem 1</span>
+                          </button>
+                        ) : (
+                          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                            <IconCheck className="w-3.5 h-3.5" />
+                            <span>Both Complete</span>
                           </span>
                         )}
                       </div>
-
-                      {/* Action buttons */}
-                      {r.status === "pending" ? (
-                        <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                          <button
-                            type="button"
-                            onClick={() => handleScrapeMissingReport(r.usn)}
-                            className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98]"
-                          >
-                            <IconBolt className="w-3.5 h-3.5" />
-                            <span>Scrape Now</span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleResolveMissingReport(r.id)}
-                            className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center"
-                          >
-                            ✓ Mark Done
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="text-[11px] text-emerald-600 font-semibold pt-1 border-t border-slate-100 flex items-center gap-1">
-                          <span>✓</span>
-                          <span>Resolved</span>
-                        </div>
-                      )}
                     </div>
                   ))}
               </div>

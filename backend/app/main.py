@@ -7,7 +7,7 @@ if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
 from typing import List, Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import hashlib
 import secrets
 
@@ -26,7 +26,7 @@ from sqlalchemy import text, desc, func, distinct, inspect
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport
+from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport, RescrapeRequest
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -53,6 +53,12 @@ from .schemas import (
     MissingUSNReportCreate,
     MissingUSNReportOut,
     AvatarUpdateRequest,
+    RescrapeRequestCreate,
+    RescrapeRequestOut,
+    RescrapeStatusResponse,
+    RescrapeActionRequest,
+    StudentSemesterAudit,
+    SemesterAuditResponse,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -252,6 +258,50 @@ def init_db():
                     """))
         except Exception as e:
             print(f"⚠️ missing_usn_reports init notice: {e}")
+
+        # rescrape_requests
+        try:
+            with engine.begin() as conn:
+                if engine.dialect.name == "postgresql":
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS rescrape_requests (
+                            id SERIAL PRIMARY KEY,
+                            usn VARCHAR NOT NULL,
+                            name VARCHAR DEFAULT '',
+                            branch VARCHAR DEFAULT '',
+                            request_type VARCHAR NOT NULL DEFAULT 'REVALUATION',
+                            target_semester VARCHAR DEFAULT '1',
+                            subject_codes VARCHAR DEFAULT '',
+                            custom_url VARCHAR DEFAULT '',
+                            message VARCHAR DEFAULT '',
+                            status VARCHAR DEFAULT 'pending',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            resolved_at TIMESTAMP,
+                            admin_notes VARCHAR DEFAULT '',
+                            ip_address VARCHAR DEFAULT ''
+                        );
+                    """))
+                else:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS rescrape_requests (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            usn TEXT NOT NULL,
+                            name TEXT DEFAULT '',
+                            branch TEXT DEFAULT '',
+                            request_type TEXT NOT NULL DEFAULT 'REVALUATION',
+                            target_semester TEXT DEFAULT '1',
+                            subject_codes TEXT DEFAULT '',
+                            custom_url TEXT DEFAULT '',
+                            message TEXT DEFAULT '',
+                            status TEXT DEFAULT 'pending',
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            resolved_at TIMESTAMP,
+                            admin_notes TEXT DEFAULT '',
+                            ip_address TEXT DEFAULT ''
+                        );
+                    """))
+        except Exception as e:
+            print(f"⚠️ rescrape_requests init notice: {e}")
 
         print("✅ Database schema initialized and verified.")
     except Exception as e:
@@ -538,6 +588,245 @@ def resolve_missing_usn_report(report_id: int, db: Session = Depends(get_db)):
     report.status = "resolved"
     db.commit()
     return {"ok": True, "message": f"Report for {report.usn} marked as resolved."}
+
+
+# -------------------------------------------------------------
+# Revaluation, Missing Semester & Re-scrape Requests
+# -------------------------------------------------------------
+
+def format_rescrape_out(r: RescrapeRequest) -> dict:
+    return {
+        "id": r.id,
+        "usn": r.usn,
+        "name": r.name or r.usn,
+        "branch": r.branch or "",
+        "request_type": r.request_type,
+        "target_semester": r.target_semester,
+        "subject_codes": r.subject_codes or "",
+        "custom_url": r.custom_url or "",
+        "message": r.message or "",
+        "status": r.status,
+        "created_at": to_utc_iso(r.created_at),
+        "resolved_at": to_utc_iso(r.resolved_at) if r.resolved_at else None,
+        "admin_notes": r.admin_notes or "",
+        "ip_address": r.ip_address or "",
+    }
+
+
+@app.post("/api/rescrape/request")
+def create_rescrape_request(
+    req: RescrapeRequestCreate,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    clean_usn = req.usn.strip().upper()
+    if not clean_usn or len(clean_usn) < 4:
+        raise HTTPException(status_code=400, detail="Please enter a valid USN.")
+
+    # 1. Anti-Spam Check: Prevent user from spamming; allow only one active pending/in-progress request per USN
+    existing_active = db.query(RescrapeRequest).filter(
+        RescrapeRequest.usn == clean_usn,
+        RescrapeRequest.status.in_(["pending", "in_progress"])
+    ).order_by(desc(RescrapeRequest.created_at)).first()
+
+    if existing_active:
+        sub_date = existing_active.created_at.strftime("%d %b %Y, %I:%M %p") if existing_active.created_at else "recently"
+        raise HTTPException(
+            status_code=400,
+            detail=f"A request for USN {clean_usn} is already in the queue (submitted {sub_date}). The admin has been notified and will scrape your updated results soon!"
+        )
+
+    # 2. Rate limit by client IP (max 5 requests per day)
+    client_ip = request.headers.get("x-forwarded-for")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+
+    one_day_ago = datetime.utcnow() - timedelta(days=1)
+    recent_ip_count = db.query(RescrapeRequest).filter(
+        RescrapeRequest.ip_address == client_ip,
+        RescrapeRequest.created_at >= one_day_ago
+    ).count()
+
+    if recent_ip_count >= 5:
+        raise HTTPException(
+            status_code=429,
+            detail="Rate limit reached for your network: maximum 5 requests per 24 hours. Please wait before submitting again."
+        )
+
+    # Lookup student record to autofill name & branch if not provided
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    student_name = req.name.strip() if req.name else (student.name if student else clean_usn)
+    student_branch = req.branch.strip().upper() if req.branch else (student.branch if student else "")
+
+    entry = RescrapeRequest(
+        usn=clean_usn,
+        name=student_name,
+        branch=student_branch,
+        request_type=req.request_type,
+        target_semester=req.target_semester or "1",
+        subject_codes=req.subject_codes.strip() if req.subject_codes else "",
+        custom_url=req.custom_url.strip() if req.custom_url else "",
+        message=req.message.strip() if req.message else "",
+        status="pending",
+        created_at=datetime.utcnow(),
+        ip_address=client_ip,
+    )
+    db.add(entry)
+    db.commit()
+    db.refresh(entry)
+
+    return {
+        "ok": True,
+        "message": f"Update request queued for USN {clean_usn}! Admin has been notified to re-scrape your semester results.",
+        "id": entry.id,
+        "request": format_rescrape_out(entry)
+    }
+
+
+@app.get("/api/rescrape/status", response_model=RescrapeStatusResponse)
+def get_rescrape_status(usn: str = Query(...), db: Session = Depends(get_db)):
+    clean_usn = usn.strip().upper()
+    pending = db.query(RescrapeRequest).filter(
+        RescrapeRequest.usn == clean_usn,
+        RescrapeRequest.status.in_(["pending", "in_progress"])
+    ).order_by(desc(RescrapeRequest.created_at)).first()
+
+    last = db.query(RescrapeRequest).filter(
+        RescrapeRequest.usn == clean_usn
+    ).order_by(desc(RescrapeRequest.created_at)).first()
+
+    return {
+        "has_pending": bool(pending),
+        "pending_request": format_rescrape_out(pending) if pending else None,
+        "last_request": format_rescrape_out(last) if last else None
+    }
+
+
+@app.get("/api/admin/rescrape-requests", dependencies=[Depends(require_admin)])
+def get_admin_rescrape_requests(
+    status: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    query = db.query(RescrapeRequest)
+    if status and status != "all":
+        query = query.filter(RescrapeRequest.status == status)
+    requests = query.order_by(desc(RescrapeRequest.created_at)).limit(150).all()
+    return [format_rescrape_out(r) for r in requests]
+
+
+@app.post("/api/admin/rescrape-requests/{request_id}/action", dependencies=[Depends(require_admin)])
+def handle_admin_rescrape_action(
+    request_id: int,
+    req: RescrapeActionRequest,
+    db: Session = Depends(get_db)
+):
+    item = db.query(RescrapeRequest).filter(RescrapeRequest.id == request_id).first()
+    if not item:
+        raise HTTPException(status_code=404, detail="Request not found.")
+
+    if req.action == "resolve":
+        item.status = "resolved"
+        item.resolved_at = datetime.utcnow()
+        if req.admin_notes:
+            item.admin_notes = req.admin_notes
+        db.commit()
+        return {"ok": True, "message": f"Request for {item.usn} marked as resolved."}
+
+    elif req.action == "reject":
+        item.status = "rejected"
+        item.resolved_at = datetime.utcnow()
+        if req.admin_notes:
+            item.admin_notes = req.admin_notes
+        db.commit()
+        return {"ok": True, "message": f"Request for {item.usn} marked as rejected."}
+
+    elif req.action == "scrape_now":
+        if scraper_worker.is_active():
+            raise HTTPException(status_code=400, detail="Scraper is currently running another job. Please wait for it to complete.")
+
+        target_sem = item.target_semester if item.target_semester in ("1", "2") else "1"
+        custom_url = item.custom_url.strip() if item.custom_url else None
+
+        started = scraper_worker.start(
+            start_usn=item.usn,
+            end_usn=item.usn,
+            semester=target_sem,
+            custom_url=custom_url
+        )
+        if not started:
+            raise HTTPException(status_code=400, detail="Could not initiate scraper worker.")
+
+        item.status = "in_progress"
+        db.commit()
+        return {
+            "ok": True,
+            "message": f"Launched scraper for {item.usn} (Sem {target_sem})! Monitor progress in the Scraper tab."
+        }
+
+    else:
+        raise HTTPException(status_code=400, detail=f"Unknown action: {req.action}")
+
+
+@app.get("/api/admin/semester-audit", response_model=SemesterAuditResponse, dependencies=[Depends(require_admin)])
+def get_admin_semester_audit(db: Session = Depends(get_db)):
+    students = db.query(Student).order_by(Student.usn).all()
+    audit_list = []
+    complete_both = 0
+    missing_sem2 = 0
+    missing_sem1 = 0
+    no_marks = 0
+
+    for s in students:
+        sems = {m.semester for m in s.marks}
+        has_sem1 = "1" in sems
+        has_sem2 = "2" in sems
+
+        unique_sems = sorted(list(sems))
+        missing = []
+        if not has_sem1:
+            missing.append("1")
+        if not has_sem2:
+            missing.append("2")
+
+        if has_sem1 and has_sem2:
+            complete_both += 1
+        elif has_sem1 and not has_sem2:
+            missing_sem2 += 1
+        elif has_sem2 and not has_sem1:
+            missing_sem1 += 1
+        else:
+            no_marks += 1
+
+        sem1_bl = sum(1 for m in s.marks if m.semester == "1" and m.status in ("F", "A"))
+        sem2_bl = sum(1 for m in s.marks if m.semester == "2" and m.status in ("F", "A"))
+
+        audit_list.append(StudentSemesterAudit(
+            usn=s.usn,
+            name=s.name or s.usn,
+            branch=s.branch,
+            batch=s.batch,
+            has_sem1=has_sem1,
+            has_sem2=has_sem2,
+            semesters_present=unique_sems,
+            missing_semesters=missing,
+            total_marks=s.total_marks,
+            max_marks=s.max_marks,
+            percentage=s.percentage,
+            total_backlogs=s.total_backlogs,
+            sem1_backlogs=sem1_bl,
+            sem2_backlogs=sem2_bl,
+        ))
+
+    return SemesterAuditResponse(
+        total_students=len(students),
+        complete_both_sems=complete_both,
+        missing_sem2=missing_sem2,
+        missing_sem1=missing_sem1,
+        no_marks=no_marks,
+        students=audit_list
+    )
 
 
 @app.get("/api/admin/disputes", response_model=List[DisputeOut], dependencies=[Depends(require_admin)])

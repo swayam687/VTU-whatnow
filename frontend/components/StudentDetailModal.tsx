@@ -10,8 +10,10 @@ import {
   IconKey,
   IconGitHub,
   IconLinkedIn,
+  IconRotateCcw,
 } from "./Icons";
 import Identicon from "./Identicon";
+import RescrapeRequestModal from "./RescrapeRequestModal";
 import { sfx } from "../lib/sfx";
 
 export interface OriginRect {
@@ -63,6 +65,7 @@ export default function StudentDetailModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [isRescrapeModalOpen, setIsRescrapeModalOpen] = useState(false);
 
   // Smooth closing transition handler (collapses back into origin element)
   const handleModalClose = () => {
@@ -384,6 +387,38 @@ export default function StudentDetailModal({
                 </div>
               </div>
 
+              {/* Revaluation & Backlog Clearance Notice */}
+              {student.total_backlogs > 0 && (
+                <div
+                  className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
+                    isObsidian
+                      ? "bg-amber-950/20 border-amber-800/40 text-amber-200"
+                      : "bg-amber-50/70 border-amber-200 text-amber-900"
+                  }`}
+                >
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5 text-xs font-bold">
+                      <IconRotateCcw className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Passed in Revaluation or Re-exam?</span>
+                    </div>
+                    <p className="text-[11px] opacity-80 leading-relaxed">
+                      If you cleared your backlogs or improved marks, request the admin to re-scrape your updated result.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      setIsRescrapeModalOpen(true);
+                    }}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shrink-0 shadow-xs flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer"
+                  >
+                    <IconRotateCcw className="w-3.5 h-3.5" />
+                    <span>Request Re-scrape</span>
+                  </button>
+                </div>
+              )}
+
               {/* Social Profile Badges */}
               {(student.github_url || student.linkedin_url) && (
                 <div
@@ -421,9 +456,22 @@ export default function StudentDetailModal({
 
               {/* Marks Breakdown Table */}
               <div>
-                <h3 className="font-bold text-xs uppercase tracking-wider opacity-70 mb-2">
-                  Subject Marks Breakdown ({student.marks?.length || 0})
-                </h3>
+                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                  <h3 className="font-bold text-xs uppercase tracking-wider opacity-70">
+                    Subject Marks Breakdown ({student.marks?.length || 0})
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      setIsRescrapeModalOpen(true);
+                    }}
+                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <IconRotateCcw className="w-3 h-3 text-cyan-500" />
+                    <span>Missing Sem 2 or Reval Results? Request Scrape</span>
+                  </button>
+                </div>
                 <div
                   className={`overflow-x-auto rounded-xl border ${
                     isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"
@@ -437,6 +485,7 @@ export default function StudentDetailModal({
                         }`}
                       >
                         <th className="py-2 px-3 font-semibold">Code</th>
+                        <th className="py-2 px-2 font-semibold text-center">Sem</th>
                         <th className="py-2 px-3 font-semibold">Subject</th>
                         <th className="py-2 px-2 font-semibold text-center">Int</th>
                         <th className="py-2 px-2 font-semibold text-center">Ext</th>
@@ -457,6 +506,9 @@ export default function StudentDetailModal({
                           >
                             <td className="py-2 px-3 font-mono font-semibold opacity-80">
                               {m.subject_code}
+                            </td>
+                            <td className="py-2 px-2 text-center font-mono text-[10px] opacity-70">
+                              S{m.semester || "1"}
                             </td>
                             <td className="py-2 px-3 font-medium max-w-[180px] sm:max-w-[220px] truncate">
                               {m.subject_name || m.subject_code}
@@ -489,7 +541,7 @@ export default function StudentDetailModal({
                         ))
                       ) : (
                         <tr>
-                          <td colSpan={6} className="py-6 text-center opacity-40 text-xs">
+                          <td colSpan={7} className="py-6 text-center opacity-40 text-xs">
                             No subject records available for this student.
                           </td>
                         </tr>
@@ -502,6 +554,15 @@ export default function StudentDetailModal({
           )}
         </div>
       </div>
+
+      {/* Re-scrape / Revaluation Request Modal */}
+      <RescrapeRequestModal
+        isOpen={isRescrapeModalOpen}
+        student={student}
+        usn={usn}
+        isObsidian={isObsidian}
+        onClose={() => setIsRescrapeModalOpen(false)}
+      />
     </div>
   );
 }

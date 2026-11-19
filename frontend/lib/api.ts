@@ -632,3 +632,130 @@ export async function resolveAdminMissingUsnReport(id: number, adminKey: string)
   });
   if (!res.ok) throw new Error("Failed to resolve missing USN report");
 }
+
+export interface RescrapeRequestRecord {
+  id: number;
+  usn: string;
+  name: string;
+  branch: string;
+  request_type: "REVALUATION" | "MISSING_SEMESTER" | "RE_EXAM" | "CORRECTION" | string;
+  target_semester: string;
+  subject_codes?: string;
+  custom_url?: string;
+  message?: string;
+  status: "pending" | "in_progress" | "resolved" | "rejected" | string;
+  created_at?: string;
+  resolved_at?: string;
+  admin_notes?: string;
+  ip_address?: string;
+}
+
+export interface RescrapeStatusData {
+  has_pending: boolean;
+  pending_request?: RescrapeRequestRecord | null;
+  last_request?: RescrapeRequestRecord | null;
+}
+
+export interface StudentSemesterAudit {
+  usn: string;
+  name: string;
+  branch: string;
+  batch?: number;
+  has_sem1: boolean;
+  has_sem2: boolean;
+  semesters_present: string[];
+  missing_semesters: string[];
+  total_marks: number;
+  max_marks: number;
+  percentage: number;
+  total_backlogs: number;
+  sem1_backlogs: number;
+  sem2_backlogs: number;
+}
+
+export interface SemesterAuditData {
+  total_students: number;
+  complete_both_sems: number;
+  missing_sem2: number;
+  missing_sem1: number;
+  no_marks: number;
+  students: StudentSemesterAudit[];
+}
+
+export async function submitRescrapeRequest(payload: {
+  usn: string;
+  name?: string;
+  branch?: string;
+  request_type: string;
+  target_semester: string;
+  subject_codes?: string;
+  custom_url?: string;
+  message?: string;
+}): Promise<{ ok: boolean; message: string; id: number; request: RescrapeRequestRecord }> {
+  const res = await fetch(`${API_BASE}/api/rescrape/request`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to submit update request");
+  }
+  return res.json();
+}
+
+export async function fetchRescrapeStatus(usn: string): Promise<RescrapeStatusData> {
+  const res = await fetch(`${API_BASE}/api/rescrape/status?usn=${encodeURIComponent(usn.trim().toUpperCase())}`, {
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    return { has_pending: false, pending_request: null, last_request: null };
+  }
+  return res.json();
+}
+
+export async function fetchAdminRescrapeRequests(
+  adminKey: string,
+  status?: string
+): Promise<RescrapeRequestRecord[]> {
+  const url = new URL(`${API_BASE}/api/admin/rescrape-requests`);
+  if (status && status !== "all") {
+    url.searchParams.set("status", status);
+  }
+  const res = await fetch(url.toString(), {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load rescrape requests");
+  return res.json();
+}
+
+export async function actionAdminRescrapeRequest(
+  requestId: number,
+  action: "resolve" | "reject" | "scrape_now",
+  adminNotes: string | undefined,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/rescrape-requests/${requestId}/action`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+    },
+    body: JSON.stringify({ action, admin_notes: adminNotes || "" }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || `Failed to perform action ${action}`);
+  }
+  return res.json();
+}
+
+export async function fetchAdminSemesterAudit(adminKey: string): Promise<SemesterAuditData> {
+  const res = await fetch(`${API_BASE}/api/admin/semester-audit`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load semester coverage audit");
+  return res.json();
+}

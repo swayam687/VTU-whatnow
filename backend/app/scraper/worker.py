@@ -20,7 +20,7 @@ from playwright.async_api import async_playwright
 
 from ..config import settings
 from ..database import SessionLocal
-from ..models import Student, Subject, Mark
+from ..models import Student, Subject, Mark, RescrapeRequest
 from .parser import parse_vtu_html
 from ..services.job_manager import job_manager
 
@@ -369,11 +369,6 @@ class ScraperWorker:
             student.name = name
             student.branch = branch
             student.batch = batch
-            student.total_marks = parsed["total_marks"]
-            student.max_marks = parsed["max_marks"]
-            student.percentage = parsed["percentage"]
-            student.total_backlogs = parsed["total_backlogs"]
-
             # Clear previous marks for this student and semester to prevent duplicate records
             db.query(Mark).filter(Mark.usn == usn, Mark.semester == semester).delete()
 
@@ -397,6 +392,32 @@ class ScraperWorker:
                     status=m["status"],
                 )
                 db.add(mark)
+
+            db.flush()
+
+            # Recalculate cumulative multi-semester totals for this student across all semesters
+            all_marks = db.query(Mark).filter(Mark.usn == usn).all()
+            if all_marks:
+                student.total_marks = sum(m.total for m in all_marks)
+                student.max_marks = sum(m.max_marks for m in all_marks)
+                student.total_backlogs = sum(1 for m in all_marks if m.status in ("F", "A"))
+                student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
+            else:
+                student.total_marks = parsed["total_marks"]
+                student.max_marks = parsed["max_marks"]
+                student.percentage = parsed["percentage"]
+                student.total_backlogs = parsed["total_backlogs"]
+
+            # Automatically mark pending student re-scrape requests as resolved for this semester
+            pending_requests = db.query(RescrapeRequest).filter(
+                RescrapeRequest.usn == usn,
+                RescrapeRequest.status.in_(["pending", "in_progress"])
+            ).all()
+            for pr in pending_requests:
+                if pr.target_semester == semester or pr.target_semester in ("all", "both"):
+                    pr.status = "resolved"
+                    pr.resolved_at = datetime.utcnow()
+                    pr.admin_notes = f"Automatically resolved via scraper run on semester {semester}."
 
             db.commit()
         except Exception as e:

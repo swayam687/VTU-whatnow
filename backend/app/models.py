@@ -125,5 +125,25 @@ class MissingUSNReport(Base):
     ip_address = Column(String, nullable=True, default="")
 
 
+class RescrapeRequest(Base):
+    __tablename__ = "rescrape_requests"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usn = Column(String, index=True, nullable=False)
+    name = Column(String, default="")
+    branch = Column(String, default="")
+    request_type = Column(String, nullable=False, default="REVALUATION")  # "REVALUATION", "MISSING_SEMESTER", "RE_EXAM", "CORRECTION"
+    target_semester = Column(String, default="1")  # "1", "2", "all"
+    subject_codes = Column(String, nullable=True, default="")  # e.g. "21MAT11, 21PHY12"
+    custom_url = Column(String, nullable=True, default="")  # Student provided VTU results / reval link
+    message = Column(String, default="")
+    status = Column(String, default="pending")  # "pending", "in_progress", "resolved", "rejected"
+    created_at = Column(DateTime, default=datetime.utcnow)
+    resolved_at = Column(DateTime, nullable=True)
+    admin_notes = Column(String, nullable=True, default="")
+    ip_address = Column(String, nullable=True, default="")
+
+
+
 
 
