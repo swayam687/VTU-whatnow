@@ -682,19 +682,31 @@ export interface SemesterAuditData {
   students: StudentSemesterAudit[];
 }
 
-export async function submitRescrapeRequest(payload: {
-  usn: string;
-  name?: string;
-  branch?: string;
-  request_type: string;
-  target_semester: string;
-  subject_codes?: string;
-  custom_url?: string;
-  message?: string;
-}): Promise<{ ok: boolean; message: string; id: number; request: RescrapeRequestRecord }> {
+export async function submitRescrapeRequest(
+  payload: {
+    usn: string;
+    name?: string;
+    branch?: string;
+    request_type: string;
+    target_semester: string;
+    subject_codes?: string;
+    custom_url?: string;
+    message?: string;
+  },
+  token?: string
+): Promise<{ ok: boolean; message: string; id: number; request: RescrapeRequestRecord }> {
+  const activeToken =
+    token ||
+    (typeof window !== "undefined"
+      ? sessionStorage.getItem("vtu_student_token") || ""
+      : "");
+
   const res = await fetch(`${API_BASE}/api/rescrape/request`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(activeToken ? { "X-Student-Token": activeToken } : {}),
+    },
     body: JSON.stringify(payload),
   });
   if (!res.ok) {

@@ -387,22 +387,22 @@ export default function StudentDetailModal({
                 </div>
               </div>
 
-              {/* Revaluation & Backlog Clearance Notice */}
-              {student.total_backlogs > 0 && (
+              {/* Account Holder Marksheet Update Request Banner */}
+              {isMyVerifiedProfile && (
                 <div
                   className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
                     isObsidian
-                      ? "bg-amber-950/20 border-amber-800/40 text-amber-200"
-                      : "bg-amber-50/70 border-amber-200 text-amber-900"
+                      ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-200"
+                      : "bg-blue-50/70 border-blue-200 text-blue-900"
                   }`}
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5 text-xs font-bold">
-                      <IconRotateCcw className="w-3.5 h-3.5 text-amber-500" />
-                      <span>Passed in Revaluation or Re-exam?</span>
+                      <IconRotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400" />
+                      <span>Need your marksheet updated?</span>
                     </div>
                     <p className="text-[11px] opacity-80 leading-relaxed">
-                      If you cleared your backlogs or improved marks, request the admin to re-scrape your updated result.
+                      Cleared backlog in revaluation/re-exam, or missing your Sem-2 results? Send a re-scrape request to admin.
                     </p>
                   </div>
                   <button
@@ -411,10 +411,10 @@ export default function StudentDetailModal({
                       sfx.playMechanicalClick();
                       setIsRescrapeModalOpen(true);
                     }}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-amber-600 hover:bg-amber-500 text-white shrink-0 shadow-xs flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer"
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-xs flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer shrink-0"
                   >
                     <IconRotateCcw className="w-3.5 h-3.5" />
-                    <span>Request Re-scrape</span>
+                    <span>Request Update</span>
                   </button>
                 </div>
               )}
@@ -460,17 +460,19 @@ export default function StudentDetailModal({
                   <h3 className="font-bold text-xs uppercase tracking-wider opacity-70">
                     Subject Marks Breakdown ({student.marks?.length || 0})
                   </h3>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      sfx.playMechanicalClick();
-                      setIsRescrapeModalOpen(true);
-                    }}
-                    className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 inline-flex items-center gap-1 transition-colors cursor-pointer"
-                  >
-                    <IconRotateCcw className="w-3 h-3 text-cyan-500" />
-                    <span>Missing Sem 2 or Reval Results? Request Scrape</span>
-                  </button>
+                  {isMyVerifiedProfile && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsRescrapeModalOpen(true);
+                      }}
+                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <IconRotateCcw className="w-3 h-3 text-cyan-500" />
+                      <span>Missing your Sem 2 or Reval Results? Request Scrape</span>
+                    </button>
+                  )}
                 </div>
                 <div
                   className={`overflow-x-auto rounded-xl border ${
@@ -555,11 +557,12 @@ export default function StudentDetailModal({
         </div>
       </div>
 
-      {/* Re-scrape / Revaluation Request Modal */}
+      {/* Re-scrape / Revaluation Request Modal (strictly for verified account owner) */}
       <RescrapeRequestModal
-        isOpen={isRescrapeModalOpen}
+        isOpen={isRescrapeModalOpen && isMyVerifiedProfile}
         student={student}
         usn={usn}
+        studentSession={studentSession}
         isObsidian={isObsidian}
         onClose={() => setIsRescrapeModalOpen(false)}
       />

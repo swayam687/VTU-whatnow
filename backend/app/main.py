@@ -617,11 +617,20 @@ def format_rescrape_out(r: RescrapeRequest) -> dict:
 def create_rescrape_request(
     req: RescrapeRequestCreate,
     request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
     db: Session = Depends(get_db)
 ):
     clean_usn = req.usn.strip().upper()
     if not clean_usn or len(clean_usn) < 4:
         raise HTTPException(status_code=400, detail="Please enter a valid USN.")
+
+    # 0. Account Holder Verification: Strictly only the logged-in student can request an update for their OWN account
+    session_usn = verify_session_token(x_student_token, db)
+    if not session_usn or session_usn.strip().upper() != clean_usn:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Access restricted: Only the verified account owner logged in with USN {clean_usn} can submit a re-scrape request for their own marksheet."
+        )
 
     # 1. Anti-Spam Check: Prevent user from spamming; allow only one active pending/in-progress request per USN
     existing_active = db.query(RescrapeRequest).filter(
