@@ -9,7 +9,7 @@ import { sfx } from "../lib/sfx";
 interface LeaderboardProps {
   toppers: Student[];
   branch: string;
-  onSelectStudent: (student: Student) => void;
+  onSelectStudent: (student: Student, e?: React.MouseEvent) => void;
   isObsidian?: boolean;
 }
 
@@ -90,9 +90,9 @@ export default function Leaderboard({
           return (
             <div
               key={s.usn}
-              onClick={() => {
+              onClick={(e) => {
                 sfx.playSonarChime();
-                onSelectStudent(s);
+                onSelectStudent(s, e);
               }}
               className={`p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border ${meta.border} ${meta.bg} flex items-center justify-between gap-3 cursor-pointer transition-all duration-150 hover:scale-[1.01] shadow-sm`}
             >

@@ -53,6 +53,7 @@ import {
 import InstallAppModal from "../components/InstallAppModal";
 import StudentAuthModal from "../components/StudentAuthModal";
 import PixelAvatarModal from "../components/PixelAvatarModal";
+import StudentDetailModal, { OriginRect } from "../components/StudentDetailModal";
 import { sfx } from "../lib/sfx";
 
 const ALL_BRANCHES = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
@@ -136,6 +137,7 @@ export default function Dashboard() {
   const [selectedUsn, setSelectedUsn] = useState<string | null>(null);
   const [detailStudent, setDetailStudent] = useState<Student | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [modalOriginRect, setModalOriginRect] = useState<OriginRect | null>(null);
 
   // User Profile / "This is Me" state
   const [myUsn, setMyUsn] = useState<string>("");
@@ -313,8 +315,20 @@ export default function Dashboard() {
     );
   }, [students, search]);
 
-  // Open detail modal and fetch full marks (with 0ms instant cached load)
-  const handleOpenDetail = async (usn: string) => {
+  // Open detail modal and fetch full marks (with 0ms instant cached load & FLIP shared element transition)
+  const handleOpenDetail = async (usn: string, e?: React.MouseEvent) => {
+    if (e && e.currentTarget) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setModalOriginRect({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    } else {
+      setModalOriginRect(null);
+    }
+
     setSelectedUsn(usn);
 
     // Step 1: 0ms Local Cache Check
@@ -349,6 +363,7 @@ export default function Dashboard() {
     setDetailStudent(null);
     setIsDetailCached(false);
     setCachedAge("");
+    setModalOriginRect(null);
   };
 
   // Compare toggle
@@ -589,7 +604,7 @@ export default function Dashboard() {
 
                   <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                     <button
-                      onClick={() => handleOpenDetail(studentSession.usn)}
+                      onClick={(e) => handleOpenDetail(studentSession.usn, e)}
                       className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white shadow-xs dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
                     >
                       <IconFileText className="w-3.5 h-3.5" />
@@ -716,7 +731,7 @@ export default function Dashboard() {
             <Leaderboard
               toppers={toppers}
               branch={activeBranch}
-              onSelectStudent={(s) => handleOpenDetail(s.usn)}
+              onSelectStudent={(s, e) => handleOpenDetail(s.usn, e)}
               isObsidian={isObsidian}
             />
 
@@ -906,7 +921,7 @@ export default function Dashboard() {
                       rank={sortBy === "percentage" && !search ? idx + 1 : undefined}
                       isSelectedForCompare={compareUsns.includes(s.usn)}
                       onToggleCompare={() => handleToggleCompare(s.usn)}
-                      onOpenDetail={() => handleOpenDetail(s.usn)}
+                      onOpenDetail={(e) => { handleOpenDetail(s.usn, e); }}
                       isObsidian={isObsidian}
                       isMyProfile={s.usn.toUpperCase() === myUsn.toUpperCase()}
                     />
@@ -1066,333 +1081,26 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Student Marksheet Detail Modal */}
-      {selectedUsn && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto">
-          <div
-            className={`rounded-2xl sm:rounded-3xl border shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 ${
-              isObsidian
-                ? "bg-[#0b0d11] border-slate-800 text-white"
-                : "bg-white border-slate-200 text-slate-900"
-            }`}
-          >
-            {/* Modal Header */}
-            <div
-              className={`px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between ${
-                isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <Identicon
-                  usn={selectedUsn}
-                  percentage={detailStudent?.percentage}
-                  totalBacklogs={detailStudent?.total_backlogs}
-                  customPixelArt={detailStudent?.avatar_pixel_art}
-                  size={42}
-                  showFingerprint
-                  isEditable={Boolean(studentSession && selectedUsn.toUpperCase() === studentSession.usn.toUpperCase())}
-                  onEditClick={() => setIsPixelModalOpen(true)}
-                />
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-bold text-sm sm:text-base leading-tight">
-                      {detailStudent?.name || "Student Marksheet"}
-                    </h2>
-                    {studentSession && selectedUsn.toUpperCase() === studentSession.usn.toUpperCase() && (
-                      <button
-                        onClick={() => setIsPixelModalOpen(true)}
-                        className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                        title="Edit your 10x10 custom pixel art avatar"
-                      >
-                        <IconPencil className="w-2.5 h-2.5" />
-                        <span>Edit Avatar</span>
-                      </button>
-                    )}
-                    {isDetailCached && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                        <span>⚡️</span>
-                        <span>0ms Cached ({cachedAge || "saved"})</span>
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs opacity-60 font-mono mt-0.5">{selectedUsn} • {detailStudent?.branch || "ENG"}</p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    sfx.playMechanicalClick();
-                    handleToggleCompare(selectedUsn);
-                  }}
-                  className={`p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all ${
-                    compareUsns.includes(selectedUsn)
-                      ? "bg-blue-600 text-white border-blue-600 font-bold"
-                      : isObsidian
-                      ? "bg-slate-900 text-slate-300 border-slate-800"
-                      : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                  }`}
-                >
-                  <IconCompare className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline text-[11px]">
-                    {compareUsns.includes(selectedUsn) ? "Added" : "Compare"}
-                  </span>
-                </button>
-                <button
-                  onClick={() => {
-                    sfx.playMechanicalClick();
-                    handleCloseDetail();
-                  }}
-                  className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl transition-colors"
-                >
-                  <IconClose className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Modal Body */}
-            <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
-              {detailLoading && !detailStudent ? (
-                <div className="space-y-3 py-6">
-                  <div className="h-6 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
-                  <div className="h-16 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
-                  <div className="h-32 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
-                </div>
-              ) : !detailStudent ? (
-                <div className="text-center py-8 space-y-2">
-                  <IconWifiOff className="w-7 h-7 mx-auto text-slate-400" />
-                  <p className="font-semibold text-sm">Marksheet Not Cached</p>
-                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                    Could not reach server and no offline cache was saved for {selectedUsn}.
-                  </p>
-                  <button
-                    onClick={() => handleOpenDetail(selectedUsn)}
-                    className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900 mt-1"
-                  >
-                    Retry Loading
-                  </button>
-                </div>
-              ) : (
-                <>
-                  {/* Summary Metric Tiles */}
-                  <div className="grid grid-cols-3 gap-2 text-center">
-                    <div
-                      className={`p-2.5 sm:p-3 rounded-xl border ${
-                        isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
-                      }`}
-                    >
-                      <p className="text-[10px] uppercase font-semibold opacity-50">Score</p>
-                      <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
-                        {detailStudent.total_marks}
-                        <span className="text-[10px] font-normal opacity-50 ml-0.5">
-                          /{detailStudent.max_marks || 100}
-                        </span>
-                      </p>
-                    </div>
-                    <div
-                      className={`p-2.5 sm:p-3 rounded-xl border ${
-                        isObsidian
-                          ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
-                          : "bg-blue-50/60 border-blue-100 text-blue-700"
-                      }`}
-                    >
-                      <p className="text-[10px] uppercase font-semibold opacity-80">Percentage</p>
-                      <p className="text-sm sm:text-base font-black font-mono mt-0.5">
-                        {detailStudent.percentage.toFixed(1)}%
-                      </p>
-                    </div>
-                    <div
-                      className={`p-2.5 sm:p-3 rounded-xl border ${
-                        detailStudent.total_backlogs > 0
-                          ? isObsidian
-                            ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
-                            : "bg-rose-50 border-rose-200 text-rose-700"
-                          : isObsidian
-                          ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
-                          : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                      }`}
-                    >
-                      <p className="text-[10px] uppercase font-semibold opacity-80">Backlogs</p>
-                      <p className="text-sm sm:text-base font-black font-mono mt-0.5">
-                        {detailStudent.total_backlogs}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Head-to-Head Comparison Banner */}
-                  <div
-                    className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${
-                      isObsidian
-                        ? "bg-white/[0.03] border-white/10"
-                        : "bg-slate-50 border-slate-200/80"
-                    }`}
-                  >
-                    <div className="text-left w-full sm:w-auto">
-                      <div className="flex items-center gap-1.5 text-xs font-bold">
-                        <IconCompare className="w-3.5 h-3.5 text-slate-500" />
-                        <span>Direct Comparison</span>
-                        {myUsn && myUsn.toUpperCase() !== selectedUsn.toUpperCase() && (
-                          <span className="text-[10px] opacity-70 font-mono">vs You ({myUsn})</span>
-                        )}
-                      </div>
-                      <p className="text-[11px] opacity-70">
-                        {myUsn && selectedUsn.toUpperCase() === myUsn.toUpperCase()
-                          ? "This is your verified personal marksheet."
-                          : myUsn
-                          ? "Evaluate subject marks and leads side-by-side."
-                          : "Sign in with your USN to compare marks side-by-side."}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                      {myUsn && selectedUsn.toUpperCase() === myUsn.toUpperCase() ? (
-                        <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-slate-800 dark:text-slate-200">
-                          Your Marksheet
-                        </span>
-                      ) : myUsn ? (
-                        <button
-                          onClick={() => handleCompareWithMe(detailStudent)}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
-                        >
-                          <IconCompare className="w-3.5 h-3.5" />
-                          <span>Compare with Me</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => {
-                            sfx.playMechanicalClick();
-                            setIsAuthModalOpen(true);
-                          }}
-                          className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
-                        >
-                          <IconKey className="w-3.5 h-3.5" />
-                          <span>Sign In to Compare</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Social Profile Badges */}
-                  {(detailStudent.github_url || detailStudent.linkedin_url) && (
-                    <div
-                      className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                        isObsidian ? "bg-slate-900/40 border-slate-800" : "bg-slate-50 border-slate-100"
-                      }`}
-                    >
-                      <span className="opacity-60 text-[11px]">Public Profiles:</span>
-                      <div className="flex items-center gap-2">
-                        {detailStudent.github_url && (
-                          <a
-                            href={detailStudent.github_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-white transition-colors text-xs font-medium"
-                          >
-                            <IconGitHub className="w-3.5 h-3.5" />
-                            <span>GitHub</span>
-                          </a>
-                        )}
-                        {detailStudent.linkedin_url && (
-                          <a
-                            href={detailStudent.linkedin_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 transition-colors text-xs font-medium"
-                          >
-                            <IconLinkedIn className="w-3.5 h-3.5" />
-                            <span>LinkedIn</span>
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Marks Breakdown Table */}
-                  <div>
-                    <h3 className="font-bold text-xs uppercase tracking-wider opacity-70 mb-2">
-                      Subject Marks Breakdown ({detailStudent.marks?.length || 0})
-                    </h3>
-                    <div
-                      className={`overflow-x-auto rounded-xl border ${
-                        isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"
-                      }`}
-                    >
-                      <table className="w-full text-left text-xs border-collapse">
-                        <thead>
-                          <tr
-                            className={`border-b text-[10px] opacity-60 uppercase ${
-                              isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                            }`}
-                          >
-                            <th className="py-2 px-3 font-semibold">Code</th>
-                            <th className="py-2 px-3 font-semibold">Subject</th>
-                            <th className="py-2 px-2 font-semibold text-center">Int</th>
-                            <th className="py-2 px-2 font-semibold text-center">Ext</th>
-                            <th className="py-2 px-2 font-semibold text-center">Total</th>
-                            <th className="py-2 px-3 font-semibold text-right">Result</th>
-                          </tr>
-                        </thead>
-                        <tbody
-                          className={`divide-y ${
-                            isObsidian ? "divide-slate-800/60" : "divide-slate-100"
-                          }`}
-                        >
-                          {detailStudent.marks && detailStudent.marks.length > 0 ? (
-                            detailStudent.marks.map((m, i) => (
-                              <tr
-                                key={i}
-                                className={isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"}
-                              >
-                                <td className="py-2 px-3 font-mono font-semibold opacity-80">
-                                  {m.subject_code}
-                                </td>
-                                <td className="py-2 px-3 font-medium max-w-[180px] sm:max-w-[220px] truncate">
-                                  {m.subject_name || m.subject_code}
-                                </td>
-                                <td className="py-2 px-2 text-center opacity-60 font-mono">
-                                  {m.internal_marks}
-                                </td>
-                                <td className="py-2 px-2 text-center opacity-60 font-mono">
-                                  {m.external_marks}
-                                </td>
-                                <td className="py-2 px-2 text-center font-bold font-mono">
-                                  {m.total}
-                                </td>
-                                <td className="py-2 px-3 text-right">
-                                  <span
-                                    className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${
-                                      m.status === "P"
-                                        ? isObsidian
-                                          ? "bg-emerald-950 text-emerald-400 border-emerald-800"
-                                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                        : isObsidian
-                                        ? "bg-rose-950 text-rose-400 border-rose-800"
-                                        : "bg-rose-50 text-rose-700 border-rose-200"
-                                    }`}
-                                  >
-                                    {m.status === "P" ? "PASS" : m.status}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td colSpan={6} className="py-6 text-center opacity-40 text-xs">
-                                No subject records available for this student.
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Student Marksheet Detail Modal with Smooth Shared Element Transition */}
+      <StudentDetailModal
+        isOpen={Boolean(selectedUsn)}
+        usn={selectedUsn}
+        student={detailStudent}
+        isLoading={detailLoading}
+        isCached={isDetailCached}
+        cachedAge={cachedAge}
+        myUsn={myUsn}
+        studentSession={studentSession}
+        originRect={modalOriginRect}
+        compareUsns={compareUsns}
+        isObsidian={isObsidian}
+        onClose={handleCloseDetail}
+        onToggleCompare={handleToggleCompare}
+        onCompareWithMe={handleCompareWithMe}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenPixelModal={() => setIsPixelModalOpen(true)}
+        onRetry={(u) => handleOpenDetail(u)}
+      />
 
       {/* Mobile Bottom Navigation Bar (Thumb Zone) */}
       <nav

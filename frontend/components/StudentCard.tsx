@@ -11,7 +11,7 @@ interface StudentCardProps {
   rank?: number;
   isSelectedForCompare?: boolean;
   onToggleCompare?: () => void;
-  onOpenDetail: () => void;
+  onOpenDetail: (e?: React.MouseEvent) => void;
   isObsidian?: boolean;
   isMyProfile?: boolean;
 }
@@ -35,10 +35,10 @@ export default function StudentCard({
       {/* High-density, touch-friendly list item                       */}
       {/* ============================================================ */}
       <div
-        onClick={() => {
+        onClick={(e) => {
           if (isTopper) sfx.playSonarChime();
           else sfx.playMechanicalClick();
-          onOpenDetail();
+          onOpenDetail(e);
         }}
         className={`sm:hidden group relative rounded-2xl border transition-all p-3 flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] ${
           isObsidian
@@ -166,7 +166,12 @@ export default function StudentCard({
       {/* Comprehensive multi-metric card with dual stats & socials    */}
       {/* ============================================================ */}
       <div
-        className={`hidden sm:flex group relative rounded-3xl border transition-all flex-col justify-between p-4.5 ${
+        onClick={(e) => {
+          if (isTopper) sfx.playSonarChime();
+          else sfx.playMechanicalClick();
+          onOpenDetail(e);
+        }}
+        className={`hidden sm:flex group relative rounded-3xl border transition-all flex-col justify-between p-4.5 cursor-pointer active:scale-[0.995] ${
           isObsidian
             ? isSelectedForCompare
               ? "bg-[#0f1115] border-cyan-400 ring-2 ring-cyan-500/30 text-white shadow-md shadow-cyan-950/20"
@@ -184,12 +189,7 @@ export default function StudentCard({
         <div>
           <div className="flex items-start justify-between gap-2.5">
             <div
-              className="flex items-start gap-2.5 min-w-0 flex-1 cursor-pointer"
-              onClick={() => {
-                if (isTopper) sfx.playSonarChime();
-                else sfx.playMechanicalClick();
-                onOpenDetail();
-              }}
+              className="flex items-start gap-2.5 min-w-0 flex-1"
             >
               {/* Procedural Identicon */}
               <Identicon

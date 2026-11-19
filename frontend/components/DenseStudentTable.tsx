@@ -13,7 +13,7 @@ interface DenseStudentTableProps {
   students: Student[];
   compareUsns: string[];
   onToggleCompare: (usn: string) => void;
-  onOpenDetail: (usn: string) => void;
+  onOpenDetail: (usn: string, e?: React.MouseEvent) => void;
   myUsn?: string;
   isObsidian?: boolean;
 }
@@ -198,7 +198,7 @@ export default function DenseStudentTable({
               return (
                 <tr
                   key={s.usn}
-                  onClick={() => onOpenDetail(s.usn)}
+                  onClick={(e) => onOpenDetail(s.usn, e)}
                   className={`cursor-pointer transition-colors group ${
                     isMyProfile
                       ? isObsidian
