@@ -47,6 +47,8 @@ import {
   IconBell,
   IconFileText,
   IconSettings,
+  IconLock,
+  IconRotateCcw,
 } from "../../components/Icons";
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";
@@ -636,21 +638,21 @@ export default function AdminPanel() {
   // -------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="w-full max-w-md mx-auto my-6 sm:my-16 px-3 sm:px-0">
-        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-5 sm:p-8 shadow-sm space-y-5">
+      <div className="w-full max-w-md mx-auto my-8 sm:my-20 px-4 sm:px-0">
+        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-12 h-12 bg-slate-900 text-white rounded-2xl flex items-center justify-center mx-auto text-lg font-bold shadow-sm">
-              🔒
+            <div className="w-11 h-11 bg-slate-50 border border-slate-200/80 text-slate-900 rounded-xl flex items-center justify-center mx-auto shadow-2xs">
+              <IconLock className="w-5 h-5" />
             </div>
-            <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Admin Portal</h2>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Admin Control Room</h2>
             <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-              Manage VTU scraping queues, configure examination semester links, and inspect student records.
+              Authenticate to manage scraping queues, examine portal endpoints, and review student ownership claims.
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
                 Admin Password
               </label>
               <input
@@ -658,28 +660,29 @@ export default function AdminPanel() {
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
                 placeholder="Enter admin password"
-                className="w-full p-3 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all font-mono"
+                className="w-full px-3.5 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-mono placeholder:font-sans placeholder:text-slate-400"
                 autoFocus
               />
             </div>
 
             {authError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs font-medium rounded-xl leading-relaxed">
-                {authError}
+              <div className="p-3 bg-rose-50/70 border border-rose-200/80 text-rose-700 text-xs font-medium rounded-xl leading-relaxed flex items-center gap-2">
+                <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                <span>{authError}</span>
               </div>
             )}
 
             <button
               type="submit"
               disabled={isVerifying || !passwordInput.trim()}
-              className="w-full py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm disabled:opacity-50"
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white font-medium text-xs sm:text-sm rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
-              {isVerifying ? "Verifying..." : "Sign In to Admin Portal"}
+              {isVerifying ? "Verifying Access..." : "Sign In to Admin Portal"}
             </button>
 
             <div className="text-center pt-2">
-              <Link href="/" className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors">
-                ← Return to Student Directory
+              <Link href="/" className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors">
+                ← Return to Results Directory
               </Link>
             </div>
           </form>
@@ -699,7 +702,7 @@ export default function AdminPanel() {
           <Link
             href="/"
             onClick={() => sfx.playClick()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-2xs transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
           >
             ← Results Dashboard
           </Link>
@@ -707,7 +710,7 @@ export default function AdminPanel() {
           <button
             type="button"
             onClick={handleLogout}
-            className="text-xs font-semibold text-rose-600 hover:text-rose-700 px-3 py-1.5 rounded-xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors shadow-2xs"
+            className="text-xs font-medium text-slate-500 hover:text-rose-600 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-rose-200 bg-white hover:bg-rose-50/50 transition-colors shadow-2xs cursor-pointer"
           >
             Sign Out
           </button>
@@ -715,7 +718,7 @@ export default function AdminPanel() {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
           <div>
-            <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight">
+            <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
               Admin Control Room
             </h1>
             <p className="text-slate-500 text-[11px] sm:text-xs">
@@ -724,30 +727,31 @@ export default function AdminPanel() {
           </div>
 
           {/* Status Badges */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-2xs">
               <span
                 className={`w-2 h-2 rounded-full ${
                   status.is_running
-                    ? "bg-emerald-500 animate-ping"
+                    ? "bg-emerald-500"
                     : status.status === "error"
                     ? "bg-rose-500"
-                    : "bg-slate-300"
+                    : "bg-slate-400"
                 }`}
               />
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-700">
-                {status.is_running ? "Scraping..." : status.status === "error" ? "Error" : "Idle"}
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-700">
+                {status.is_running ? "Scraping" : status.status === "error" ? "Error" : "Idle"}
               </span>
             </div>
 
             <div
-              className={`flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border shadow-2xs ${
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-2xs ${
                 browserStatus?.status === "ready"
-                  ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-                  : "bg-amber-50 border-amber-200 text-amber-800"
+                  ? "bg-emerald-50/70 border-emerald-200/80 text-emerald-800"
+                  : "bg-amber-50/70 border-amber-200/80 text-amber-800"
               }`}
             >
-              <span>{browserStatus?.status === "ready" ? "Browser Ready ✅" : "Browser ⚠️"}</span>
+              <span className={`w-1.5 h-1.5 rounded-full ${browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"}`} />
+              <span>{browserStatus?.status === "ready" ? "Browser Ready" : "Browser Check"}</span>
             </div>
           </div>
         </div>
@@ -755,7 +759,7 @@ export default function AdminPanel() {
 
       {/* Global Alerts */}
       {actionError && (
-        <div className="p-3.5 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-2xl font-medium flex items-center justify-between shadow-xs">
+        <div className="p-3 bg-rose-50/80 border border-rose-200/80 text-rose-700 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
           <span>{actionError}</span>
           <button onClick={() => setActionError("")} className="text-rose-500 hover:text-rose-800 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
@@ -764,7 +768,7 @@ export default function AdminPanel() {
       )}
 
       {deleteSuccessMsg && (
-        <div className="p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs rounded-2xl font-medium flex items-center justify-between shadow-xs">
+        <div className="p-3 bg-emerald-50/80 border border-emerald-200/80 text-emerald-700 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
           <span>{deleteSuccessMsg}</span>
           <button onClick={() => setDeleteSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
@@ -772,17 +776,17 @@ export default function AdminPanel() {
         </div>
       )}
 
-      {/* Mobile-First Tab Navigation (Smooth touch scroll on mobile, flex row on tablet/desktop) */}
-      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar bg-slate-100 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
+      {/* Mobile-First Tab Navigation (Polished horizontally scrollable track) */}
+      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar touch-pan-x bg-slate-100/80 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
         <button
           type="button"
           onClick={() => {
             sfx.playClick();
             setActiveTab("scraper");
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "scraper"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
@@ -796,15 +800,15 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("semesters");
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "semesters"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
           <IconLayers className="w-3.5 h-3.5" />
           <span>Semesters</span>
-          <span className="hidden sm:inline text-[9px] px-1 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+          <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono">
             {semesterLinks.length}
           </span>
         </button>
@@ -815,15 +819,15 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("records");
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "records"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
           <IconUsers className="w-3.5 h-3.5" />
           <span>Students</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono">
             {allStudents.length}
           </span>
         </button>
@@ -835,16 +839,16 @@ export default function AdminPanel() {
             setActiveTab("disputes");
             loadDisputes();
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "disputes"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
           <IconShield className="w-3.5 h-3.5" />
           <span>Claims</span>
           {disputes.filter((d) => d.status === "pending").length > 0 && (
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500 text-white font-mono animate-pulse font-bold">
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-amber-500 text-white font-mono font-bold">
               {disputes.filter((d) => d.status === "pending").length}
             </span>
           )}
@@ -857,16 +861,16 @@ export default function AdminPanel() {
             setActiveTab("missing_usn");
             loadMissingReports();
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "missing_usn"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
           <IconBell className="w-3.5 h-3.5" />
           <span>Requests</span>
           {missingReports.filter((r) => r.status === "pending").length > 0 && (
-            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-600 text-white font-mono animate-pulse font-bold">
+            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-600 text-white font-mono font-bold">
               {missingReports.filter((r) => r.status === "pending").length}
             </span>
           )}
@@ -879,16 +883,16 @@ export default function AdminPanel() {
             setActiveTab("logs");
             loadLoginLogs();
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "logs"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
           <IconFileText className="w-3.5 h-3.5" />
           <span>Logs</span>
           {loginLogsData && (
-            <span className="hidden sm:inline text-[9px] px-1.5 py-0.2 rounded-full bg-slate-200 text-slate-700 font-mono">
+            <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono">
               {loginLogsData.total_logins}
             </span>
           )}
@@ -900,9 +904,9 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("system");
           }}
-          className={`py-2 px-2.5 sm:px-3 text-[11px] sm:text-xs font-bold rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 ${
+          className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "system"
-              ? "bg-white text-slate-900 shadow-sm"
+              ? "bg-white text-slate-900 shadow-2xs font-semibold"
               : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
           }`}
         >
@@ -1183,51 +1187,54 @@ export default function AdminPanel() {
 
           {/* Interactive Captcha Solving Card */}
           {status.captcha_base64 && (
-            <div className="bg-amber-50/90 border-2 border-amber-300 rounded-3xl p-5 sm:p-7 shadow-lg space-y-4 animate-in fade-in duration-200">
+            <div className="bg-white border border-amber-300/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4 animate-in fade-in duration-150">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-amber-800 px-2 py-0.5 rounded bg-amber-200/70">
-                    Action Required
-                  </span>
-                  <h3 className="font-black text-amber-950 text-base sm:text-lg mt-1">
-                    Solve Captcha for <span className="font-mono text-blue-700">{status.current_usn}</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                      Captcha Required
+                    </span>
+                  </div>
+                  <h3 className="font-bold text-slate-900 text-sm sm:text-base mt-0.5">
+                    Solve Verification for <span className="font-mono text-slate-900">{status.current_usn}</span>
                   </h3>
                 </div>
 
                 {/* Captcha Controls */}
-                <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-amber-200 shadow-xs self-start sm:self-auto">
-                  <span className="text-[10px] font-bold text-slate-400 px-1">Zoom:</span>
+                <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
+                  <span className="text-[10px] font-medium text-slate-400 px-1">Zoom:</span>
                   {([1, 2, 3] as const).map((z) => (
                     <button
                       key={z}
                       type="button"
                       onClick={() => setCaptchaZoom(z)}
-                      className={`px-2 py-0.5 text-[11px] font-bold rounded-lg ${
-                        captchaZoom === z ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:bg-slate-100"
+                      className={`px-2 py-0.5 text-[11px] font-semibold rounded-lg transition-colors ${
+                        captchaZoom === z ? "bg-slate-900 text-white shadow-2xs" : "text-slate-600 hover:bg-slate-200/60"
                       }`}
                     >
                       {z}x
                     </button>
                   ))}
-                  <div className="w-px h-4 bg-slate-200 mx-0.5" />
+                  <div className="w-px h-3.5 bg-slate-200 mx-0.5" />
                   <button
                     type="button"
                     onClick={() => setCaptchaInvert((v) => !v)}
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border transition-colors ${
+                    className={`px-2 py-0.5 text-[10px] font-medium rounded-lg border transition-colors ${
                       captchaInvert
                         ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
                     }`}
                   >
-                    {captchaInvert ? "Normal Contrast" : "High Contrast"}
+                    {captchaInvert ? "Normal" : "High Contrast"}
                   </button>
                 </div>
               </div>
 
               {/* Captcha Image & Form */}
-              <div className="bg-white p-4 rounded-2xl border border-amber-200/80 flex flex-col sm:flex-row items-center gap-4">
+              <div className="bg-slate-50/60 p-3 sm:p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
                 <div
-                  className={`bg-slate-100 p-3 rounded-xl border border-slate-200 flex items-center justify-center transition-all ${
+                  className={`bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-center transition-all ${
                     captchaInvert ? "filter invert" : ""
                   }`}
                 >
@@ -1618,13 +1625,16 @@ export default function AdminPanel() {
           <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">🛡️ USN Ownership Claims &amp; Disputes</h2>
-                <p className="text-xs text-slate-500">
-                  Review selfie verifications submitted by genuine students claiming their USN ownership.
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  <IconShield className="w-4 h-4 text-slate-700" />
+                  <span>USN Ownership Claims &amp; Disputes</span>
+                </h2>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Review selfie verifications submitted by students claiming verified account ownership.
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl border border-slate-200 text-xs">
                   {["all", "pending", "approved", "rejected"].map((f) => (
                     <button
                       key={f}
@@ -1633,8 +1643,8 @@ export default function AdminPanel() {
                         sfx.playClick();
                         setDisputeFilter(f);
                       }}
-                      className={`px-2 sm:px-2.5 py-1 rounded-lg font-bold capitalize transition-colors text-[11px] sm:text-xs ${
-                        disputeFilter === f ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"
+                      className={`px-2.5 py-1 rounded-lg font-medium capitalize transition-colors text-[11px] sm:text-xs ${
+                        disputeFilter === f ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-500 hover:text-slate-900"
                       }`}
                     >
                       {f}
@@ -1647,18 +1657,19 @@ export default function AdminPanel() {
                     sfx.playClick();
                     loadDisputes();
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5"
                 >
-                  ↻ Refresh
+                  <IconRotateCcw className="w-3 h-3" />
+                  <span>Refresh</span>
                 </button>
               </div>
             </div>
 
             {disputeActionMsg && (
-              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-xl font-medium flex items-center justify-between">
+              <div className="p-3 bg-blue-50/70 border border-blue-200 text-blue-800 text-xs rounded-xl font-medium flex items-center justify-between">
                 <span>{disputeActionMsg}</span>
-                <button onClick={() => setDisputeActionMsg("")} className="text-blue-500 hover:text-blue-800 font-bold">
-                  ✕
+                <button onClick={() => setDisputeActionMsg("")} className="text-blue-500 hover:text-blue-800 font-bold p-1">
+                  <IconClose className="w-3 h-3" />
                 </button>
               </div>
             )}
@@ -1667,8 +1678,8 @@ export default function AdminPanel() {
               <div className="text-center py-12 text-xs text-slate-400">Loading dispute requests...</div>
             ) : disputes.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
-                <span className="text-2xl">🛡️</span>
-                <p className="font-bold text-xs text-slate-700 mt-2">No dispute requests found</p>
+                <IconShield className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="font-semibold text-xs text-slate-700 mt-2">No dispute requests found</p>
                 <p className="text-[11px] text-slate-400">
                   {disputeFilter === "all"
                     ? "No students have submitted dispute claims yet."
@@ -1688,13 +1699,13 @@ export default function AdminPanel() {
                           <span className="font-mono text-xs font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100">
                             {d.usn}
                           </span>
-                          <span className="text-[10px] font-bold text-slate-600 uppercase px-1.5 py-0.2 rounded bg-slate-100">
+                          <span className="text-[10px] font-bold text-slate-600 uppercase px-1.5 py-0.5 rounded bg-slate-100">
                             {d.branch}
                           </span>
                         </div>
                         <h3 className="font-bold text-sm text-slate-900 mt-1">{d.name}</h3>
                         {d.created_at && (
-                          <p className="text-[10px] text-slate-400 mt-0.5">
+                          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
                             Submitted: {formatDateTime(d.created_at).full}
                           </p>
                         )}
@@ -1731,13 +1742,13 @@ export default function AdminPanel() {
                         </span>
                       </div>
                       <div className="text-xs min-w-0">
-                        <p className="font-semibold text-slate-700">Verification Selfie</p>
+                        <p className="font-semibold text-slate-700">Verification Photo</p>
                         <button
                           type="button"
                           onClick={() => setSelectedSelfieZoom(d.selfie_base64)}
                           className="text-[11px] text-blue-600 hover:underline font-medium block mt-0.5"
                         >
-                          🔍 Tap to inspect full photo
+                          Inspect full photo
                         </button>
                       </div>
                     </div>
@@ -1749,9 +1760,9 @@ export default function AdminPanel() {
                           type="button"
                           disabled={processingDisputeId === d.id}
                           onClick={() => handleReviewDispute(d.id, "approve")}
-                          className="flex-1 py-2.5 px-3 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs transition-colors disabled:opacity-50 text-center"
+                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition-colors disabled:opacity-50 text-center active:scale-[0.98]"
                         >
-                          {processingDisputeId === d.id ? "Processing..." : "✓ Approve & Transfer"}
+                          {processingDisputeId === d.id ? "Processing..." : "Approve & Transfer"}
                         </button>
                         <button
                           type="button"
@@ -1760,7 +1771,7 @@ export default function AdminPanel() {
                             const notes = prompt("Enter rejection reason (optional):") || undefined;
                             handleReviewDispute(d.id, "reject", notes);
                           }}
-                          className="py-2.5 px-3 text-xs font-bold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 text-center"
+                          className="py-2 px-3 text-xs font-semibold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 text-center active:scale-[0.98]"
                         >
                           ✕ Reject
                         </button>
@@ -1810,9 +1821,10 @@ export default function AdminPanel() {
                   sfx.playClick();
                   loadMissingReports();
                 }}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors self-start sm:self-auto"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5"
               >
-                ↻ Refresh
+                <IconRotateCcw className="w-3 h-3" />
+                <span>Refresh</span>
               </button>
             </div>
 
@@ -1980,9 +1992,10 @@ export default function AdminPanel() {
                   if (logsSubTab === "logins") loadLoginLogs();
                   else loadComparisonLogs();
                 }}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-colors self-start sm:self-auto"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5"
               >
-                ↻ Refresh
+                <IconRotateCcw className="w-3 h-3" />
+                <span>Refresh</span>
               </button>
             </div>
 
@@ -2123,18 +2136,20 @@ export default function AdminPanel() {
                         >
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-semibold text-slate-500">Student User:</span>
-                              <span className="font-bold text-blue-900 px-2 py-0.5 rounded-lg bg-blue-50 border border-blue-200 font-mono text-[11px]">
+                              <span className="font-medium text-slate-500">Student:</span>
+                              <span className="font-semibold text-slate-900 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 font-mono text-[11px]">
                                 {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn})` : log.viewer_usn}
                               </span>
-                              <span className="text-slate-400 font-semibold text-[11px]">compared</span>
+                              <span className="text-slate-400 font-medium text-[11px]">compared</span>
                             </div>
                             <div className="flex items-center gap-2 text-slate-800 flex-wrap text-xs">
-                              <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                              <span className="font-semibold text-slate-900 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60 font-mono">
                                 {log.student1_name ? `${log.student1_name} (${log.student1_usn})` : log.student1_usn}
                               </span>
-                              <span className="font-black text-amber-500 text-[11px]">⚔️ VS</span>
-                              <span className="font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-0.5">
+                                vs
+                              </span>
+                              <span className="font-semibold text-slate-900 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60 font-mono">
                                 {log.student2_name ? `${log.student2_name} (${log.student2_usn})` : log.student2_usn}
                               </span>
                             </div>
@@ -2142,10 +2157,10 @@ export default function AdminPanel() {
 
                           <div className="flex items-center justify-between sm:justify-end gap-2.5 text-[11px] text-slate-500 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                             {log.compared_at && (
-                              <div className="flex items-center gap-1.5 font-mono text-[11px] bg-slate-50 px-2 py-1 rounded-lg border border-slate-200">
-                                <span>📅 {formatDateTime(log.compared_at).date}</span>
-                                <span className="text-slate-300">•</span>
-                                <span>⏰ {formatDateTime(log.compared_at).time}</span>
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600">
+                                <span>{formatDateTime(log.compared_at).date}</span>
+                                <span className="text-slate-300">·</span>
+                                <span>{formatDateTime(log.compared_at).time}</span>
                               </div>
                             )}
                             {log.ip_address && (

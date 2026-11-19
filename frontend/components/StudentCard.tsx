@@ -67,7 +67,7 @@ export default function StudentCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span
-                className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full uppercase tracking-wider ${
+                className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
                   isObsidian
                     ? "bg-slate-800 text-slate-300 border border-slate-700"
                     : "bg-slate-100 text-slate-700"
@@ -77,7 +77,7 @@ export default function StudentCard({
               </span>
               {rank !== undefined && (
                 <span
-                  className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded border font-mono ${
+                  className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border font-mono ${
                     rank === 1
                       ? isObsidian
                         ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
@@ -91,7 +91,7 @@ export default function StudentCard({
                 </span>
               )}
               {isMyProfile && (
-                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500 text-slate-950">
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-slate-950">
                   You
                 </span>
               )}
@@ -121,7 +121,7 @@ export default function StudentCard({
             </div>
             <div className="mt-1">
               <span
-                className={`inline-block text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${
+                className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
                   hasBacklogs
                     ? isObsidian
                       ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
@@ -204,7 +204,7 @@ export default function StudentCard({
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                   <span
-                    className={`text-[10px] font-semibold px-2 py-0.2 rounded-full uppercase tracking-wider ${
+                    className={`text-[10px] font-semibold px-2 py-0.5 rounded-full uppercase tracking-wider ${
                       isObsidian
                         ? "bg-slate-800 text-slate-300 border border-slate-700"
                         : "bg-slate-100 text-slate-700"
@@ -214,7 +214,7 @@ export default function StudentCard({
                   </span>
                   {rank !== undefined && (
                     <span
-                      className={`text-[10px] font-bold px-1.5 py-0.2 rounded border font-mono ${
+                      className={`text-[10px] font-bold px-1.5 py-0.5 rounded border font-mono ${
                         rank === 1
                           ? isObsidian
                             ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
@@ -229,7 +229,7 @@ export default function StudentCard({
                   )}
                   {isTopper && (
                     <span
-                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded border ${
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded border ${
                         isObsidian
                           ? "bg-amber-500/15 text-amber-400 border-amber-500/30"
                           : "bg-amber-50 text-amber-700 border-amber-200"
@@ -239,7 +239,7 @@ export default function StudentCard({
                     </span>
                   )}
                   {isMyProfile && (
-                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500 text-slate-950">
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500 text-slate-950">
                       You
                     </span>
                   )}

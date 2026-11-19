@@ -43,7 +43,7 @@ export default function BranchTabs({
           >
             <span className="font-semibold text-xs tracking-tight">{b}</span>
             <span
-              className={`text-[10px] font-mono ml-2.5 sm:ml-0 sm:mt-0.5 px-2 py-0.2 rounded-full font-medium ${
+              className={`text-[10px] font-mono ml-2.5 sm:ml-0 sm:mt-0.5 px-2 py-0.5 rounded-full font-medium ${
                 isObsidian
                   ? isActive
                     ? "bg-slate-950 text-cyan-400"

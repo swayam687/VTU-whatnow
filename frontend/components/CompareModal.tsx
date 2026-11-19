@@ -406,7 +406,7 @@ export default function CompareModal({
                           <span className="font-mono text-xs font-bold">{code}</span>
                           {(m1?.semester || m2?.semester) && (
                             <span
-                              className={`text-[9px] px-1.5 py-0.2 rounded border ${
+                              className={`text-[9px] px-1.5 py-0.5 rounded border ${
                                 isObsidian
                                   ? "bg-slate-800 text-slate-400 border-slate-700"
                                   : "bg-slate-100 text-slate-500 border-slate-200"
@@ -435,7 +435,7 @@ export default function CompareModal({
                               (Int: {m1.internal_marks}, Ext: {m1.external_marks})
                             </span>
                             <span
-                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${
                                 m1.status === "P"
                                   ? isObsidian ? "text-emerald-400 bg-emerald-950/40" : "text-emerald-700 bg-emerald-50"
                                   : isObsidian ? "text-rose-400 bg-rose-950/40" : "text-rose-700 bg-rose-50"
@@ -465,7 +465,7 @@ export default function CompareModal({
                               (Int: {m2.internal_marks}, Ext: {m2.external_marks})
                             </span>
                             <span
-                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${
                                 m2.status === "P"
                                   ? isObsidian ? "text-emerald-400 bg-emerald-950/40" : "text-emerald-700 bg-emerald-50"
                                   : isObsidian ? "text-rose-400 bg-rose-950/40" : "text-rose-700 bg-rose-50"

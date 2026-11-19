@@ -462,7 +462,7 @@ export default function Dashboard() {
           <>
             {/* Hero Summary Header */}
             <div
-              className={`rounded-2xl sm:rounded-3xl p-4.5 sm:p-7 border transition-all ${
+              className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 border transition-all ${
                 isObsidian
                   ? "bg-[#0c0e12] border-slate-800/90 text-white shadow-xl shadow-black/20"
                   : "bg-white border-slate-200/90 text-slate-900 shadow-sm"
@@ -477,7 +477,7 @@ export default function Dashboard() {
                       }`}
                     />
                     <span
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
+                      className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                         isObsidian
                           ? "bg-cyan-950/40 text-cyan-400 border-cyan-800/40"
                           : "bg-blue-50 text-blue-700 border-blue-200"
@@ -486,7 +486,7 @@ export default function Dashboard() {
                       Campus Performance
                     </span>
                   </div>
-                  <h1 className="text-lg sm:text-2xl font-extrabold mt-1.5 tracking-tight">
+                  <h1 className="text-lg sm:text-2xl font-bold mt-1 tracking-tight">
                     VTU Semester Results
                   </h1>
                   <p className="text-xs sm:text-sm mt-0.5 max-w-xl opacity-70">
@@ -503,14 +503,14 @@ export default function Dashboard() {
                   }`}
                 >
                   <div className="text-center px-1 sm:px-2">
-                    <p className="text-xl sm:text-2xl font-black font-mono">{students.length}</p>
+                    <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums">{students.length}</p>
                     <p className="text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
                       Students
                     </p>
                   </div>
                   <div className="w-px h-7 bg-slate-300 dark:bg-slate-800" />
                   <div className="text-center px-1 sm:px-2">
-                    <p className="text-xl sm:text-2xl font-black font-mono text-emerald-500">
+                    <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums text-emerald-500">
                       {students.filter((s) => s.total_backlogs === 0).length}
                     </p>
                     <p className="text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
@@ -519,7 +519,7 @@ export default function Dashboard() {
                   </div>
                   <div className="w-px h-7 bg-slate-300 dark:bg-slate-800" />
                   <div className="text-center px-1 sm:px-2">
-                    <p className="text-xl sm:text-2xl font-black font-mono text-rose-500">
+                    <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums text-rose-500">
                       {students.reduce((sum, s) => sum + s.total_backlogs, 0)}
                     </p>
                     <p className="text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
@@ -720,7 +720,7 @@ export default function Dashboard() {
               isObsidian={isObsidian}
             />
 
-            {/* Search & Sort Controls */}
+            {/* Search & Sort Controls (Unified h-9 baseline alignment) */}
             <div
               className={`flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between p-3 rounded-2xl border transition-all ${
                 isObsidian
@@ -734,7 +734,7 @@ export default function Dashboard() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search student name or USN (e.g. 1RM25CS..., 1RM25CD...)"
-                  className={`w-full pl-9 pr-8 py-2 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full h-9 pl-9 pr-8 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     isObsidian
                       ? "bg-slate-950 border-slate-800 text-white placeholder-slate-500"
                       : "bg-slate-50/70 border-slate-200 text-slate-900"
@@ -756,7 +756,7 @@ export default function Dashboard() {
                 )}
               </div>
 
-              {/* Sort Filter & View Mode Toggle */}
+              {/* Sort Filter & View Mode Toggle (Matched h-9 height) */}
               <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
                 <div className="flex items-center gap-1.5">
                   <span className="text-[11px] font-medium opacity-60">Sort:</span>
@@ -766,7 +766,7 @@ export default function Dashboard() {
                       sfx.playMechanicalClick();
                       setSortBy(e.target.value as any);
                     }}
-                    className={`text-xs font-semibold rounded-xl border px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    className={`h-9 text-xs font-semibold rounded-xl border px-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                       isObsidian
                         ? "bg-slate-950 border-slate-800 text-slate-200"
                         : "bg-white border-slate-200 text-slate-700"
@@ -779,12 +779,12 @@ export default function Dashboard() {
                 </div>
 
                 {/* Linear-style Grid vs Table View Mode Switcher */}
-                <div className="flex items-center bg-slate-100 dark:bg-white/5 p-0.5 rounded-xl border border-slate-200 dark:border-white/10 shrink-0">
+                <div className="h-9 flex items-center bg-slate-100 dark:bg-white/5 p-0.5 rounded-xl border border-slate-200 dark:border-white/10 shrink-0">
                   <button
                     type="button"
                     onClick={() => handleSetViewMode("grid")}
                     title="Card Grid View"
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    className={`h-full px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
                       viewMode === "grid"
                         ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
                         : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -797,7 +797,7 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => handleSetViewMode("table")}
                     title="Dense Spreadsheet Table View"
-                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    className={`h-full px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
                       viewMode === "table"
                         ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
                         : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
@@ -1361,7 +1361,7 @@ export default function Dashboard() {
                                 </td>
                                 <td className="py-2 px-3 text-right">
                                   <span
-                                    className={`inline-block font-semibold px-2 py-0.2 rounded text-[10px] border ${
+                                    className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${
                                       m.status === "P"
                                         ? isObsidian
                                           ? "bg-emerald-950 text-emerald-400 border-emerald-800"
@@ -1465,7 +1465,7 @@ export default function Dashboard() {
           onClick={() => sfx.playMechanicalClick()}
           className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-slate-400 hover:text-white"
         >
-          <span className="text-base leading-none">🛡️</span>
+          <IconShield className="w-5 h-5 stroke-[2]" />
           <span className="text-[10px]">Admin</span>
         </Link>
 

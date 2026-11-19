@@ -249,7 +249,7 @@ export default function DenseStudentTable({
                         {s.usn}
                       </span>
                       {isMyProfile && (
-                        <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500 text-slate-950">
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-500 text-slate-950">
                           You
                         </span>
                       )}

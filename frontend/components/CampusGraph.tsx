@@ -528,7 +528,7 @@ export default function CampusGraph({
                   </p>
                   <p className="font-mono text-[10px] opacity-60">{hoveredNode.student.usn}</p>
                   <span
-                    className={`inline-block mt-1 px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                    className={`inline-block mt-1 px-1.5 py-0.5 rounded text-[9px] font-bold ${
                       isObsidian
                         ? "bg-slate-800 text-cyan-400"
                         : "bg-slate-100 text-slate-700"

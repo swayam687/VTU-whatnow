@@ -280,7 +280,7 @@ export default function BacklogMatrix({
                               {subj.subject_code}
                             </span>
                             {subj.branch && subj.branch !== "ALL" && (
-                              <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 opacity-70">
+                              <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 opacity-70">
                                 {subj.branch}
                               </span>
                             )}

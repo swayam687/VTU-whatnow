@@ -106,7 +106,7 @@ export default function Leaderboard({
                 />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-1.5 mb-0.5">
-                    <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${meta.badge}`}>
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${meta.badge}`}>
                       #{idx + 1}
                     </span>
                     <span className="text-[10px] font-bold opacity-60 uppercase">
