@@ -55,6 +55,9 @@ import StudentAuthModal from "../components/StudentAuthModal";
 import PixelAvatarModal from "../components/PixelAvatarModal";
 import StudentDetailModal, { OriginRect } from "../components/StudentDetailModal";
 import { sfx } from "../lib/sfx";
+import CountUp from "../components/CountUp";
+import BlurText from "../components/BlurText";
+import FadeContent from "../components/FadeContent";
 
 const ALL_BRANCHES = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
 
@@ -315,6 +318,18 @@ export default function Dashboard() {
     );
   }, [students, search]);
 
+  // Aggregate metrics for hero counter cards
+  const heroStats = useMemo(() => {
+    const count = students.length;
+    const avg = count > 0 ? students.reduce((sum, s) => sum + s.percentage, 0) / count : 0;
+    const max = count > 0 ? Math.max(...students.map((s) => s.percentage)) : 0;
+    return {
+      count,
+      avg: Math.round(avg * 10) / 10,
+      max: Math.round(max * 10) / 10,
+    };
+  }, [students]);
+
   // Open detail modal and fetch full marks (with 0ms instant cached load & FLIP shared element transition)
   const handleOpenDetail = async (usn: string, e?: React.MouseEvent) => {
     if (e && e.currentTarget) {
@@ -423,7 +438,7 @@ export default function Dashboard() {
         onSignOut={handleSignOut}
       />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-32 sm:pb-24 lg:pb-12 space-y-5 sm:space-y-6">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-20 lg:pb-8 space-y-5 sm:space-y-6">
         {/* Backend Offline Notice */}
         {backendOnline === false && (
           <div className="bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
@@ -501,44 +516,69 @@ export default function Dashboard() {
                       Campus Performance
                     </span>
                   </div>
-                  <h1 className="text-lg sm:text-2xl font-bold mt-1 tracking-tight">
-                    VTU Semester Results
-                  </h1>
-                  <p className="text-xs sm:text-sm mt-0.5 max-w-xl opacity-70">
+                  <BlurText
+                    text="VTU WhatNow • Departmental Results Intelligence"
+                    delay={35}
+                    animateBy="words"
+                    direction="top"
+                    className="text-base sm:text-xl md:text-2xl font-bold mt-1 tracking-tight"
+                  />
+                  <p className="text-xs sm:text-sm mt-1 max-w-xl opacity-70">
                     Search students by name or USN, inspect department leaderboards, and compare marks.
                   </p>
                 </div>
 
-                {/* Metrics Badges */}
+                {/* Metrics Badges with Tabular Number Ticker */}
                 <div
-                  className={`flex items-center gap-3 sm:gap-6 rounded-2xl p-3 sm:p-4 border self-start md:self-auto ${
+                  className={`grid grid-cols-3 divide-x rounded-2xl p-2.5 sm:p-4 border self-stretch md:self-auto ${
                     isObsidian
-                      ? "bg-slate-950/60 border-slate-800"
-                      : "bg-slate-50 border-slate-200/80"
+                      ? "bg-slate-950/60 border-slate-800 divide-slate-800"
+                      : "bg-slate-50 border-slate-200/80 divide-slate-200"
                   }`}
                 >
-                  <div className="text-center px-1 sm:px-2">
-                    <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums">{students.length}</p>
-                    <p className="text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
+                  <div className="text-center px-1.5 sm:px-3">
+                    <p className="text-base sm:text-2xl font-bold font-mono tabular-nums">
+                      <CountUp
+                        key={`students-${activeBranch}-${heroStats.count}`}
+                        to={heroStats.count}
+                        duration={1}
+                        className="font-mono tabular-nums"
+                      />
+                    </p>
+                    <p className="text-[9px] sm:text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
                       Students
                     </p>
                   </div>
-                  <div className="w-px h-7 bg-slate-300 dark:bg-slate-800" />
-                  <div className="text-center px-1 sm:px-2">
-                    <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums text-emerald-500">
-                      {students.filter((s) => s.total_backlogs === 0).length}
+
+                  <div className="text-center px-1.5 sm:px-3">
+                    <p className="text-base sm:text-2xl font-bold font-mono tabular-nums text-blue-600 dark:text-cyan-400">
+                      <CountUp
+                        key={`avg-${activeBranch}-${heroStats.avg}`}
+                        to={heroStats.avg}
+                        decimals={1}
+                        suffix="%"
+                        duration={1.2}
+                        className="font-mono tabular-nums text-blue-600 dark:text-cyan-400"
+                      />
                     </p>
-                    <p className="text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
-                      All Clear
+                    <p className="text-[9px] sm:text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
+                      Class Average
                     </p>
                   </div>
-                  <div className="w-px h-7 bg-slate-300 dark:bg-slate-800" />
-                  <div className="text-center px-1 sm:px-2">
-                    <p className="text-lg sm:text-2xl font-bold font-mono tabular-nums text-rose-500">
-                      {students.reduce((sum, s) => sum + s.total_backlogs, 0)}
+
+                  <div className="text-center px-1.5 sm:px-3">
+                    <p className="text-base sm:text-2xl font-bold font-mono tabular-nums text-emerald-500">
+                      <CountUp
+                        key={`max-${activeBranch}-${heroStats.max}`}
+                        to={heroStats.max}
+                        decimals={1}
+                        suffix="%"
+                        duration={1.2}
+                        className="font-mono tabular-nums text-emerald-500"
+                      />
                     </p>
-                    <p className="text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
-                      Backlogs
+                    <p className="text-[9px] sm:text-[10px] font-semibold opacity-60 uppercase tracking-wider mt-0.5">
+                      Highest Score
                     </p>
                   </div>
                 </div>
@@ -913,7 +953,14 @@ export default function Dashboard() {
                   </p>
                 </div>
               ) : viewMode === "grid" ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5">
+                <FadeContent
+                  key={`grid-${activeBranch}-${sortBy}`}
+                  trigger="mount"
+                  duration={0.35}
+                  blur={false}
+                  stagger={0.02}
+                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5"
+                >
                   {filteredStudents.map((s, idx) => (
                     <StudentCard
                       key={s.usn}
@@ -962,9 +1009,15 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
-                </div>
+                </FadeContent>
               ) : (
-                <div className="space-y-3">
+                <FadeContent
+                  key={`table-${activeBranch}-${sortBy}`}
+                  trigger="mount"
+                  duration={0.35}
+                  blur={false}
+                  className="space-y-3"
+                >
                   <DenseStudentTable
                     students={filteredStudents}
                     compareUsns={compareUsns}
@@ -1009,7 +1062,7 @@ export default function Dashboard() {
                       </div>
                     </div>
                   )}
-                </div>
+                </FadeContent>
               )}
             </div>
           </>
