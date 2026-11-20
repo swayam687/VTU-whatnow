@@ -58,6 +58,8 @@ import { sfx } from "../lib/sfx";
 import CountUp from "../components/CountUp";
 import BlurText from "../components/BlurText";
 import FadeContent from "../components/FadeContent";
+import DecryptedText from "../components/DecryptedText";
+import CursorGrid from "../components/CursorGrid";
 
 const ALL_BRANCHES = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
 
@@ -426,19 +428,39 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col">
-      {/* Navigation */}
-      <Navbar
-        currentView={currentView}
-        onSelectView={setCurrentView}
-        isObsidian={isObsidian}
-        onToggleTheme={handleToggleTheme}
-        studentSession={studentSession}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onSignOut={handleSignOut}
-      />
+    <div className="min-h-screen flex flex-col relative">
+      {/* Subtle Ambient Tech Grid (Obsidian Dark Mode Only) */}
+      {isObsidian && (
+        <div className="fixed inset-0 pointer-events-none z-0 opacity-40">
+          <CursorGrid
+            cellSize={36}
+            gridStyle="lines"
+            gridColor="#1e293b"
+            color="#38bdf8"
+            lineWidth={0.8}
+            gridOpacity={0.25}
+            maxOpacity={0.35}
+            spotlight={180}
+            ambient={0.08}
+            edgeFade={0.2}
+          />
+        </div>
+      )}
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-20 lg:pb-8 space-y-5 sm:space-y-6">
+      {/* Navigation */}
+      <div className="relative z-10">
+        <Navbar
+          currentView={currentView}
+          onSelectView={setCurrentView}
+          isObsidian={isObsidian}
+          onToggleTheme={handleToggleTheme}
+          studentSession={studentSession}
+          onOpenAuth={() => setIsAuthModalOpen(true)}
+          onSignOut={handleSignOut}
+        />
+      </div>
+
+      <div className="relative z-10 flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-20 lg:pb-8 space-y-5 sm:space-y-6">
         {/* Backend Offline Notice */}
         {backendOnline === false && (
           <div className="bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
@@ -789,7 +811,7 @@ export default function Dashboard() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search student name or USN (e.g. 1RM25CS..., 1RM25CD...)"
-                  className={`w-full h-9 pl-9 pr-8 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full h-9 pl-9 pr-24 sm:pr-28 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     isObsidian
                       ? "bg-slate-950 border-slate-800 text-white placeholder-slate-500"
                       : "bg-slate-50/70 border-slate-200 text-slate-900"
@@ -798,16 +820,39 @@ export default function Dashboard() {
                 <span className="absolute left-3 top-2.5 opacity-40">
                   <IconSearch className="w-4 h-4" />
                 </span>
-                {search && (
-                  <button
-                    onClick={() => {
-                      sfx.playMechanicalClick();
-                      setSearch("");
-                    }}
-                    className="absolute right-3 top-2.5 opacity-40 hover:opacity-100"
-                  >
-                    <IconClose className="w-4 h-4" />
-                  </button>
+                {search ? (
+                  <div className="absolute right-2.5 top-1.5 flex items-center gap-1.5">
+                    <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
+                      <span className="opacity-60 text-[9px]">USN</span>
+                      <DecryptedText
+                        text={search.toUpperCase()}
+                        speed={30}
+                        maxIterations={6}
+                        animateOn="view"
+                        className="font-mono font-bold"
+                      />
+                    </span>
+                    <button
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setSearch("");
+                      }}
+                      className="opacity-40 hover:opacity-100 p-1"
+                      title="Clear search"
+                    >
+                      <IconClose className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <span className="absolute right-3 top-2 hidden sm:inline-flex items-center gap-1 text-[10px] font-mono opacity-40 pointer-events-none">
+                    <span className="opacity-50">decode:</span>
+                    <DecryptedText
+                      text="1RM25CS..."
+                      speed={50}
+                      animateOn="hover"
+                      className="font-mono font-medium"
+                    />
+                  </span>
                 )}
               </div>
 

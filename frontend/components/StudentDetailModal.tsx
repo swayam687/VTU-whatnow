@@ -15,6 +15,7 @@ import {
 import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";
 import { sfx } from "../lib/sfx";
+import DecryptedText from "./DecryptedText";
 
 export interface OriginRect {
   left: number;
@@ -232,9 +233,21 @@ export default function StudentDetailModal({
                   </span>
                 )}
               </div>
-              <p className="text-xs opacity-60 font-mono mt-0.5">
-                {usn} • {student?.branch || "ENG"}
-              </p>
+              <div className="text-xs opacity-75 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 font-bold text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10">
+                  <DecryptedText
+                    text={usn || "UNKNOWN"}
+                    speed={35}
+                    maxIterations={10}
+                    animateOn="view"
+                    revealDirection="start"
+                    characters="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%"
+                    className="font-mono font-bold tracking-wider"
+                  />
+                </span>
+                <span className="opacity-40">•</span>
+                <span>{student?.branch || "ENG"}</span>
+              </div>
             </div>
           </div>
 

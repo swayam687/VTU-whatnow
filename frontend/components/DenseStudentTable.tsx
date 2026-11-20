@@ -199,7 +199,8 @@ export default function DenseStudentTable({
                 <tr
                   key={s.usn}
                   onClick={(e) => onOpenDetail(s.usn, e)}
-                  className={`cursor-pointer transition-colors group ${
+                  style={{ animationDelay: `${Math.min(index * 16, 320)}ms` }}
+                  className={`table-row-stagger cursor-pointer transition-colors group ${
                     isMyProfile
                       ? isObsidian
                         ? "bg-amber-950/20 hover:bg-amber-950/30"
