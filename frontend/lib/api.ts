@@ -771,3 +771,20 @@ export async function fetchAdminSemesterAudit(adminKey: string): Promise<Semeste
   if (!res.ok) throw new Error("Failed to load semester coverage audit");
   return res.json();
 }
+
+export async function recalculateCumulativeTotals(
+  adminKey: string,
+  usn?: string
+): Promise<{ ok: boolean; message: string; updated_count: number }> {
+  const url = new URL(`${API_BASE}/api/admin/recalculate-cumulative-totals`);
+  if (usn) url.searchParams.set("usn", usn.trim().toUpperCase());
+  const res = await fetch(url.toString(), {
+    method: "POST",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to recalculate cumulative totals");
+  }
+  return res.json();
+}

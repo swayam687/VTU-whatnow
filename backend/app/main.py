@@ -755,7 +755,14 @@ def handle_admin_rescrape_action(
         if scraper_worker.is_active():
             raise HTTPException(status_code=400, detail="Scraper is currently running another job. Please wait for it to complete.")
 
-        target_sem = item.target_semester if item.target_semester in ("1", "2") else "1"
+        if item.target_semester == "both":
+            # If student already has Sem 1 in DB, scrape Sem 2; otherwise scrape Sem 1
+            has_sem1 = db.query(Mark).filter(Mark.usn == item.usn, Mark.semester == "1").first() is not None
+            target_sem = "2" if has_sem1 else "1"
+        elif item.target_semester in ("1", "2"):
+            target_sem = item.target_semester
+        else:
+            target_sem = "1"
         custom_url = item.custom_url.strip() if item.custom_url else None
 
         started = scraper_worker.start(
@@ -836,6 +843,57 @@ def get_admin_semester_audit(db: Session = Depends(get_db)):
         no_marks=no_marks,
         students=audit_list
     )
+
+
+@app.post("/api/admin/recalculate-cumulative-totals", dependencies=[Depends(require_admin)])
+def recalculate_cumulative_totals(
+    usn: Optional[str] = Query(None, description="Optional single USN to recalculate, or omit for all students"),
+    db: Session = Depends(get_db)
+):
+    """
+    Recalculates cumulative degree totals, percentages, and backlogs from scratch
+    using the distinct-subject deduplication algorithm across all available semesters in the database.
+    Fixes legacy records where multi-semester max_marks were frozen at 800/900.
+    """
+    query = db.query(Student)
+    if usn:
+        query = query.filter(Student.usn == usn.strip().upper())
+    students = query.all()
+
+    updated_count = 0
+    for student in students:
+        all_marks = db.query(Mark).filter(Mark.usn == student.usn).all()
+        if not all_marks:
+            continue
+
+        effective_subjects = {}
+        for m in all_marks:
+            code = m.subject_code.strip().upper()
+            if code not in effective_subjects:
+                effective_subjects[code] = m
+            else:
+                existing = effective_subjects[code]
+                if m.status == "P" and existing.status != "P":
+                    effective_subjects[code] = m
+                elif m.status == "P" and existing.status == "P" and m.total > existing.total:
+                    effective_subjects[code] = m
+                elif m.status != "P" and existing.status != "P" and m.total > existing.total:
+                    effective_subjects[code] = m
+
+        final_marks = list(effective_subjects.values())
+        student.total_marks = sum(m.total for m in final_marks)
+        student.max_marks = sum(m.max_marks for m in final_marks)
+        student.total_backlogs = sum(1 for m in final_marks if m.status in ("F", "A"))
+        student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
+        updated_count += 1
+
+    db.commit()
+    return {
+        "ok": True,
+        "message": f"Successfully recalculated cumulative totals for {updated_count} students.",
+        "updated_count": updated_count
+    }
+
 
 
 @app.get("/api/admin/disputes", response_model=List[DisputeOut], dependencies=[Depends(require_admin)])

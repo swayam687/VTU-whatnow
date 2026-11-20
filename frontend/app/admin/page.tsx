@@ -36,6 +36,7 @@ import {
   fetchAdminRescrapeRequests,
   actionAdminRescrapeRequest,
   fetchAdminSemesterAudit,
+  recalculateCumulativeTotals,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -385,6 +386,7 @@ export default function AdminPanel() {
   };
 
   // Load Semester Coverage Audit
+  const [recalculatingTotals, setRecalculatingTotals] = useState(false);
   const loadSemesterAudit = async () => {
     if (!adminKey) return;
     setSemesterAuditLoading(true);
@@ -395,6 +397,25 @@ export default function AdminPanel() {
       console.error("Failed to load semester audit", err);
     } finally {
       setSemesterAuditLoading(false);
+    }
+  };
+
+  const handleRecalculateTotals = async () => {
+    if (!adminKey || recalculatingTotals) return;
+    sfx.playClick();
+    setRecalculatingTotals(true);
+    setActionError("");
+    setActionSuccessMsg("");
+    try {
+      const res = await recalculateCumulativeTotals(adminKey);
+      setActionSuccessMsg(res.message || "Recalculated cumulative totals successfully!");
+      sfx.playSonar();
+      await loadSemesterAudit();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to recalculate totals";
+      setActionError(msg);
+    } finally {
+      setRecalculatingTotals(false);
     }
   };
 
@@ -2344,17 +2365,30 @@ export default function AdminPanel() {
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  sfx.playClick();
-                  loadSemesterAudit();
-                }}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
-              >
-                <IconRotateCcw className="w-3 h-3" />
-                <span>Refresh Audit</span>
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleRecalculateTotals}
+                  disabled={recalculatingTotals}
+                  title="Recalculate and combine multi-semester totals and deduplicate backlogs for all students from database marks without re-scraping VTU"
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  <IconBolt className="w-3.5 h-3.5 text-blue-600" />
+                  <span>{recalculatingTotals ? "Recalculating..." : "⚡ Sync / Recalculate Totals"}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    loadSemesterAudit();
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <IconRotateCcw className="w-3 h-3" />
+                  <span>Refresh Audit</span>
+                </button>
+              </div>
             </div>
 
             {/* Summary Metric Cards */}
