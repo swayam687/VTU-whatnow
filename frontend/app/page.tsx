@@ -1003,57 +1003,58 @@ export default function Dashboard() {
                   trigger="mount"
                   duration={0.35}
                   blur={false}
-                  stagger={0.02}
-                  className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5"
+                  className="w-full"
                 >
-                  {filteredStudents.map((s, idx) => (
-                    <StudentCard
-                      key={s.usn}
-                      student={s}
-                      rank={sortBy === "percentage" && !search ? idx + 1 : undefined}
-                      isSelectedForCompare={compareUsns.includes(s.usn)}
-                      onToggleCompare={() => handleToggleCompare(s.usn)}
-                      onOpenDetail={(e) => { handleOpenDetail(s.usn, e); }}
-                      isObsidian={isObsidian}
-                      isMyProfile={s.usn.toUpperCase() === myUsn.toUpperCase()}
-                    />
-                  ))}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
+                    {filteredStudents.map((s, idx) => (
+                      <StudentCard
+                        key={s.usn}
+                        student={s}
+                        rank={sortBy === "percentage" && !search ? idx + 1 : undefined}
+                        isSelectedForCompare={compareUsns.includes(s.usn)}
+                        onToggleCompare={() => handleToggleCompare(s.usn)}
+                        onOpenDetail={(e) => { handleOpenDetail(s.usn, e); }}
+                        isObsidian={isObsidian}
+                        isMyProfile={s.usn.toUpperCase() === myUsn.toUpperCase()}
+                      />
+                    ))}
 
-                  {/* Public Locked Teaser Card */}
-                  {!studentSession && (
-                    <div
-                      onClick={() => {
-                        sfx.playMechanicalClick();
-                        setIsAuthModalOpen(true);
-                      }}
-                      className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
-                        isObsidian
-                          ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
-                          : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
-                      }`}
-                    >
-                      <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border ${
-                        isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-white border-slate-200 text-slate-700"
-                      }`}>
-                        <IconLock className="w-4 h-4" />
+                    {/* Public Locked Teaser Card */}
+                    {!studentSession && (
+                      <div
+                        onClick={() => {
+                          sfx.playMechanicalClick();
+                          setIsAuthModalOpen(true);
+                        }}
+                        className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
+                          isObsidian
+                            ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
+                            : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
+                        }`}
+                      >
+                        <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border ${
+                          isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-white border-slate-200 text-slate-700"
+                        }`}>
+                          <IconLock className="w-4 h-4" />
+                        </div>
+                        <h3 className="font-bold text-sm sm:text-base tracking-tight">
+                          Unlock Full Batch Results &amp; Rankings
+                        </h3>
+                        <p className="text-xs opacity-65 max-w-md mx-auto leading-relaxed">
+                          Public preview displays top departmental ranks. Sign in with your USN to view the full directory, detailed marksheet, and subject-level percentiles.
+                        </p>
+                        <div className="pt-1">
+                          <button
+                            type="button"
+                            className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs inline-flex items-center gap-1.5"
+                          >
+                            <IconKey className="w-3.5 h-3.5" />
+                            <span>Sign In / Claim Your USN</span>
+                          </button>
+                        </div>
                       </div>
-                      <h3 className="font-bold text-sm sm:text-base tracking-tight">
-                        Unlock Full Batch Results &amp; Rankings
-                      </h3>
-                      <p className="text-xs opacity-65 max-w-md mx-auto leading-relaxed">
-                        Public preview displays top departmental ranks. Sign in with your USN to view the full directory, detailed marksheet, and subject-level percentiles.
-                      </p>
-                      <div className="pt-1">
-                        <button
-                          type="button"
-                          className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs inline-flex items-center gap-1.5"
-                        >
-                          <IconKey className="w-3.5 h-3.5" />
-                          <span>Sign In / Claim Your USN</span>
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </FadeContent>
               ) : (
                 <FadeContent

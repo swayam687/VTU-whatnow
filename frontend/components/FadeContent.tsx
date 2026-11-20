@@ -408,7 +408,7 @@ const FadeContent = ({
   ]);
 
   return (
-    <div ref={ref} className={['invisible', className].filter(Boolean).join('')} style={style} {...props}>
+    <div ref={ref} className={['invisible', className].filter(Boolean).join(' ')} style={style} {...props}>
       {children}
     </div>
   );
