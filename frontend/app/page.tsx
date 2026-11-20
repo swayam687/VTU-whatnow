@@ -423,7 +423,7 @@ export default function Dashboard() {
         onSignOut={handleSignOut}
       />
 
-      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-20 lg:pb-8 space-y-5 sm:space-y-6">
+      <div className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-8 pb-32 sm:pb-24 lg:pb-12 space-y-5 sm:space-y-6">
         {/* Backend Offline Notice */}
         {backendOnline === false && (
           <div className="bg-amber-50 border border-amber-200 dark:bg-amber-950/40 dark:border-amber-800/60 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-amber-900 dark:text-amber-200 text-xs shadow-sm">
