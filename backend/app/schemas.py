@@ -30,7 +30,7 @@ class StudentBase(BaseModel):
     github_url: Optional[str] = ""
     linkedin_url: Optional[str] = ""
     avatar_pixel_art: Optional[str] = ""
-    show_my_backlogs: bool = False
+    show_my_backlogs: bool = True
     has_pending_subjects: Optional[str] = None
     is_my_profile: bool = False
 
@@ -38,7 +38,7 @@ class PrivacySettingsUpdate(BaseModel):
     show_my_backlogs: Optional[bool] = None
 
 class PrivacySettingsOut(BaseModel):
-    show_my_backlogs: bool = False
+    show_my_backlogs: bool = True
 
 class AvatarUpdateRequest(BaseModel):
     pixel_art: str

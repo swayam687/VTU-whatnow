@@ -29,7 +29,7 @@ class Student(Base):
     # Student Privacy Controls
     show_my_name = Column(Boolean, default=True)
     show_my_marks = Column(Boolean, default=True)
-    show_my_backlogs = Column(Boolean, default=False)  # default off
+    show_my_backlogs = Column(Boolean, default=True)  # default on
     allow_comparison = Column(Boolean, default=True)
 
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")

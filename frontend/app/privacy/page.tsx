@@ -266,14 +266,13 @@ export default function PrivacyPage() {
               >
                 <div className="flex items-center justify-between">
                   <span className="font-bold font-mono text-xs">show_my_backlogs (Pending Subjects / Re-attempts)</span>
-                  <span className="text-[10px] uppercase font-bold text-amber-500">Default: OFF (Masked)</span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-500">Default: ON (Public)</span>
                 </div>
                 <p className="text-xs opacity-70 mt-1">
-                  Default is <strong>OFF</strong>. When OFF, your public badge displays &ldquo;All Clear&rdquo;
-                  and failed subjects are filtered from public view. When opted in (ON), your public badge
-                  indicates your pending re-attempts count, and subjects pending re-attempt are marked with
-                  result &ldquo;F&rdquo; in your marks breakdown. Verified account owners always see all their
-                  authentic scores.
+                  Default is <strong>ON</strong>. When ON, your public badge displays your pending re-attempts count,
+                  and subjects pending re-attempt are marked with result &ldquo;F&rdquo; in your marks breakdown. If opted out
+                  (OFF), your public badge displays &ldquo;All Clear&rdquo; and failed subjects are filtered from public view.
+                  Verified account owners always see all their authentic scores regardless of toggle setting.
                 </p>
               </div>
             </div>

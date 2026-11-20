@@ -165,7 +165,7 @@ def init_db():
                     ("avatar_pixel_art", "ALTER TABLE students ADD COLUMN avatar_pixel_art VARCHAR DEFAULT '';"),
                     ("show_my_name", "ALTER TABLE students ADD COLUMN show_my_name BOOLEAN DEFAULT TRUE;"),
                     ("show_my_marks", "ALTER TABLE students ADD COLUMN show_my_marks BOOLEAN DEFAULT TRUE;"),
-                    ("show_my_backlogs", "ALTER TABLE students ADD COLUMN show_my_backlogs BOOLEAN DEFAULT FALSE;"),
+                    ("show_my_backlogs", "ALTER TABLE students ADD COLUMN show_my_backlogs BOOLEAN DEFAULT TRUE;"),
                     ("allow_comparison", "ALTER TABLE students ADD COLUMN allow_comparison BOOLEAN DEFAULT TRUE;"),
                 ]
                 for col_name, sql_stmt in columns_to_ensure:
@@ -187,7 +187,7 @@ def init_db():
                     ("avatar_pixel_art", "VARCHAR DEFAULT ''"),
                     ("show_my_name", "BOOLEAN DEFAULT TRUE"),
                     ("show_my_marks", "BOOLEAN DEFAULT TRUE"),
-                    ("show_my_backlogs", "BOOLEAN DEFAULT FALSE"),
+                    ("show_my_backlogs", "BOOLEAN DEFAULT TRUE"),
                     ("allow_comparison", "BOOLEAN DEFAULT TRUE"),
                 ]:
                     try:
@@ -1180,18 +1180,19 @@ def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_adm
     """
     Applies student privacy preferences:
     - Name, USN, Marks, Percentile, and Comparison are ALWAYS public for all students.
-    - The ONLY thing a student can control is show_my_backlogs (default: False).
-    - If show_my_backlogs is True (or viewer is verified account owner/admin):
+    - The ONLY thing a student can control is show_my_backlogs (default: True).
+    - If show_my_backlogs is True (default, or viewer is verified account owner/admin):
       * total_backlogs = s.total_backlogs
       * has_pending_subjects = "Yes" if s.total_backlogs > 0 else "No"
       * marks = s.marks (includes failed subjects with 'F')
-    - If show_my_backlogs is False (default):
+    - If show_my_backlogs is False (opted out):
       * total_backlogs = 0
       * has_pending_subjects = None
       * marks = [m for m in s.marks if m.status == "P"]
     """
     is_owner = bool(viewer_usn and viewer_usn.strip().upper() == s.usn.strip().upper())
-    should_show_backlogs = bool(s.show_my_backlogs or is_owner or is_admin)
+    is_backlogs_enabled = s.show_my_backlogs if s.show_my_backlogs is not None else True
+    should_show_backlogs = bool(is_backlogs_enabled or is_owner or is_admin)
 
     if should_show_backlogs:
         pending_str = "Yes" if s.total_backlogs > 0 else "No"
@@ -1215,7 +1216,7 @@ def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_adm
         "github_url": s.github_url or "",
         "linkedin_url": s.linkedin_url or "",
         "avatar_pixel_art": s.avatar_pixel_art or "",
-        "show_my_backlogs": s.show_my_backlogs if s.show_my_backlogs is not None else False,
+        "show_my_backlogs": is_backlogs_enabled,
         "has_pending_subjects": pending_str,
         "is_my_profile": is_owner,
         "marks": public_marks,
@@ -1447,7 +1448,7 @@ def get_student_privacy(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
     return {
-        "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else False,
+        "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else True,
     }
 
 
@@ -1474,7 +1475,7 @@ def update_student_privacy(
     db.commit()
     db.refresh(student)
     return {
-        "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else False,
+        "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else True,
     }
 
 

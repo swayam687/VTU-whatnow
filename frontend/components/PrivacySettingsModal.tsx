@@ -23,7 +23,7 @@ export default function PrivacySettingsModal({
   onUpdated,
 }: PrivacySettingsModalProps) {
   const [settings, setSettings] = useState<PrivacySettings>({
-    show_my_backlogs: false,
+    show_my_backlogs: true,
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -37,7 +37,7 @@ export default function PrivacySettingsModal({
     fetchStudentPrivacy(usn, studentToken)
       .then((data) => {
         setSettings({
-          show_my_backlogs: Boolean(data.show_my_backlogs),
+          show_my_backlogs: data.show_my_backlogs !== undefined ? Boolean(data.show_my_backlogs) : true,
         });
       })
       .catch((err) => {
@@ -185,13 +185,13 @@ export default function PrivacySettingsModal({
                             : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                         }`}
                       >
-                        {settings.show_my_backlogs ? "Public (Re-attempts / Pending)" : "Masked (Default All Clear)"}
+                        {settings.show_my_backlogs ? "Public (Default)" : "Masked (Opted Out)"}
                       </span>
                     </div>
                     <p className="text-[11px] opacity-65 mt-1 leading-snug">
                       {settings.show_my_backlogs
-                        ? "Public badge shows your re-attempts count, and pending subjects appear with status \"F\" in your marks breakdown."
-                        : "Default (OFF). Public badge shows \"All Clear\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
+                        ? "Default is ON. Public badge shows your re-attempts count, and pending subjects appear with status \"F\" in your marks breakdown."
+                        : "Opted out (OFF). Public badge shows \"All Clear\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
                     </p>
                   </div>
                   {/* Switch */}
