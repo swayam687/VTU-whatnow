@@ -395,12 +395,30 @@ class ScraperWorker:
 
             db.flush()
 
-            # Recalculate cumulative multi-semester totals for this student across all semesters
+            # Recalculate cumulative multi-semester totals for this student across all semesters.
+            # Handles VTU re-exam & revaluation: If the same subject_code was attempted in multiple
+            # semesters (e.g. backlog cleared in supplementary), deduplicate so the paper is only
+            # counted ONCE towards degree total and max marks (preferring the passing/higher attempt).
             all_marks = db.query(Mark).filter(Mark.usn == usn).all()
             if all_marks:
-                student.total_marks = sum(m.total for m in all_marks)
-                student.max_marks = sum(m.max_marks for m in all_marks)
-                student.total_backlogs = sum(1 for m in all_marks if m.status in ("F", "A"))
+                effective_subjects = {}
+                for m in all_marks:
+                    code = m.subject_code.strip().upper()
+                    if code not in effective_subjects:
+                        effective_subjects[code] = m
+                    else:
+                        existing = effective_subjects[code]
+                        if m.status == "P" and existing.status != "P":
+                            effective_subjects[code] = m
+                        elif m.status == "P" and existing.status == "P" and m.total > existing.total:
+                            effective_subjects[code] = m
+                        elif m.status != "P" and existing.status != "P" and m.total > existing.total:
+                            effective_subjects[code] = m
+
+                final_marks = list(effective_subjects.values())
+                student.total_marks = sum(m.total for m in final_marks)
+                student.max_marks = sum(m.max_marks for m in final_marks)
+                student.total_backlogs = sum(1 for m in final_marks if m.status in ("F", "A"))
                 student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
             else:
                 student.total_marks = parsed["total_marks"]
