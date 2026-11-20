@@ -23,10 +23,7 @@ export default function PrivacySettingsModal({
   onUpdated,
 }: PrivacySettingsModalProps) {
   const [settings, setSettings] = useState<PrivacySettings>({
-    show_my_name: true,
-    show_my_marks: true,
     show_my_backlogs: false,
-    allow_comparison: true,
   });
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -40,10 +37,7 @@ export default function PrivacySettingsModal({
     fetchStudentPrivacy(usn, studentToken)
       .then((data) => {
         setSettings({
-          show_my_name: data.show_my_name ?? true,
-          show_my_marks: data.show_my_marks ?? true,
-          show_my_backlogs: data.show_my_backlogs ?? false,
-          allow_comparison: data.allow_comparison ?? true,
+          show_my_backlogs: Boolean(data.show_my_backlogs),
         });
       })
       .catch((err) => {
@@ -140,125 +134,64 @@ export default function PrivacySettingsModal({
           ) : (
             <>
               <p className="text-xs opacity-75 leading-relaxed">
-                Configure your public visibility on VTU WhatNow. Changes take effect across public
-                search, departmental leaderboards, and marksheet views.
+                Control your public visibility on VTU WhatNow. Per university record standards,
+                examination marks, names, and leaderboard rankings remain public and authentic.
+                You can choose whether to display or mask your pending subjects (re-attempts).
               </p>
 
-              {/* Toggles Container */}
+              {/* Standard Public Metrics (Read-only badges) */}
+              <div
+                className={`p-3.5 rounded-2xl border space-y-2.5 ${
+                  isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold opacity-80">Student Name &amp; Identity</span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Always Public
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold opacity-80">Total Marks &amp; Percentage</span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Always Public
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold opacity-80">Batch Rank &amp; Comparison</span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                    Always Active
+                  </span>
+                </div>
+              </div>
+
+              {/* Controllable Preference: Show Pending Subjects (Re-attempts) */}
               <div className="space-y-3 pt-1">
-                {/* 1. Show My Name */}
-                <div
-                  onClick={() => handleToggle("show_my_name")}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                    isObsidian
-                      ? "bg-white/[0.02] border-white/10 hover:border-white/20"
-                      : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs tracking-tight">Public Name Display</span>
-                      <span
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                          settings.show_my_name
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-slate-500/20 text-slate-400"
-                        }`}
-                      >
-                        {settings.show_my_name ? "Visible" : "Anonymous"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] opacity-60 mt-0.5 leading-snug">
-                      When OFF, your name appears publicly as &ldquo;Anonymous Student&rdquo;.
-                    </p>
-                  </div>
-                  {/* Switch */}
-                  <div
-                    className={`w-11 h-6 rounded-full transition-colors p-0.5 shrink-0 ${
-                      settings.show_my_name
-                        ? "bg-cyan-500"
-                        : isObsidian
-                        ? "bg-slate-800"
-                        : "bg-slate-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                        settings.show_my_name ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* 2. Show My Marks */}
-                <div
-                  onClick={() => handleToggle("show_my_marks")}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                    isObsidian
-                      ? "bg-white/[0.02] border-white/10 hover:border-white/20"
-                      : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs tracking-tight">Marks &amp; Percentage</span>
-                      <span
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                          settings.show_my_marks
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-slate-500/20 text-slate-400"
-                        }`}
-                      >
-                        {settings.show_my_marks ? "Visible" : "Protected"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] opacity-60 mt-0.5 leading-snug">
-                      When OFF, subject breakdowns and percentages are masked from public view.
-                    </p>
-                  </div>
-                  {/* Switch */}
-                  <div
-                    className={`w-11 h-6 rounded-full transition-colors p-0.5 shrink-0 ${
-                      settings.show_my_marks
-                        ? "bg-cyan-500"
-                        : isObsidian
-                        ? "bg-slate-800"
-                        : "bg-slate-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                        settings.show_my_marks ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* 3. Show My Backlogs (Default OFF) */}
                 <div
                   onClick={() => handleToggle("show_my_backlogs")}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
                     isObsidian
-                      ? "bg-white/[0.02] border-white/10 hover:border-white/20"
-                      : "bg-slate-50 border-slate-200 hover:border-slate-300"
+                      ? "bg-white/[0.03] border-white/10 hover:border-white/20"
+                      : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
                   }`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs tracking-tight">Pending Subjects (Re-attempts)</span>
+                      <span className="font-bold text-xs tracking-tight">Show Pending Subjects / Re-attempts</span>
                       <span
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
                           settings.show_my_backlogs
-                            ? "bg-amber-500/20 text-amber-400"
-                            : "bg-emerald-500/20 text-emerald-400"
+                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                            : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                         }`}
                       >
-                        {settings.show_my_backlogs ? "Opted In (Yes/No)" : "Hidden (Default)"}
+                        {settings.show_my_backlogs ? "Public (Re-attempts / Pending)" : "Masked (Default All Clear)"}
                       </span>
                     </div>
-                    <p className="text-[11px] opacity-60 mt-0.5 leading-snug">
-                      Default is <strong>OFF</strong>. Individual failed subjects are NEVER published.
-                      If opted in, public view only shows &ldquo;Has pending subjects: Yes/No&rdquo;.
+                    <p className="text-[11px] opacity-65 mt-1 leading-snug">
+                      {settings.show_my_backlogs
+                        ? "Public badge shows your re-attempts count, and pending subjects appear with status \"F\" in your marks breakdown."
+                        : "Default (OFF). Public badge shows \"All Clear\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
                     </p>
                   </div>
                   {/* Switch */}
@@ -274,50 +207,6 @@ export default function PrivacySettingsModal({
                     <div
                       className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
                         settings.show_my_backlogs ? "translate-x-5" : "translate-x-0"
-                      }`}
-                    />
-                  </div>
-                </div>
-
-                {/* 4. Allow Comparison */}
-                <div
-                  onClick={() => handleToggle("allow_comparison")}
-                  className={`p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                    isObsidian
-                      ? "bg-white/[0.02] border-white/10 hover:border-white/20"
-                      : "bg-slate-50 border-slate-200 hover:border-slate-300"
-                  }`}
-                >
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs tracking-tight">Peer Head-to-Head Comparison</span>
-                      <span
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                          settings.allow_comparison
-                            ? "bg-emerald-500/20 text-emerald-400"
-                            : "bg-slate-500/20 text-slate-400"
-                        }`}
-                      >
-                        {settings.allow_comparison ? "Allowed" : "Blocked"}
-                      </span>
-                    </div>
-                    <p className="text-[11px] opacity-60 mt-0.5 leading-snug">
-                      Allow classmates to select your record in head-to-head comparison cards.
-                    </p>
-                  </div>
-                  {/* Switch */}
-                  <div
-                    className={`w-11 h-6 rounded-full transition-colors p-0.5 shrink-0 ${
-                      settings.allow_comparison
-                        ? "bg-cyan-500"
-                        : isObsidian
-                        ? "bg-slate-800"
-                        : "bg-slate-300"
-                    }`}
-                  >
-                    <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                        settings.allow_comparison ? "translate-x-5" : "translate-x-0"
                       }`}
                     />
                   </div>

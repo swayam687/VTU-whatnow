@@ -266,21 +266,6 @@ export default function Navbar({
             </button>
           )}
 
-          {/* Privacy & Transparency Policy */}
-          <Link
-            href="/privacy"
-            onClick={() => sfx.playMechanicalClick()}
-            title="Student Consent & Privacy Policy"
-            className={`p-1.5 sm:px-2.5 sm:py-2 rounded-xl border transition-all flex items-center gap-1 shrink-0 ${
-              isObsidian
-                ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white"
-                : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
-            }`}
-          >
-            <span className="text-xs">🛡️</span>
-            <span className="hidden lg:inline text-[11px] font-medium">Privacy</span>
-          </Link>
-
           {/* Admin Room Link with clean icon and proper margins */}
           <Link
             href="/admin"

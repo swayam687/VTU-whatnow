@@ -1178,81 +1178,46 @@ async def submit_captcha(req: CaptchaSubmit):
 
 def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_admin: bool = False):
     """
-    Applies professional privacy controls and student consent preferences:
-    - show_my_name: When OFF, student name is masked as 'Anonymous Student'.
-    - show_my_marks: When OFF, marksheet and scores are masked to 0.
-    - show_my_backlogs: Default OFF. When OFF, backlog count is masked and has_pending_subjects is None.
-      When ON, only 'Has pending subjects: Yes/No' is shown. Individual failed subjects are NEVER shown publicly!
-    - allow_comparison: When OFF, peer comparison is blocked.
-    The verified owner of the USN and administrators always see full authentic details.
+    Applies student privacy preferences:
+    - Name, USN, Marks, Percentile, and Comparison are ALWAYS public for all students.
+    - The ONLY thing a student can control is show_my_backlogs (default: False).
+    - If show_my_backlogs is True (or viewer is verified account owner/admin):
+      * total_backlogs = s.total_backlogs
+      * has_pending_subjects = "Yes" if s.total_backlogs > 0 else "No"
+      * marks = s.marks (includes failed subjects with 'F')
+    - If show_my_backlogs is False (default):
+      * total_backlogs = 0
+      * has_pending_subjects = None
+      * marks = [m for m in s.marks if m.status == "P"]
     """
     is_owner = bool(viewer_usn and viewer_usn.strip().upper() == s.usn.strip().upper())
-    if is_owner or is_admin:
+    should_show_backlogs = bool(s.show_my_backlogs or is_owner or is_admin)
+
+    if should_show_backlogs:
         pending_str = "Yes" if s.total_backlogs > 0 else "No"
-        return {
-            "usn": s.usn,
-            "name": s.name or s.usn,
-            "branch": s.branch,
-            "batch": s.batch,
-            "total_marks": s.total_marks,
-            "max_marks": s.max_marks,
-            "percentage": s.percentage,
-            "cgpa": s.cgpa,
-            "total_backlogs": s.total_backlogs,
-            "github_url": s.github_url or "",
-            "linkedin_url": s.linkedin_url or "",
-            "avatar_pixel_art": s.avatar_pixel_art or "",
-            "show_my_name": s.show_my_name if s.show_my_name is not None else True,
-            "show_my_marks": s.show_my_marks if s.show_my_marks is not None else True,
-            "show_my_backlogs": s.show_my_backlogs if s.show_my_backlogs is not None else False,
-            "allow_comparison": s.allow_comparison if s.allow_comparison is not None else True,
-            "has_pending_subjects": pending_str,
-            "is_my_profile": is_owner,
-            "marks": s.marks,
-        }
-
-    # Public View / Other Student View
-    disp_name = s.name if (s.show_my_name is not False) else "Anonymous Student"
-    disp_total_marks = s.total_marks if (s.show_my_marks is not False) else 0
-    disp_max_marks = s.max_marks if (s.show_my_marks is not False) else 0
-    disp_percentage = s.percentage if (s.show_my_marks is not False) else 0.0
-    disp_cgpa = s.cgpa if (s.show_my_marks is not False) else 0.0
-
-    # Backlog handling:
-    # Public view shows only: "Has pending subjects: Yes/No" — and even that only if the student opts in show_my_backlogs (default: off).
-    # Never show individual failed subject lists publicly!
-    if s.show_my_backlogs:
-        has_pending = "Yes" if s.total_backlogs > 0 else "No"
         public_backlogs = s.total_backlogs
+        public_marks = s.marks
     else:
-        has_pending = None  # Completely hidden
+        pending_str = None
         public_backlogs = 0
-
-    if s.show_my_marks is not False:
-        # Never show individual failed/backlog subjects in the public marks list!
         public_marks = [m for m in s.marks if m.status == "P"]
-    else:
-        public_marks = []
 
     return {
         "usn": s.usn,
-        "name": disp_name or s.usn,
+        "name": s.name or s.usn,
         "branch": s.branch,
         "batch": s.batch,
-        "total_marks": disp_total_marks,
-        "max_marks": disp_max_marks,
-        "percentage": disp_percentage,
-        "cgpa": disp_cgpa,
+        "total_marks": s.total_marks,
+        "max_marks": s.max_marks,
+        "percentage": s.percentage,
+        "cgpa": s.cgpa,
         "total_backlogs": public_backlogs,
         "github_url": s.github_url or "",
         "linkedin_url": s.linkedin_url or "",
         "avatar_pixel_art": s.avatar_pixel_art or "",
-        "show_my_name": s.show_my_name if s.show_my_name is not None else True,
-        "show_my_marks": s.show_my_marks if s.show_my_marks is not None else True,
         "show_my_backlogs": s.show_my_backlogs if s.show_my_backlogs is not None else False,
-        "allow_comparison": s.allow_comparison if s.allow_comparison is not None else True,
-        "has_pending_subjects": has_pending,
-        "is_my_profile": False,
+        "has_pending_subjects": pending_str,
+        "is_my_profile": is_owner,
         "marks": public_marks,
     }
 
@@ -1356,11 +1321,6 @@ def log_student_comparison(
     if st2:
         s2_name = s2_name or st2.name
         s2_branch = s2_branch or st2.branch
-
-    # Privacy check: If student opted out of comparison, block logging
-    if (st1 and st1.allow_comparison is False and clean_viewer_usn != s1_usn) or \
-       (st2 and st2.allow_comparison is False and clean_viewer_usn != s2_usn):
-        return {"ok": False, "message": "Peer comparison has been disabled by one of the selected students."}
 
     entry = ComparisonLog(
         viewer_usn=clean_viewer_usn,
@@ -1487,10 +1447,7 @@ def get_student_privacy(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
     return {
-        "show_my_name": student.show_my_name if student.show_my_name is not None else True,
-        "show_my_marks": student.show_my_marks if student.show_my_marks is not None else True,
         "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else False,
-        "allow_comparison": student.allow_comparison if student.allow_comparison is not None else True,
     }
 
 
@@ -1511,22 +1468,13 @@ def update_student_privacy(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
 
-    if data.show_my_name is not None:
-        student.show_my_name = data.show_my_name
-    if data.show_my_marks is not None:
-        student.show_my_marks = data.show_my_marks
     if data.show_my_backlogs is not None:
         student.show_my_backlogs = data.show_my_backlogs
-    if data.allow_comparison is not None:
-        student.allow_comparison = data.allow_comparison
 
     db.commit()
     db.refresh(student)
     return {
-        "show_my_name": student.show_my_name if student.show_my_name is not None else True,
-        "show_my_marks": student.show_my_marks if student.show_my_marks is not None else True,
         "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else False,
-        "allow_comparison": student.allow_comparison if student.allow_comparison is not None else True,
     }
 
 

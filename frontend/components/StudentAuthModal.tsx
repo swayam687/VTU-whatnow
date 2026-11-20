@@ -36,6 +36,7 @@ export default function StudentAuthModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [disputeSuccess, setDisputeSuccess] = useState<string | null>(null);
+  const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
 
   // Selfie capture state
   const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
@@ -59,6 +60,7 @@ export default function StudentAuthModal({
     setNewPassword("");
     setSelfieBase64(null);
     setSelfiePreview(null);
+    setAgreedToPrivacy(false);
     setMode("auth");
   };
 
@@ -161,6 +163,10 @@ export default function StudentAuthModal({
     }
     if (!password.trim() || password.length < 4) {
       setError("Password must be at least 4 characters.");
+      return;
+    }
+    if (!agreedToPrivacy) {
+      setError("Please check and agree to the Privacy Policy to sign in.");
       return;
     }
 
@@ -451,11 +457,35 @@ export default function StudentAuthModal({
                     />
                   </div>
 
+                  {/* Privacy Policy Agreement Checkbox */}
+                  <div className="pt-1">
+                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs">
+                      <input
+                        type="checkbox"
+                        checked={agreedToPrivacy}
+                        onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+                        className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-500 shrink-0"
+                      />
+                      <span className={isObsidian ? "text-zinc-300" : "text-zinc-700"}>
+                        I have read and agree to the{" "}
+                        <a
+                          href="/privacy"
+                          target="_blank"
+                          rel="noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                          className="text-cyan-400 hover:underline font-semibold"
+                        >
+                          Privacy Policy
+                        </a>
+                      </span>
+                    </label>
+                  </div>
+
                   {/* Submit Button */}
                   <button
                     type="submit"
-                    disabled={loading}
-                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.99] transition-all disabled:opacity-50"
+                    disabled={loading || !agreedToPrivacy}
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {loading
                       ? "Authenticating..."

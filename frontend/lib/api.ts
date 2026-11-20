@@ -25,10 +25,7 @@ export interface Student {
   github_url?: string;
   linkedin_url?: string;
   avatar_pixel_art?: string;
-  show_my_name?: boolean;
-  show_my_marks?: boolean;
   show_my_backlogs?: boolean;
-  allow_comparison?: boolean;
   has_pending_subjects?: string | null;
   is_my_profile?: boolean;
   marks?: Mark[];
@@ -184,10 +181,7 @@ export async function fetchStudent(usn: string, token?: string): Promise<Student
 }
 
 export interface PrivacySettings {
-  show_my_name: boolean;
-  show_my_marks: boolean;
   show_my_backlogs: boolean;
-  allow_comparison: boolean;
 }
 
 export async function fetchStudentPrivacy(usn: string, token?: string): Promise<PrivacySettings> {

@@ -235,72 +235,45 @@ export default function PrivacyPage() {
               <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold">
                 3
               </span>
-              <span>Granular Student Privacy Toggles</span>
+              <span>Examination Records &amp; Backlog Privacy Controls</span>
             </h2>
             <p className="opacity-80 leading-relaxed mb-4">
-              We empower every student with granular autonomy over how their information is presented.
-              When logged in to your verified student account, you have access to four immediate toggles:
+              All student names, USNs, examination marks, and departmental percentiles are transparent academic
+              records sourced from VTU’s public results portal. To preserve individual dignity, students have
+              direct control over whether pending subjects (re-attempts) are publicly flagged:
             </p>
             <div className="space-y-3">
               <div
-                className={`p-3 rounded-xl border ${
+                className={`p-3.5 rounded-xl border ${
                   isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold font-mono text-xs">show_my_name</span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-500">Default: ON</span>
+                  <span className="font-bold font-mono text-xs">Public Examination Records (Name, Marks, Rank)</span>
+                  <span className="text-[10px] uppercase font-bold text-emerald-500">Always Public</span>
                 </div>
                 <p className="text-xs opacity-70 mt-1">
-                  When enabled, your name appears alongside your USN. When toggled OFF, your public
-                  record is instantaneously masked across the entire app as &ldquo;Anonymous Student&rdquo;.
+                  University seat numbers, student names, semester marks, percentages, and batch ranks remain
+                  authentic and transparent for unbiased college analytics. Peer comparison is active across
+                  all records.
                 </p>
               </div>
 
               <div
-                className={`p-3 rounded-xl border ${
+                className={`p-3.5 rounded-xl border ${
                   isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-bold font-mono text-xs">show_my_marks</span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-500">Default: ON</span>
+                  <span className="font-bold font-mono text-xs">show_my_backlogs (Pending Subjects / Re-attempts)</span>
+                  <span className="text-[10px] uppercase font-bold text-amber-500">Default: OFF (Masked)</span>
                 </div>
                 <p className="text-xs opacity-70 mt-1">
-                  When enabled, your subject scores and semester percentage are viewable. When toggled
-                  OFF, your marksheet is protected and obscured from public viewers.
-                </p>
-              </div>
-
-              <div
-                className={`p-3 rounded-xl border ${
-                  isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold font-mono text-xs">show_my_backlogs</span>
-                  <span className="text-[10px] uppercase font-bold text-amber-500">Default: OFF (Protected)</span>
-                </div>
-                <p className="text-xs opacity-70 mt-1">
-                  By default, information about re-attempts or pending subjects is strictly private.
-                  Even if explicitly enabled by the student, the public view only displays &ldquo;Has pending
-                  subjects: Yes/No&rdquo;. Individual failed subjects are <strong>NEVER</strong> exposed
-                  publicly under any circumstance.
-                </p>
-              </div>
-
-              <div
-                className={`p-3 rounded-xl border ${
-                  isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold font-mono text-xs">allow_comparison</span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-500">Default: ON</span>
-                </div>
-                <p className="text-xs opacity-70 mt-1">
-                  Permits peers to select your record in the side-by-side comparison modal. When toggled
-                  OFF, other users are blocked from comparing against your marksheet.
+                  Default is <strong>OFF</strong>. When OFF, your public badge displays &ldquo;All Clear&rdquo;
+                  and failed subjects are filtered from public view. When opted in (ON), your public badge
+                  indicates your pending re-attempts count, and subjects pending re-attempt are marked with
+                  result &ldquo;F&rdquo; in your marks breakdown. Verified account owners always see all their
+                  authentic scores.
                 </p>
               </div>
             </div>

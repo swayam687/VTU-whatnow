@@ -330,16 +330,10 @@ export default function StudentDetailModal({
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-50">Score</p>
                   <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
-                    {student.show_my_marks === false && !isMyVerifiedProfile ? (
-                      <span className="text-xs opacity-50 italic">Private</span>
-                    ) : (
-                      <>
-                        {student.total_marks}
-                        <span className="text-[10px] font-normal opacity-50 ml-0.5">
-                          /{student.max_marks || 100}
-                        </span>
-                      </>
-                    )}
+                    {student.total_marks}
+                    <span className="text-[10px] font-normal opacity-50 ml-0.5">
+                      /{student.max_marks || 100}
+                    </span>
                   </p>
                 </div>
                 <div
@@ -351,39 +345,25 @@ export default function StudentDetailModal({
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-80">Percentage</p>
                   <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
-                    {student.show_my_marks === false && !isMyVerifiedProfile ? (
-                      <span className="text-xs opacity-50 italic">Private</span>
-                    ) : (
-                      `${student.percentage.toFixed(1)}%`
-                    )}
+                    {student.percentage.toFixed(1)}%
                   </p>
                 </div>
                 <div
                   className={`p-2.5 sm:p-3 rounded-xl border ${
-                    isMyVerifiedProfile
-                      ? student.total_backlogs > 0
-                        ? isObsidian
-                          ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
-                          : "bg-rose-50 border-rose-200 text-rose-700"
-                        : isObsidian
-                        ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
-                        : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                      : student.has_pending_subjects === "Yes"
+                    (student.show_my_backlogs || isMyVerifiedProfile) && student.total_backlogs > 0
                       ? isObsidian
-                        ? "bg-amber-950/30 border-amber-800/60 text-amber-400"
-                        : "bg-amber-50 border-amber-200 text-amber-700"
+                        ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
+                        : "bg-rose-50 border-rose-200 text-rose-700"
                       : isObsidian
-                      ? "bg-slate-900/60 border-slate-800 text-slate-300"
-                      : "bg-slate-50 border-slate-200 text-slate-700"
+                      ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
+                      : "bg-emerald-50 border-emerald-200 text-emerald-700"
                   }`}
                 >
-                  <p className="text-[10px] uppercase font-semibold opacity-80">Pending Subjects</p>
+                  <p className="text-[10px] uppercase font-semibold opacity-80">Re-attempts / Pending</p>
                   <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
-                    {isMyVerifiedProfile
-                      ? student.total_backlogs
-                      : student.has_pending_subjects
-                      ? student.has_pending_subjects
-                      : "Protected"}
+                    {(student.show_my_backlogs || isMyVerifiedProfile) && student.total_backlogs > 0
+                      ? `${student.total_backlogs} Pending`
+                      : "All Clear"}
                   </p>
                 </div>
               </div>
@@ -405,8 +385,6 @@ export default function StudentDetailModal({
                   <p className="text-[11px] opacity-70">
                     {myUsn && usn.toUpperCase() === myUsn.toUpperCase()
                       ? "This is your verified personal marksheet."
-                      : student.allow_comparison === false && !isMyVerifiedProfile
-                      ? "This student has disabled peer comparisons in their privacy settings."
                       : myUsn
                       ? "Evaluate subject marks and leads side-by-side."
                       : "Sign in with your USN to compare marks side-by-side."}
@@ -417,10 +395,6 @@ export default function StudentDetailModal({
                   {myUsn && usn.toUpperCase() === myUsn.toUpperCase() ? (
                     <span className="text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-200/70 dark:bg-white/10 text-slate-800 dark:text-slate-200">
                       Your Marksheet
-                    </span>
-                  ) : student.allow_comparison === false && !isMyVerifiedProfile ? (
-                    <span className="text-xs font-medium px-3 py-1.5 rounded-xl border border-dashed border-slate-700 text-slate-400">
-                      Comparison Disabled
                     </span>
                   ) : myUsn ? (
                     <button
@@ -516,7 +490,7 @@ export default function StudentDetailModal({
               <div>
                 <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
                   <h3 className="font-bold text-xs uppercase tracking-wider opacity-70">
-                    Subject Marks Breakdown ({student.show_my_marks === false && !isMyVerifiedProfile ? 0 : (student.marks?.length || 0)})
+                    Subject Marks Breakdown ({student.marks?.length || 0})
                   </h3>
                   {isMyVerifiedProfile && (
                     <button
@@ -533,103 +507,83 @@ export default function StudentDetailModal({
                   )}
                 </div>
 
-                {student.show_my_marks === false && !isMyVerifiedProfile ? (
-                  <div
-                    className={`p-6 sm:p-8 rounded-2xl border border-dashed text-center space-y-2.5 ${
-                      isObsidian ? "border-slate-800 bg-slate-950/30" : "border-slate-200 bg-slate-50/60"
-                    }`}
-                  >
-                    <div
-                      className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center border ${
-                        isObsidian ? "bg-white/5 border-white/10 text-slate-400" : "bg-white border-slate-200 text-slate-600"
-                      }`}
-                    >
-                      <IconLock className="w-4 h-4" />
-                    </div>
-                    <p className="font-bold text-xs">Marksheet Protected by Student</p>
-                    <p className="text-[11px] opacity-65 max-w-sm mx-auto leading-relaxed">
-                      This student has opted to keep their detailed subject marks and grade breakdown private in their privacy settings.
-                    </p>
-                  </div>
-                ) : (
-                  <div
-                    className={`overflow-x-auto rounded-xl border ${
-                      isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"
-                    }`}
-                  >
-                    <table className="w-full text-left text-xs border-collapse">
-                      <thead>
-                        <tr
-                          className={`border-b text-[10px] opacity-60 uppercase ${
-                            isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                          }`}
-                        >
-                          <th className="py-2 px-3 font-semibold">Code</th>
-                          <th className="py-2 px-2 font-semibold text-center">Sem</th>
-                          <th className="py-2 px-3 font-semibold">Subject</th>
-                          <th className="py-2 px-2 font-semibold text-center">Int</th>
-                          <th className="py-2 px-2 font-semibold text-center">Ext</th>
-                          <th className="py-2 px-2 font-semibold text-center">Total</th>
-                          <th className="py-2 px-3 font-semibold text-right">Result</th>
-                        </tr>
-                      </thead>
-                      <tbody
-                        className={`divide-y ${
-                          isObsidian ? "divide-slate-800/60" : "divide-slate-100"
+                <div
+                  className={`overflow-x-auto rounded-xl border ${
+                    isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr
+                        className={`border-b text-[10px] opacity-60 uppercase ${
+                          isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
                         }`}
                       >
-                        {student.marks && student.marks.length > 0 ? (
-                          student.marks.map((m, i) => (
-                            <tr
-                              key={i}
-                              className={isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"}
-                            >
-                              <td className="py-2 px-3 font-mono font-semibold opacity-80">
-                                {m.subject_code}
-                              </td>
-                              <td className="py-2 px-2 text-center font-mono text-[10px] opacity-70">
-                                S{m.semester || "1"}
-                              </td>
-                              <td className="py-2 px-3 font-medium max-w-[180px] sm:max-w-[220px] truncate">
-                                {m.subject_name || m.subject_code}
-                              </td>
-                              <td className="py-2 px-2 text-center opacity-60 font-mono">
-                                {m.internal_marks}
-                              </td>
-                              <td className="py-2 px-2 text-center opacity-60 font-mono">
-                                {m.external_marks}
-                              </td>
-                              <td className="py-2 px-2 text-center font-bold font-mono">
-                                {m.total}
-                              </td>
-                              <td className="py-2 px-3 text-right">
-                                <span
-                                  className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${
-                                    m.status === "P"
-                                      ? isObsidian
-                                        ? "bg-emerald-950 text-emerald-400 border-emerald-800"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                      : isObsidian
-                                      ? "bg-rose-950 text-rose-400 border-rose-800"
-                                      : "bg-rose-50 text-rose-700 border-rose-200"
-                                  }`}
-                                >
-                                  {m.status === "P" ? "PASS" : m.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={7} className="py-6 text-center opacity-40 text-xs">
-                              No subject records available for this student.
+                        <th className="py-2 px-3 font-semibold">Code</th>
+                        <th className="py-2 px-2 font-semibold text-center">Sem</th>
+                        <th className="py-2 px-3 font-semibold">Subject</th>
+                        <th className="py-2 px-2 font-semibold text-center">Int</th>
+                        <th className="py-2 px-2 font-semibold text-center">Ext</th>
+                        <th className="py-2 px-2 font-semibold text-center">Total</th>
+                        <th className="py-2 px-3 font-semibold text-right">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody
+                      className={`divide-y ${
+                        isObsidian ? "divide-slate-800/60" : "divide-slate-100"
+                      }`}
+                    >
+                      {student.marks && student.marks.length > 0 ? (
+                        student.marks.map((m, i) => (
+                          <tr
+                            key={i}
+                            className={isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"}
+                          >
+                            <td className="py-2 px-3 font-mono font-semibold opacity-80">
+                              {m.subject_code}
+                            </td>
+                            <td className="py-2 px-2 text-center font-mono text-[10px] opacity-70">
+                              S{m.semester || "1"}
+                            </td>
+                            <td className="py-2 px-3 font-medium max-w-[180px] sm:max-w-[220px] truncate">
+                              {m.subject_name || m.subject_code}
+                            </td>
+                            <td className="py-2 px-2 text-center opacity-60 font-mono">
+                              {m.internal_marks}
+                            </td>
+                            <td className="py-2 px-2 text-center opacity-60 font-mono">
+                              {m.external_marks}
+                            </td>
+                            <td className="py-2 px-2 text-center font-bold font-mono">
+                              {m.total}
+                            </td>
+                            <td className="py-2 px-3 text-right">
+                              <span
+                                className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${
+                                  m.status === "P"
+                                    ? isObsidian
+                                      ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : isObsidian
+                                    ? "bg-rose-950 text-rose-400 border-rose-800"
+                                    : "bg-rose-50 text-rose-700 border-rose-200"
+                                }`}
+                              >
+                                {m.status === "P" ? "PASS" : "F"}
+                              </span>
                             </td>
                           </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={7} className="py-6 text-center opacity-40 text-xs">
+                            No subject records available for this student.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </>
           )}

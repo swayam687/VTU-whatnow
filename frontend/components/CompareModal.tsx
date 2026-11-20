@@ -165,22 +165,6 @@ export default function CompareModal({
 
         {/* Scrollable Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1">
-          {((s1.allow_comparison === false && viewer?.usn?.toUpperCase() !== s1.usn?.toUpperCase()) ||
-            (s2.allow_comparison === false && viewer?.usn?.toUpperCase() !== s2.usn?.toUpperCase())) && (
-            <div
-              className={`p-3 rounded-xl border text-xs font-medium flex items-center gap-2 ${
-                isObsidian
-                  ? "bg-amber-950/20 border-amber-800/40 text-amber-300"
-                  : "bg-amber-50 border-amber-200 text-amber-800"
-              }`}
-            >
-              <span>⚠️</span>
-              <span>
-                One or more selected students have opted out of peer comparisons in their privacy settings. Detailed marksheet comparison is restricted.
-              </span>
-            </div>
-          )}
-
           {/* Student Selector / Cards Header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {/* Student 1 Card */}
