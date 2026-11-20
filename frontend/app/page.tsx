@@ -54,6 +54,8 @@ import InstallAppModal from "../components/InstallAppModal";
 import StudentAuthModal from "../components/StudentAuthModal";
 import PixelAvatarModal from "../components/PixelAvatarModal";
 import StudentDetailModal, { OriginRect } from "../components/StudentDetailModal";
+import ConsentBanner from "../components/ConsentBanner";
+import PrivacySettingsModal from "../components/PrivacySettingsModal";
 import { sfx } from "../lib/sfx";
 import CountUp from "../components/CountUp";
 import BlurText from "../components/BlurText";
@@ -76,6 +78,7 @@ export default function Dashboard() {
   // Student Authentication state (Session-only, resets on browser close)
   const [studentSession, setStudentSession] = useState<AuthSession | null>(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
   // View state: 'dashboard' | 'topology' | 'backlogs'
   const [currentView, setCurrentView] = useState<"dashboard" | "topology" | "backlogs">("dashboard");
@@ -687,6 +690,21 @@ export default function Dashboard() {
                       <IconPencil className="w-3.5 h-3.5" />
                       <span>Pixel Avatar</span>
                     </button>
+                    <button
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsPrivacyModalOpen(true);
+                      }}
+                      className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
+                        isObsidian
+                          ? "border-cyan-500/30 bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-300"
+                          : "border-cyan-200 bg-cyan-50 hover:bg-cyan-100 text-cyan-800"
+                      }`}
+                      title="Manage your public visibility, name, marks, and comparison settings"
+                    >
+                      <IconShield className="w-3.5 h-3.5" />
+                      <span>Privacy Settings</span>
+                    </button>
                     {students.length > 0 && (
                       <button
                         onClick={() => {
@@ -1113,6 +1131,18 @@ export default function Dashboard() {
             </div>
           </>
         )}
+
+        {/* Global Footer */}
+        <footer className="pt-8 pb-12 border-t border-slate-200/60 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs opacity-60">
+          <p>© {new Date().getFullYear()} VTU WhatNow • Open Student Results Intelligence</p>
+          <div className="flex items-center gap-4">
+            <Link href="/privacy" className="hover:underline flex items-center gap-1 text-cyan-400">
+              <IconShield className="w-3.5 h-3.5" />
+              <span>Privacy Policy &amp; Opt-Out</span>
+            </Link>
+            <Link href="/admin" className="hover:underline">Admin Portal</Link>
+          </div>
+        </footer>
       </div>
 
       {/* Floating Comparison Action Bar */}
@@ -1334,6 +1364,28 @@ export default function Dashboard() {
             try {
               localStorage.setItem(`vtu_avatar_${studentSession.usn.toUpperCase()}`, savedArt);
             } catch {}
+          }}
+        />
+      )}
+
+      {/* One-Time Disclaimer & Student Consent Banner */}
+      <ConsentBanner
+        isObsidian={isObsidian}
+        isLoggedIn={Boolean(studentSession)}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
+        onOpenPrivacySettings={() => setIsPrivacyModalOpen(true)}
+      />
+
+      {/* Student Privacy Settings Modal */}
+      {studentSession && (
+        <PrivacySettingsModal
+          isOpen={isPrivacyModalOpen}
+          onClose={() => setIsPrivacyModalOpen(false)}
+          usn={studentSession.usn}
+          studentToken={studentSession.token}
+          isObsidian={isObsidian}
+          onUpdated={() => {
+            fetchStudents({ branch: activeBranch, search, sort: sortBy }).then((res) => setStudents(res));
           }}
         />
       )}

@@ -165,6 +165,22 @@ export default function CompareModal({
 
         {/* Scrollable Content */}
         <div className="p-4 sm:p-6 overflow-y-auto space-y-4 sm:space-y-6 flex-1">
+          {((s1.allow_comparison === false && viewer?.usn?.toUpperCase() !== s1.usn?.toUpperCase()) ||
+            (s2.allow_comparison === false && viewer?.usn?.toUpperCase() !== s2.usn?.toUpperCase())) && (
+            <div
+              className={`p-3 rounded-xl border text-xs font-medium flex items-center gap-2 ${
+                isObsidian
+                  ? "bg-amber-950/20 border-amber-800/40 text-amber-300"
+                  : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}
+            >
+              <span>⚠️</span>
+              <span>
+                One or more selected students have opted out of peer comparisons in their privacy settings. Detailed marksheet comparison is restricted.
+              </span>
+            </div>
+          )}
+
           {/* Student Selector / Cards Header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {/* Student 1 Card */}
@@ -223,19 +239,35 @@ export default function CompareModal({
               </div>
 
               <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-800/40">
-                <span className="opacity-70 text-[11px]">Backlogs Status:</span>
+                <span className="opacity-70 text-[11px]">Pending Subjects:</span>
                 <span
                   className={`font-bold text-[10px] px-2 py-0.5 rounded-full border ${
-                    s1.total_backlogs > 0
+                    viewer?.usn?.toUpperCase() === s1.usn?.toUpperCase()
+                      ? s1.total_backlogs > 0
+                        ? isObsidian
+                          ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
+                          : "bg-rose-50 text-rose-700 border-rose-200"
+                        : isObsidian
+                        ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : s1.has_pending_subjects === "Yes"
                       ? isObsidian
-                        ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-                        : "bg-rose-50 text-rose-700 border-rose-200"
+                        ? "bg-amber-950/30 text-amber-400 border-amber-800/40"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
                       : isObsidian
-                      ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      ? "bg-slate-900 text-slate-400 border-slate-800"
+                      : "bg-slate-100 text-slate-600 border-slate-200"
                   }`}
                 >
-                  {s1.total_backlogs === 0 ? "0 Backlogs" : `${s1.total_backlogs} Backlog(s)`}
+                  {viewer?.usn?.toUpperCase() === s1.usn?.toUpperCase()
+                    ? s1.total_backlogs === 0
+                      ? "All Clear"
+                      : `${s1.total_backlogs} Pending`
+                    : s1.has_pending_subjects
+                    ? s1.has_pending_subjects === "Yes"
+                      ? "Pending: Yes"
+                      : "All Clear"
+                    : "Protected"}
                 </span>
               </div>
             </div>
@@ -296,19 +328,35 @@ export default function CompareModal({
               </div>
 
               <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-800/40">
-                <span className="opacity-70 text-[11px]">Backlogs Status:</span>
+                <span className="opacity-70 text-[11px]">Pending Subjects:</span>
                 <span
                   className={`font-bold text-[10px] px-2 py-0.5 rounded-full border ${
-                    s2.total_backlogs > 0
+                    viewer?.usn?.toUpperCase() === s2.usn?.toUpperCase()
+                      ? s2.total_backlogs > 0
+                        ? isObsidian
+                          ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
+                          : "bg-rose-50 text-rose-700 border-rose-200"
+                        : isObsidian
+                        ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
+                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      : s2.has_pending_subjects === "Yes"
                       ? isObsidian
-                        ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-                        : "bg-rose-50 text-rose-700 border-rose-200"
+                        ? "bg-amber-950/30 text-amber-400 border-amber-800/40"
+                        : "bg-amber-50 text-amber-700 border-amber-200"
                       : isObsidian
-                      ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
-                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                      ? "bg-slate-900 text-slate-400 border-slate-800"
+                      : "bg-slate-100 text-slate-600 border-slate-200"
                   }`}
                 >
-                  {s2.total_backlogs === 0 ? "0 Backlogs" : `${s2.total_backlogs} Backlog(s)`}
+                  {viewer?.usn?.toUpperCase() === s2.usn?.toUpperCase()
+                    ? s2.total_backlogs === 0
+                      ? "All Clear"
+                      : `${s2.total_backlogs} Pending`
+                    : s2.has_pending_subjects
+                    ? s2.has_pending_subjects === "Yes"
+                      ? "Pending: Yes"
+                      : "All Clear"
+                    : "Protected"}
                 </span>
               </div>
             </div>

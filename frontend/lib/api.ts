@@ -25,6 +25,12 @@ export interface Student {
   github_url?: string;
   linkedin_url?: string;
   avatar_pixel_art?: string;
+  show_my_name?: boolean;
+  show_my_marks?: boolean;
+  show_my_backlogs?: boolean;
+  allow_comparison?: boolean;
+  has_pending_subjects?: string | null;
+  is_my_profile?: boolean;
   marks?: Mark[];
 }
 
@@ -163,9 +169,55 @@ export async function fetchStudents(params?: {
   }
 }
 
-export async function fetchStudent(usn: string): Promise<Student> {
-  const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}`, { cache: "no-store" });
+export async function fetchStudent(usn: string, token?: string): Promise<Student> {
+  const headers: Record<string, string> = {};
+  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  if (effectiveToken) {
+    headers["X-Student-Token"] = effectiveToken;
+  }
+  const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}`, {
+    headers,
+    cache: "no-store",
+  });
   if (!res.ok) throw new Error("Student not found");
+  return res.json();
+}
+
+export interface PrivacySettings {
+  show_my_name: boolean;
+  show_my_marks: boolean;
+  show_my_backlogs: boolean;
+  allow_comparison: boolean;
+}
+
+export async function fetchStudentPrivacy(usn: string, token?: string): Promise<PrivacySettings> {
+  const headers: Record<string, string> = {};
+  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  if (effectiveToken) headers["X-Student-Token"] = effectiveToken;
+
+  const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}/privacy`, {
+    headers,
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to fetch privacy settings");
+  return res.json();
+}
+
+export async function updateStudentPrivacy(
+  usn: string,
+  settings: Partial<PrivacySettings>,
+  token?: string
+): Promise<PrivacySettings> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  if (effectiveToken) headers["X-Student-Token"] = effectiveToken;
+
+  const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}/privacy`, {
+    method: "PATCH",
+    headers,
+    body: JSON.stringify(settings),
+  });
+  if (!res.ok) throw new Error("Failed to update privacy settings");
   return res.json();
 }
 

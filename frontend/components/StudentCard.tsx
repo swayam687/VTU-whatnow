@@ -25,11 +25,54 @@ export default function StudentCard({
   isObsidian = false,
   isMyProfile = false,
 }: StudentCardProps) {
+  const isMarksHidden = student.show_my_marks === false && !isMyProfile;
+  const canCompare = student.allow_comparison !== false || isMyProfile;
   const hasBacklogs = student.total_backlogs > 0;
-  const isTopper = student.percentage >= 80 && !hasBacklogs;
+  const isTopper = !isMarksHidden && student.percentage >= 80 && !hasBacklogs;
+
+  // Dignity & Privacy handling for pending subjects:
+  // - Public view: only shows "Has pending subjects: Yes/No" iff student opted in (default: off).
+  // - Verified account owner: sees full count of pending subjects.
+  const pendingStatusBadge = isMyProfile ? (
+    hasBacklogs ? (
+      <span
+        className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+          isObsidian
+            ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
+            : "bg-rose-50 text-rose-700 border-rose-200"
+        }`}
+      >
+        {student.total_backlogs} Re-attempt{student.total_backlogs > 1 ? "s" : ""}
+      </span>
+    ) : (
+      <span
+        className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+          isObsidian
+            ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
+            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+        }`}
+      >
+        All Clear
+      </span>
+    )
+  ) : student.has_pending_subjects ? (
+    <span
+      className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+        student.has_pending_subjects === "Yes"
+          ? isObsidian
+            ? "bg-amber-950/30 text-amber-400 border-amber-800/40"
+            : "bg-amber-50 text-amber-700 border-amber-200"
+          : isObsidian
+          ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
+          : "bg-emerald-50 text-emerald-700 border-emerald-200"
+      }`}
+    >
+      Pending: {student.has_pending_subjects}
+    </span>
+  ) : null;
 
   return (
-    <>
+    <div className="w-full flex flex-col h-full">
       {/* ============================================================ */}
       {/* MOBILE COMPACT ROW LAYOUT (< sm screens)                     */}
       {/* High-density, touch-friendly list item                       */}
@@ -40,7 +83,7 @@ export default function StudentCard({
           else sfx.playMechanicalClick();
           onOpenDetail(e);
         }}
-        className={`sm:hidden group relative rounded-2xl border transition-all p-3 flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] ${
+        className={`sm:hidden group relative rounded-2xl border transition-all p-3 flex items-center justify-between gap-2.5 cursor-pointer active:scale-[0.99] w-full ${
           isObsidian
             ? isSelectedForCompare
               ? "bg-[#0f1115] border-cyan-400 ring-2 ring-cyan-500/30 text-white shadow-md shadow-cyan-950/20"
@@ -110,33 +153,21 @@ export default function StudentCard({
           <div className="text-right">
             <div
               className={`text-sm font-black font-mono tabular-nums leading-none ${
-                isTopper
+                isMarksHidden
+                  ? "text-slate-400 text-xs italic"
+                  : isTopper
                   ? isObsidian ? "text-amber-400" : "text-amber-600"
                   : student.percentage >= 60
                   ? isObsidian ? "text-cyan-400" : "text-blue-600"
                   : "text-rose-500"
               }`}
             >
-              {student.percentage.toFixed(1)}%
+              {isMarksHidden ? "Private" : `${student.percentage.toFixed(1)}%`}
             </div>
-            <div className="mt-1">
-              <span
-                className={`inline-block text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${
-                  hasBacklogs
-                    ? isObsidian
-                      ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-                      : "bg-rose-50 text-rose-700 border-rose-200"
-                    : isObsidian
-                    ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
-                    : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                }`}
-              >
-                {hasBacklogs ? `${student.total_backlogs} BL` : "Clear"}
-              </span>
-            </div>
+            {pendingStatusBadge && <div className="mt-1">{pendingStatusBadge}</div>}
           </div>
 
-          {onToggleCompare && (
+          {onToggleCompare && canCompare && (
             <button
               type="button"
               onClick={(e) => {
@@ -163,7 +194,7 @@ export default function StudentCard({
 
       {/* ============================================================ */}
       {/* DESKTOP RICH CARD VIEW (>= sm screens)                       */}
-      {/* Comprehensive multi-metric card with dual stats & socials    */}
+      {/* Multi-column grid card with stats & clean alignment          */}
       {/* ============================================================ */}
       <div
         onClick={(e) => {
@@ -171,7 +202,7 @@ export default function StudentCard({
           else sfx.playMechanicalClick();
           onOpenDetail(e);
         }}
-        className={`hidden sm:flex group relative rounded-3xl border transition-all flex-col justify-between p-4.5 cursor-pointer active:scale-[0.995] ${
+        className={`hidden sm:flex group relative rounded-3xl border transition-all flex-col justify-between p-4.5 cursor-pointer active:scale-[0.995] w-full h-full ${
           isObsidian
             ? isSelectedForCompare
               ? "bg-[#0f1115] border-cyan-400 ring-2 ring-cyan-500/30 text-white shadow-md shadow-cyan-950/20"
@@ -188,10 +219,7 @@ export default function StudentCard({
         {/* Top Header */}
         <div>
           <div className="flex items-start justify-between gap-2.5">
-            <div
-              className="flex items-start gap-2.5 min-w-0 flex-1"
-            >
-              {/* Procedural Identicon */}
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
               <Identicon
                 usn={student.usn}
                 name={student.name}
@@ -245,7 +273,7 @@ export default function StudentCard({
                   )}
                 </div>
 
-                <h3 className="font-bold text-sm leading-snug truncate group-hover:text-blue-500 transition-colors">
+                <h3 className="font-bold text-sm leading-snug truncate group-hover:text-cyan-400 transition-colors">
                   {student.name || "Anonymous Student"}
                 </h3>
                 <p className="font-mono text-[11px] opacity-50 mt-0.5 tracking-wider">
@@ -256,29 +284,38 @@ export default function StudentCard({
 
             {/* Compare Toggle */}
             {onToggleCompare && (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  sfx.playMechanicalClick();
-                  onToggleCompare();
-                }}
-                title={isSelectedForCompare ? "Remove from comparison" : "Add to comparison"}
-                className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
-                  isSelectedForCompare
-                    ? isObsidian
-                      ? "bg-cyan-500 text-slate-950 font-bold"
-                      : "bg-blue-600 text-white font-bold"
-                    : isObsidian
-                    ? "bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700"
-                    : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                }`}
-              >
-                <IconCompare className="w-3.5 h-3.5" />
-                <span className="text-[10px] uppercase font-bold">
-                  {isSelectedForCompare ? "Added" : "Compare"}
+              canCompare ? (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    sfx.playMechanicalClick();
+                    onToggleCompare();
+                  }}
+                  title={isSelectedForCompare ? "Remove from comparison" : "Add to comparison"}
+                  className={`p-2 rounded-xl text-xs font-semibold flex items-center gap-1 transition-all ${
+                    isSelectedForCompare
+                      ? isObsidian
+                        ? "bg-cyan-500 text-slate-950 font-bold"
+                        : "bg-blue-600 text-white font-bold"
+                      : isObsidian
+                      ? "bg-slate-800/80 text-slate-300 hover:bg-slate-700 border border-slate-700"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <IconCompare className="w-3.5 h-3.5" />
+                  <span className="text-[10px] uppercase font-bold">
+                    {isSelectedForCompare ? "Added" : "Compare"}
+                  </span>
+                </button>
+              ) : (
+                <span
+                  title="Comparison disabled by student in privacy settings"
+                  className="text-[10px] opacity-40 px-2 py-1 rounded-lg border border-dashed border-slate-700 text-slate-400"
+                >
+                  Opted Out
                 </span>
-              </button>
+              )
             )}
           </div>
 
@@ -297,24 +334,32 @@ export default function StudentCard({
             <div>
               <p className="text-[9px] uppercase font-semibold opacity-50 tracking-wider">Total Marks</p>
               <p className="text-sm font-bold mt-0.5 font-mono tabular-nums">
-                {student.total_marks}
-                <span className="text-[10px] opacity-40 font-normal ml-0.5">
-                  /{student.max_marks || 100}
-                </span>
+                {isMarksHidden ? (
+                  <span className="text-xs opacity-50 italic">Private</span>
+                ) : (
+                  <>
+                    {student.total_marks}
+                    <span className="text-[10px] opacity-40 font-normal ml-0.5">
+                      /{student.max_marks || 100}
+                    </span>
+                  </>
+                )}
               </p>
             </div>
             <div>
               <p className="text-[9px] uppercase font-semibold opacity-50 tracking-wider">Percentage</p>
               <p
                 className={`text-sm font-black mt-0.5 font-mono tabular-nums ${
-                  isTopper
+                  isMarksHidden
+                    ? "text-slate-400 text-xs italic"
+                    : isTopper
                     ? isObsidian ? "text-amber-400" : "text-amber-600"
                     : student.percentage >= 60
                     ? isObsidian ? "text-cyan-400" : "text-blue-600"
                     : "text-rose-500"
                 }`}
               >
-                {student.percentage.toFixed(1)}%
+                {isMarksHidden ? "Private" : `${student.percentage.toFixed(1)}%`}
               </p>
             </div>
           </div>
@@ -322,19 +367,13 @@ export default function StudentCard({
 
         {/* Footer / Status & Socials */}
         <div className="pt-2 border-t border-slate-800/30 flex items-center justify-between gap-2 text-xs">
-          <span
-            className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-              hasBacklogs
-                ? isObsidian
-                  ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-                  : "bg-rose-50 text-rose-700 border-rose-200"
-                : isObsidian
-                ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
-                : "bg-emerald-50 text-emerald-700 border-emerald-200"
-            }`}
-          >
-            {hasBacklogs ? `${student.total_backlogs} Backlog${student.total_backlogs > 1 ? "s" : ""}` : "All Clear"}
-          </span>
+          <div>
+            {pendingStatusBadge ? (
+              pendingStatusBadge
+            ) : (
+              <span className="text-[10px] opacity-45 italic">Status Protected</span>
+            )}
+          </div>
 
           {/* Social Links */}
           <div className="flex items-center gap-1 opacity-70">
@@ -348,7 +387,7 @@ export default function StudentCard({
                   sfx.playMechanicalClick();
                 }}
                 title="GitHub Profile"
-                className="p-1 hover:text-blue-500 transition-colors"
+                className="p-1 hover:text-cyan-400 transition-colors"
               >
                 <IconGitHub className="w-3.5 h-3.5" />
               </a>
@@ -363,7 +402,7 @@ export default function StudentCard({
                   sfx.playMechanicalClick();
                 }}
                 title="LinkedIn Profile"
-                className="p-1 hover:text-blue-500 transition-colors"
+                className="p-1 hover:text-cyan-400 transition-colors"
               >
                 <IconLinkedIn className="w-3.5 h-3.5" />
               </a>
@@ -371,6 +410,6 @@ export default function StudentCard({
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

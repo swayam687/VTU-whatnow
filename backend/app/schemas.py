@@ -30,6 +30,24 @@ class StudentBase(BaseModel):
     github_url: Optional[str] = ""
     linkedin_url: Optional[str] = ""
     avatar_pixel_art: Optional[str] = ""
+    show_my_name: bool = True
+    show_my_marks: bool = True
+    show_my_backlogs: bool = False
+    allow_comparison: bool = True
+    has_pending_subjects: Optional[str] = None
+    is_my_profile: bool = False
+
+class PrivacySettingsUpdate(BaseModel):
+    show_my_name: Optional[bool] = None
+    show_my_marks: Optional[bool] = None
+    show_my_backlogs: Optional[bool] = None
+    allow_comparison: Optional[bool] = None
+
+class PrivacySettingsOut(BaseModel):
+    show_my_name: bool = True
+    show_my_marks: bool = True
+    show_my_backlogs: bool = False
+    allow_comparison: bool = True
 
 class AvatarUpdateRequest(BaseModel):
     pixel_art: str

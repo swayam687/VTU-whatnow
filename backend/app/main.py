@@ -59,6 +59,8 @@ from .schemas import (
     RescrapeActionRequest,
     StudentSemesterAudit,
     SemesterAuditResponse,
+    PrivacySettingsUpdate,
+    PrivacySettingsOut,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -161,6 +163,10 @@ def init_db():
                     ("login_count", "ALTER TABLE students ADD COLUMN login_count INTEGER DEFAULT 0;"),
                     ("last_login_at", "ALTER TABLE students ADD COLUMN last_login_at TIMESTAMP;"),
                     ("avatar_pixel_art", "ALTER TABLE students ADD COLUMN avatar_pixel_art VARCHAR DEFAULT '';"),
+                    ("show_my_name", "ALTER TABLE students ADD COLUMN show_my_name BOOLEAN DEFAULT TRUE;"),
+                    ("show_my_marks", "ALTER TABLE students ADD COLUMN show_my_marks BOOLEAN DEFAULT TRUE;"),
+                    ("show_my_backlogs", "ALTER TABLE students ADD COLUMN show_my_backlogs BOOLEAN DEFAULT FALSE;"),
+                    ("allow_comparison", "ALTER TABLE students ADD COLUMN allow_comparison BOOLEAN DEFAULT TRUE;"),
                 ]
                 for col_name, sql_stmt in columns_to_ensure:
                     if col_name not in existing_cols:
@@ -179,6 +185,10 @@ def init_db():
                     ("login_count", "INTEGER DEFAULT 0"),
                     ("last_login_at", "TIMESTAMP"),
                     ("avatar_pixel_art", "VARCHAR DEFAULT ''"),
+                    ("show_my_name", "BOOLEAN DEFAULT TRUE"),
+                    ("show_my_marks", "BOOLEAN DEFAULT TRUE"),
+                    ("show_my_backlogs", "BOOLEAN DEFAULT FALSE"),
+                    ("allow_comparison", "BOOLEAN DEFAULT TRUE"),
                 ]:
                     try:
                         with engine.begin() as conn:
@@ -1166,6 +1176,87 @@ async def submit_captcha(req: CaptchaSubmit):
 # Student & Branch Query Endpoints
 # -------------------------------------------------------------
 
+def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_admin: bool = False):
+    """
+    Applies professional privacy controls and student consent preferences:
+    - show_my_name: When OFF, student name is masked as 'Anonymous Student'.
+    - show_my_marks: When OFF, marksheet and scores are masked to 0.
+    - show_my_backlogs: Default OFF. When OFF, backlog count is masked and has_pending_subjects is None.
+      When ON, only 'Has pending subjects: Yes/No' is shown. Individual failed subjects are NEVER shown publicly!
+    - allow_comparison: When OFF, peer comparison is blocked.
+    The verified owner of the USN and administrators always see full authentic details.
+    """
+    is_owner = bool(viewer_usn and viewer_usn.strip().upper() == s.usn.strip().upper())
+    if is_owner or is_admin:
+        pending_str = "Yes" if s.total_backlogs > 0 else "No"
+        return {
+            "usn": s.usn,
+            "name": s.name or s.usn,
+            "branch": s.branch,
+            "batch": s.batch,
+            "total_marks": s.total_marks,
+            "max_marks": s.max_marks,
+            "percentage": s.percentage,
+            "cgpa": s.cgpa,
+            "total_backlogs": s.total_backlogs,
+            "github_url": s.github_url or "",
+            "linkedin_url": s.linkedin_url or "",
+            "avatar_pixel_art": s.avatar_pixel_art or "",
+            "show_my_name": s.show_my_name if s.show_my_name is not None else True,
+            "show_my_marks": s.show_my_marks if s.show_my_marks is not None else True,
+            "show_my_backlogs": s.show_my_backlogs if s.show_my_backlogs is not None else False,
+            "allow_comparison": s.allow_comparison if s.allow_comparison is not None else True,
+            "has_pending_subjects": pending_str,
+            "is_my_profile": is_owner,
+            "marks": s.marks,
+        }
+
+    # Public View / Other Student View
+    disp_name = s.name if (s.show_my_name is not False) else "Anonymous Student"
+    disp_total_marks = s.total_marks if (s.show_my_marks is not False) else 0
+    disp_max_marks = s.max_marks if (s.show_my_marks is not False) else 0
+    disp_percentage = s.percentage if (s.show_my_marks is not False) else 0.0
+    disp_cgpa = s.cgpa if (s.show_my_marks is not False) else 0.0
+
+    # Backlog handling:
+    # Public view shows only: "Has pending subjects: Yes/No" — and even that only if the student opts in show_my_backlogs (default: off).
+    # Never show individual failed subject lists publicly!
+    if s.show_my_backlogs:
+        has_pending = "Yes" if s.total_backlogs > 0 else "No"
+        public_backlogs = s.total_backlogs
+    else:
+        has_pending = None  # Completely hidden
+        public_backlogs = 0
+
+    if s.show_my_marks is not False:
+        # Never show individual failed/backlog subjects in the public marks list!
+        public_marks = [m for m in s.marks if m.status == "P"]
+    else:
+        public_marks = []
+
+    return {
+        "usn": s.usn,
+        "name": disp_name or s.usn,
+        "branch": s.branch,
+        "batch": s.batch,
+        "total_marks": disp_total_marks,
+        "max_marks": disp_max_marks,
+        "percentage": disp_percentage,
+        "cgpa": disp_cgpa,
+        "total_backlogs": public_backlogs,
+        "github_url": s.github_url or "",
+        "linkedin_url": s.linkedin_url or "",
+        "avatar_pixel_art": s.avatar_pixel_art or "",
+        "show_my_name": s.show_my_name if s.show_my_name is not None else True,
+        "show_my_marks": s.show_my_marks if s.show_my_marks is not None else True,
+        "show_my_backlogs": s.show_my_backlogs if s.show_my_backlogs is not None else False,
+        "allow_comparison": s.allow_comparison if s.allow_comparison is not None else True,
+        "has_pending_subjects": has_pending,
+        "is_my_profile": False,
+        "marks": public_marks,
+    }
+
+
 @app.get("/api/students", response_model=List[StudentOut])
 def get_students(
     branch: Optional[str] = Query(None, description="Filter by branch code, e.g. CSE, DS, ALL"),
@@ -1209,14 +1300,15 @@ def get_students(
         if response:
             response.headers["X-Is-Authenticated"] = "false"
         if branch and branch.upper() != "ALL":
-            return query.limit(3).all()
+            raw_list = query.limit(3).all()
         else:
-            return query.limit(5).all()
+            raw_list = query.limit(5).all()
+        return [sanitize_student_record(s, None) for s in raw_list]
 
     if response:
         response.headers["X-Is-Authenticated"] = "true"
     students = query.limit(limit).all()
-    return students
+    return [sanitize_student_record(s, current_usn) for s in students]
 
 
 # -------------------------------------------------------------
@@ -1252,20 +1344,23 @@ def log_student_comparison(
     s1_usn = req.student1_usn.strip().upper()
     s1_name = (req.student1_name or "").strip()
     s1_branch = (req.student1_branch or "").strip()
-    if not s1_name or not s1_branch:
-        st1 = db.query(Student).filter(Student.usn == s1_usn).first()
-        if st1:
-            s1_name = s1_name or st1.name
-            s1_branch = s1_branch or st1.branch
+    st1 = db.query(Student).filter(Student.usn == s1_usn).first()
+    if st1:
+        s1_name = s1_name or st1.name
+        s1_branch = s1_branch or st1.branch
 
     s2_usn = req.student2_usn.strip().upper()
     s2_name = (req.student2_name or "").strip()
     s2_branch = (req.student2_branch or "").strip()
-    if not s2_name or not s2_branch:
-        st2 = db.query(Student).filter(Student.usn == s2_usn).first()
-        if st2:
-            s2_name = s2_name or st2.name
-            s2_branch = s2_branch or st2.branch
+    st2 = db.query(Student).filter(Student.usn == s2_usn).first()
+    if st2:
+        s2_name = s2_name or st2.name
+        s2_branch = s2_branch or st2.branch
+
+    # Privacy check: If student opted out of comparison, block logging
+    if (st1 and st1.allow_comparison is False and clean_viewer_usn != s1_usn) or \
+       (st2 and st2.allow_comparison is False and clean_viewer_usn != s2_usn):
+        return {"ok": False, "message": "Peer comparison has been disabled by one of the selected students."}
 
     entry = ComparisonLog(
         viewer_usn=clean_viewer_usn,
@@ -1361,11 +1456,78 @@ def get_admin_compare_logs(db: Session = Depends(get_db)):
 
 
 @app.get("/api/students/{usn}", response_model=StudentOut)
-def get_student(usn: str, db: Session = Depends(get_db)):
-    student = db.query(Student).filter(Student.usn == usn.strip().upper()).first()
+def get_student(
+    usn: str,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    clean_usn = usn.strip().upper()
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
-    return student
+    current_usn = verify_session_token(x_student_token, db)
+    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    return sanitize_student_record(student, current_usn, is_admin=is_admin)
+
+
+@app.get("/api/students/{usn}/privacy", response_model=PrivacySettingsOut)
+def get_student_privacy(
+    usn: str,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    clean_usn = usn.strip().upper()
+    current_usn = verify_session_token(x_student_token, db)
+    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    if not is_admin and (not current_usn or current_usn.strip().upper() != clean_usn):
+        raise HTTPException(status_code=403, detail="Unauthorized: You can only view privacy settings for your own verified account.")
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+    return {
+        "show_my_name": student.show_my_name if student.show_my_name is not None else True,
+        "show_my_marks": student.show_my_marks if student.show_my_marks is not None else True,
+        "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else False,
+        "allow_comparison": student.allow_comparison if student.allow_comparison is not None else True,
+    }
+
+
+@app.patch("/api/students/{usn}/privacy", response_model=PrivacySettingsOut)
+def update_student_privacy(
+    usn: str,
+    data: PrivacySettingsUpdate,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    db: Session = Depends(get_db)
+):
+    clean_usn = usn.strip().upper()
+    current_usn = verify_session_token(x_student_token, db)
+    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    if not is_admin and (not current_usn or current_usn.strip().upper() != clean_usn):
+        raise HTTPException(status_code=403, detail="Unauthorized: You can only update privacy settings for your own verified account.")
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    if data.show_my_name is not None:
+        student.show_my_name = data.show_my_name
+    if data.show_my_marks is not None:
+        student.show_my_marks = data.show_my_marks
+    if data.show_my_backlogs is not None:
+        student.show_my_backlogs = data.show_my_backlogs
+    if data.allow_comparison is not None:
+        student.allow_comparison = data.allow_comparison
+
+    db.commit()
+    db.refresh(student)
+    return {
+        "show_my_name": student.show_my_name if student.show_my_name is not None else True,
+        "show_my_marks": student.show_my_marks if student.show_my_marks is not None else True,
+        "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else False,
+        "allow_comparison": student.allow_comparison if student.allow_comparison is not None else True,
+    }
 
 
 @app.patch("/api/students/{usn}", dependencies=[Depends(require_admin)])

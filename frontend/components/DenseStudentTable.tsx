@@ -177,7 +177,7 @@ export default function DenseStudentTable({
                 className="py-3 px-3 text-center cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors w-24"
               >
                 <div className="flex items-center justify-center gap-0.5">
-                  <span>Backlogs</span>
+                  <span>Re-attempts</span>
                   {renderSortIndicator("total_backlogs")}
                 </div>
               </th>
@@ -277,39 +277,67 @@ export default function DenseStudentTable({
 
                   {/* Total Marks */}
                   <td className="py-2.5 px-3 text-right text-slate-500 dark:text-slate-400 tabular-nums hidden md:table-cell">
-                    {s.total_marks > 0 ? `${s.total_marks} / ${s.max_marks || 800}` : "—"}
+                    {s.show_my_marks === false && !isMyProfile ? (
+                      <span className="text-xs opacity-50 italic">Private</span>
+                    ) : s.total_marks > 0 ? (
+                      `${s.total_marks} / ${s.max_marks || 800}`
+                    ) : (
+                      "—"
+                    )}
                   </td>
 
                   {/* Percentage Score */}
                   <td className="py-2.5 px-3 text-right">
-                    <span
-                      className={`font-bold tabular-nums text-sm ${
-                        s.percentage >= 80
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : s.percentage >= 60
-                          ? "text-slate-900 dark:text-slate-100"
-                          : "text-rose-600 dark:text-rose-400"
-                      }`}
-                    >
-                      {s.percentage.toFixed(1)}%
-                    </span>
+                    {s.show_my_marks === false && !isMyProfile ? (
+                      <span className="text-xs opacity-50 italic">Private</span>
+                    ) : (
+                      <span
+                        className={`font-bold tabular-nums text-sm ${
+                          s.percentage >= 80
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : s.percentage >= 60
+                            ? "text-slate-900 dark:text-slate-100"
+                            : "text-rose-600 dark:text-rose-400"
+                        }`}
+                      >
+                        {s.percentage.toFixed(1)}%
+                      </span>
+                    )}
                   </td>
 
-                  {/* Backlogs */}
+                  {/* Re-attempts / Pending Subjects */}
                   <td className="py-2.5 px-3 text-center">
-                    <span
-                      className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                        hasBacklogs
-                          ? isObsidian
-                            ? "bg-rose-950/40 text-rose-300 border-rose-800/40"
-                            : "bg-rose-50 text-rose-700 border-rose-200"
-                          : isObsidian
-                          ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/40"
-                          : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      }`}
-                    >
-                      {hasBacklogs ? `${s.total_backlogs} BL` : "Pass"}
-                    </span>
+                    {isMyProfile ? (
+                      <span
+                        className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          hasBacklogs
+                            ? isObsidian
+                              ? "bg-rose-950/40 text-rose-300 border-rose-800/40"
+                              : "bg-rose-50 text-rose-700 border-rose-200"
+                            : isObsidian
+                            ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/40"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }`}
+                      >
+                        {hasBacklogs ? `${s.total_backlogs} BL` : "Pass"}
+                      </span>
+                    ) : s.has_pending_subjects ? (
+                      <span
+                        className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          s.has_pending_subjects === "Yes"
+                            ? isObsidian
+                              ? "bg-amber-950/40 text-amber-300 border-amber-800/40"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                            : isObsidian
+                            ? "bg-emerald-950/40 text-emerald-300 border-emerald-800/40"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }`}
+                      >
+                        {s.has_pending_subjects === "Yes" ? "Pending" : "Clear"}
+                      </span>
+                    ) : (
+                      <span className="text-slate-500 text-[10px] opacity-40">—</span>
+                    )}
                   </td>
 
                   {/* Compare Action */}
@@ -317,26 +345,37 @@ export default function DenseStudentTable({
                     className="py-2.5 px-3 text-center"
                     onClick={(e) => {
                       e.stopPropagation();
-                      onToggleCompare(s.usn);
+                      if (s.allow_comparison !== false || isMyProfile) {
+                        onToggleCompare(s.usn);
+                      }
                     }}
                   >
-                    <button
-                      type="button"
-                      title={isSelected ? "Remove from comparison" : "Add to comparison"}
-                      className={`p-1.5 rounded-lg border transition-all ${
-                        isSelected
-                          ? "bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900"
-                          : isObsidian
-                          ? "border-white/10 text-slate-400 hover:text-white hover:border-white/20"
-                          : "border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300"
-                      }`}
-                    >
-                      {isSelected ? (
-                        <IconCheck className="w-3 h-3 stroke-[2.5]" />
-                      ) : (
-                        <IconCompare className="w-3 h-3" />
-                      )}
-                    </button>
+                    {s.allow_comparison !== false || isMyProfile ? (
+                      <button
+                        type="button"
+                        title={isSelected ? "Remove from comparison" : "Add to comparison"}
+                        className={`p-1.5 rounded-lg border transition-all ${
+                          isSelected
+                            ? "bg-slate-900 border-slate-900 text-white dark:bg-white dark:border-white dark:text-slate-900"
+                            : isObsidian
+                            ? "border-white/10 text-slate-400 hover:text-white hover:border-white/20"
+                            : "border-slate-200 text-slate-500 hover:text-slate-900 hover:border-slate-300"
+                        }`}
+                      >
+                        {isSelected ? (
+                          <IconCheck className="w-3 h-3 stroke-[2.5]" />
+                        ) : (
+                          <IconCompare className="w-3 h-3" />
+                        )}
+                      </button>
+                    ) : (
+                      <span
+                        title="Student opted out of peer comparison"
+                        className="text-[10px] opacity-40 text-slate-500"
+                      >
+                        Opted Out
+                      </span>
+                    )}
                   </td>
                 </tr>
               );

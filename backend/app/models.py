@@ -26,6 +26,12 @@ class Student(Base):
     last_login_at = Column(DateTime, nullable=True)
     avatar_pixel_art = Column(String, nullable=True, default="")  # 10x10 custom pixel art matrix
 
+    # Student Privacy Controls
+    show_my_name = Column(Boolean, default=True)
+    show_my_marks = Column(Boolean, default=True)
+    show_my_backlogs = Column(Boolean, default=False)  # default off
+    allow_comparison = Column(Boolean, default=True)
+
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")
 
 

@@ -41,12 +41,6 @@ export default function BacklogMatrix({
     return branchData ? branchData.top_failed_subjects : [];
   }, [data, selectedBranchTab]);
 
-  const criticalStudents = React.useMemo(() => {
-    return students
-      .filter((s) => s.total_backlogs >= 3)
-      .sort((a, b) => b.total_backlogs - a.total_backlogs);
-  }, [students]);
-
   return (
     <div
       className={`rounded-2xl sm:rounded-3xl p-4 sm:p-6 border transition-all ${
@@ -93,16 +87,22 @@ export default function BacklogMatrix({
               {data ? data.total_failed_papers : "..."}
             </span>
             <span className="text-[10px] uppercase font-semibold opacity-60">
-              Backlog Papers
+              Pending Papers
             </span>
           </div>
           <div className="w-px h-7 bg-slate-300 dark:bg-slate-800" />
           <div className="text-center px-2">
-            <span className="block text-xl sm:text-2xl font-black text-amber-500">
-              {criticalStudents.length}
+            <span className="block text-xl sm:text-2xl font-black text-emerald-500">
+              {data && data.branches.length > 0
+                ? `${(
+                    (data.branches.reduce((acc, b) => acc + b.clean_pass_students, 0) /
+                      (data.branches.reduce((acc, b) => acc + b.total_students, 0) || 1)) *
+                    100
+                  ).toFixed(1)}%`
+                : "..."}
             </span>
             <span className="text-[10px] uppercase font-semibold opacity-60">
-              &ge;3 Backlogs
+              Clean Pass Rate
             </span>
           </div>
         </div>
@@ -326,50 +326,30 @@ export default function BacklogMatrix({
             </div>
           </div>
 
-          {/* SECTION 3: Students with Multiple Backlogs */}
-          {criticalStudents.length > 0 && (
-            <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-amber-500 mb-2.5">
-                Students with &ge;3 Backlogs
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                {criticalStudents.map((s) => (
-                  <div
-                    key={s.usn}
-                    onClick={() => {
-                      if (onSelectStudent) {
-                        sfx.playMechanicalClick();
-                        onSelectStudent(s.usn);
-                      }
-                    }}
-                    className={`p-3 rounded-2xl border cursor-pointer transition-all flex items-center justify-between ${
-                      isObsidian
-                        ? "bg-slate-900/60 border-slate-800 hover:border-amber-500/50"
-                        : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
-                    }`}
-                  >
-                    <div>
-                      <p className="font-bold text-xs truncate max-w-[150px]">
-                        {s.name || s.usn}
-                      </p>
-                      <span className="font-mono text-[10px] opacity-60">{s.usn}</span>
-                      <span className="ml-2 text-[9px] font-semibold text-blue-500">
-                        {s.branch}
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-400 border border-rose-200 dark:border-rose-800">
-                        {s.total_backlogs} Backlogs
-                      </span>
-                      <span className="block text-[10px] font-mono opacity-60 mt-0.5">
-                        {s.percentage.toFixed(1)}%
-                      </span>
-                    </div>
-                  </div>
-                ))}
+          {/* SECTION 3: Privacy & Re-attempt Aggregate Transparency Notice */}
+          <div
+            className={`p-4 sm:p-5 rounded-2xl border ${
+              isObsidian
+                ? "bg-white/[0.02] border-white/10 text-slate-300"
+                : "bg-slate-50 border-slate-200 text-slate-700"
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span className="text-base mt-0.5">🛡️</span>
+              <div className="text-xs leading-relaxed space-y-1">
+                <h4 className="font-bold text-xs uppercase tracking-wider text-slate-200 dark:text-white">
+                  Student Privacy &amp; Dignity Standard
+                </h4>
+                <p className="opacity-80">
+                  Individual student backlog registries are strictly confidential. Under our Student
+                  Consent &amp; Transparency Policy, individual student profiles never publicly expose
+                  failed subject lists. Departmental failure curves and pass metrics above are aggregate
+                  institutional benchmarks designed to highlight curriculum difficulty without exposing
+                  individual peers.
+                </p>
               </div>
             </div>
-          )}
+          </div>
         </div>
       )}
     </div>
