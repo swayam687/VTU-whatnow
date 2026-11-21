@@ -11,10 +11,13 @@ from typing import List, Optional
 
 # Ensure persistent Playwright cache on Linux / Render hosts
 if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and sys.platform != "win32":
-    render_cache = Path("/opt/render/project/src/.cache/ms-playwright")
+    # If on Render, prefer package-level persistence (PLAYWRIGHT_BROWSERS_PATH=0) so Chromium survives sleep/wakeups
     if Path("/opt/render/project/src").exists():
+        render_cache = Path("/opt/render/project/src/.cache/ms-playwright")
         render_cache.mkdir(parents=True, exist_ok=True)
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(render_cache)
+    else:
+        os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 
 from playwright.async_api import BrowserContext, Page, async_playwright
 
