@@ -341,9 +341,9 @@ export default function StudentAuthModal({
                     ) : (
                       <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
                         <div>
-                          <span className="text-xs font-bold text-amber-400 block">⚠️ USN Not Found in College Database</span>
-                          <p className="text-[11px] text-zinc-400 mt-0.5">
-                            Your USN isn&apos;t in the database yet, so you cannot log in. Send a message to the admin below to scrape your results.
+                          <span className="text-xs font-bold text-amber-400 block">⚠️ USN Not Found in Records</span>
+                          <p className={`text-[11px] mt-0.5 ${isObsidian ? "text-zinc-400" : "text-zinc-600"}`}>
+                            We haven&apos;t added this USN yet. Enter your details below, and the administrator will add your marksheet.
                           </p>
                         </div>
 
@@ -355,20 +355,28 @@ export default function StudentAuthModal({
                               value={missingStudentName}
                               onChange={(e) => setMissingStudentName(e.target.value)}
                               placeholder="Your Name (Optional)"
-                              className="px-2.5 py-1.5 text-xs rounded-lg border bg-black/20 border-white/10 text-white outline-none focus:border-amber-400"
+                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none transition-colors ${
+                                isObsidian
+                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
+                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
+                              }`}
                             />
                             <select
                               value={missingStudentBranch}
                               onChange={(e) => setMissingStudentBranch(e.target.value)}
-                              className="px-2.5 py-1.5 text-xs rounded-lg border bg-black/20 border-white/10 text-white outline-none focus:border-amber-400"
+                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none transition-colors ${
+                                isObsidian
+                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
+                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
+                              }`}
                             >
-                              <option value="CSE" className="bg-zinc-900">CSE</option>
-                              <option value="DS" className="bg-zinc-900">DS</option>
-                              <option value="AIML" className="bg-zinc-900">AIML</option>
-                              <option value="ISE" className="bg-zinc-900">ISE</option>
-                              <option value="ECE" className="bg-zinc-900">ECE</option>
-                              <option value="MECH" className="bg-zinc-900">MECH</option>
-                              <option value="CIVIL" className="bg-zinc-900">CIVIL</option>
+                              <option value="CSE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CSE</option>
+                              <option value="DS" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>DS</option>
+                              <option value="AIML" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>AIML</option>
+                              <option value="ISE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ISE</option>
+                              <option value="ECE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ECE</option>
+                              <option value="MECH" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>MECH</option>
+                              <option value="CIVIL" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CIVIL</option>
                             </select>
                           </div>
 
@@ -376,12 +384,12 @@ export default function StudentAuthModal({
                             type="button"
                             onClick={handleReportMissingUsn}
                             disabled={reportingMissing}
-                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-black font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20"
+                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
                           >
                             {reportingMissing ? (
                               <span>Sending Request...</span>
                             ) : (
-                              <span>📢 Request Admin to Scrape My USN</span>
+                              <span>📢 Request Admin to Add My USN</span>
                             )}
                           </button>
                         </div>
@@ -480,10 +488,10 @@ export default function StudentAuthModal({
                   <button
                     type="submit"
                     disabled={loading || !agreedToPrivacy}
-                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                   >
                     {loading
-                      ? "Authenticating..."
+                      ? "Signing In..."
                       : authStatus?.is_claimed
                         ? "Unlock Results & Rankings"
                         : "Claim USN & Create Password"}

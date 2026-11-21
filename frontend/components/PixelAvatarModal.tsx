@@ -685,7 +685,7 @@ export default function PixelAvatarModal({
             type="button"
             onClick={handleSave}
             disabled={saving}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+            className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.98] transition-all disabled:opacity-50 flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
           >
             <IconCheck className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>{saving ? "Saving Avatar..." : "Save My Pixel Art"}</span>

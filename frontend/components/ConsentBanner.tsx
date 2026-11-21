@@ -100,7 +100,7 @@ export default function ConsentBanner({
               <button
                 type="button"
                 onClick={handleDismiss}
-                className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 active:scale-[0.98] ${
                   isObsidian
                     ? "bg-cyan-500 hover:bg-cyan-400 text-slate-950"
                     : "bg-slate-900 hover:bg-slate-800 text-white"
@@ -112,14 +112,14 @@ export default function ConsentBanner({
               <button
                 type="button"
                 onClick={handleManageClick}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors inline-flex items-center gap-1.5 ${
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-medium border transition-colors inline-flex items-center gap-1.5 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${
                   isObsidian
-                    ? "border-slate-800 hover:border-slate-700 bg-white/5 text-slate-200"
+                    ? "border-slate-800 hover:border-slate-700 bg-white/5 text-slate-200 hover:text-white"
                     : "border-slate-200 hover:bg-slate-100 text-slate-700"
                 }`}
               >
                 <IconKey className="w-3 h-3 text-cyan-400" />
-                <span>{isLoggedIn ? "My Privacy Settings" : "Claim USN & Hide Data"}</span>
+                <span>{isLoggedIn ? "My Privacy Settings" : "Manage Privacy Settings"}</span>
               </button>
 
               <Link

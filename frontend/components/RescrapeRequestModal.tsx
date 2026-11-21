@@ -104,7 +104,12 @@ export default function RescrapeRequestModal({
         studentSession?.token
       );
 
-      setSuccessMsg(res.message);
+      const finalMsg =
+        requestType === "DATA_DELETION"
+          ? "Deletion request sent to admin. Your data will be deleted in 24 hours."
+          : res.message || "Update request submitted to admin!";
+
+      setSuccessMsg(finalMsg);
       setPendingRequest(res.request);
       sfx.playSonarChime();
       if (onSuccess) onSuccess();
@@ -184,7 +189,7 @@ export default function RescrapeRequestModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 text-white dark:bg-white dark:text-slate-900"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm cursor-pointer transition-all active:scale-[0.98]"
                 >
                   Close
                 </button>
@@ -263,7 +268,7 @@ export default function RescrapeRequestModal({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="w-full py-2.5 rounded-xl text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900 hover:opacity-90 transition-opacity"
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
                 >
                   Understood, Return to Marksheet
                 </button>
@@ -370,7 +375,7 @@ export default function RescrapeRequestModal({
                 </div>
               )}
 
-              {/* Question 2: Target Semester to Scrape or Data Deletion Notice */}
+              {/* Question 2: Target Semester to Update or Data Deletion Notice */}
               {requestType === "DATA_DELETION" ? (
                 <div
                   className={`p-3.5 rounded-2xl border text-xs leading-relaxed space-y-1 ${
@@ -381,16 +386,16 @@ export default function RescrapeRequestModal({
                 >
                   <p className="font-bold flex items-center gap-1.5">
                     <IconShield className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Public Profile Soft-Hide Notice</span>
+                    <span>Profile Removal Notice</span>
                   </p>
-                  <p className="text-[11px] opacity-80 leading-relaxed">
-                    Submitting this request alerts the administrator to completely hide your profile from all public search results, campus leaderboards, and peer comparisons. Faculty and administrative records will retain institutional data securely.
+                  <p className="text-[11px] opacity-85 leading-relaxed">
+                    Submitting this request notifies the administrator to remove your profile from all public search results, campus rankings, and peer comparisons within 24 hours.
                   </p>
                 </div>
               ) : (
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1.5">
-                    Target Semester to Scrape
+                    Target Semester to Update
                   </label>
                   <div className="grid grid-cols-3 gap-2">
                     {[
@@ -407,7 +412,7 @@ export default function RescrapeRequestModal({
                         }}
                         className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
                           targetSemester === sem.id
-                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs border-transparent font-bold"
+                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-sm border-transparent font-bold"
                             : isObsidian
                             ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
                             : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
@@ -429,9 +434,9 @@ export default function RescrapeRequestModal({
               )}
 
               {successMsg && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs flex items-center gap-2">
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span>{successMsg}</span>
+                  <span className="font-medium">{successMsg}</span>
                 </div>
               )}
 
@@ -440,7 +445,7 @@ export default function RescrapeRequestModal({
                 <button
                   type="submit"
                   disabled={isSubmitting || !requestType || (requestType !== "DATA_DELETION" && !targetSemester)}
-                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-transform active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-transform active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-sm flex items-center justify-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                 >
                   <IconRotateCcw className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
                   <span>

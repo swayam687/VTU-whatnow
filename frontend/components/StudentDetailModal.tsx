@@ -314,7 +314,7 @@ export default function StudentDetailModal({
               </p>
               <button
                 onClick={() => onRetry(usn)}
-                className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-slate-900 text-white dark:bg-white dark:text-slate-900 mt-1"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm mt-1 transition-all active:scale-[0.98] cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
               >
                 Retry Loading
               </button>
@@ -412,7 +412,7 @@ export default function StudentDetailModal({
                   ) : myUsn ? (
                     <button
                       onClick={() => onCompareWithMe(student)}
-                      className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                     >
                       <IconCompare className="w-3.5 h-3.5" />
                       <span>Compare with Me</span>
@@ -423,7 +423,7 @@ export default function StudentDetailModal({
                         sfx.playMechanicalClick();
                         onOpenAuth();
                       }}
-                      className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
+                      className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                     >
                       <IconKey className="w-3.5 h-3.5" />
                       <span>Sign In to Compare</span>
@@ -447,7 +447,7 @@ export default function StudentDetailModal({
                       <span>Need your marksheet updated?</span>
                     </div>
                     <p className="text-[11px] opacity-80 leading-relaxed">
-                      Cleared backlog in revaluation/re-exam, or missing your Sem-2 results? Send a re-scrape request to admin.
+                      Cleared pending subjects in revaluation/re-exam, or missing results? Send an update request to admin.
                     </p>
                   </div>
                   <button
@@ -456,7 +456,7 @@ export default function StudentDetailModal({
                       sfx.playMechanicalClick();
                       setIsRescrapeModalOpen(true);
                     }}
-                    className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 shadow-xs flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer shrink-0"
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                   >
                     <IconRotateCcw className="w-3.5 h-3.5" />
                     <span>Request Update</span>

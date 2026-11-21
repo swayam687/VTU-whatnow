@@ -119,7 +119,8 @@ export default function Dashboard() {
     const obsidian = savedTheme !== "paper";
     setIsObsidian(obsidian);
     if (typeof document !== "undefined") {
-      document.body.className = obsidian ? "theme-obsidian" : "theme-paper";
+      document.documentElement.classList.toggle("dark", obsidian);
+      document.body.className = obsidian ? "theme-obsidian dark" : "theme-paper";
     }
   }, []);
 
@@ -128,7 +129,8 @@ export default function Dashboard() {
       const next = !prev;
       localStorage.setItem("vtu_theme", next ? "obsidian" : "paper");
       if (typeof document !== "undefined") {
-        document.body.className = next ? "theme-obsidian" : "theme-paper";
+        document.documentElement.classList.toggle("dark", next);
+        document.body.className = next ? "theme-obsidian dark" : "theme-paper";
       }
       return next;
     });
@@ -670,7 +672,7 @@ export default function Dashboard() {
                   <div className="flex items-center gap-2 self-stretch sm:self-auto justify-end flex-wrap pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800">
                     <button
                       onClick={(e) => handleOpenDetail(studentSession.usn, e)}
-                      className="flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white shadow-xs dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98]"
+                      className="flex-1 sm:flex-none px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white shadow-xs dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                     >
                       <IconFileText className="w-3.5 h-3.5" />
                       <span>View Marksheet</span>
@@ -779,7 +781,7 @@ export default function Dashboard() {
                         sfx.playMechanicalClick();
                         setIsAuthModalOpen(true);
                       }}
-                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl font-medium text-xs sm:text-sm bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 active:scale-[0.98] shadow-xs transition-all flex items-center justify-center gap-2"
+                      className="w-full sm:w-auto px-5 py-2.5 rounded-xl font-semibold text-xs sm:text-sm bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 active:scale-[0.98] shadow-sm transition-all flex items-center justify-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                     >
                       <IconKey className="w-3.5 h-3.5" />
                       <span>Sign In with USN</span>
@@ -1044,30 +1046,32 @@ export default function Dashboard() {
                           sfx.playMechanicalClick();
                           setIsAuthModalOpen(true);
                         }}
-                        className={`col-span-1 sm:col-span-2 lg:col-span-3 p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
+                        className={`col-span-1 sm:col-span-2 lg:col-span-3 p-6 sm:p-7 rounded-2xl sm:rounded-3xl border border-dashed cursor-pointer text-center space-y-3 transition-all hover:border-solid active:scale-[0.99] group ${
                           isObsidian
                             ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
-                            : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
+                            : "bg-slate-50/70 border-slate-300 hover:bg-slate-100/70 text-slate-800"
                         }`}
                       >
-                        <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border ${
-                          isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-white border-slate-200 text-slate-700"
+                        <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border transition-transform group-hover:scale-105 ${
+                          isObsidian ? "bg-white/5 border-white/10 text-cyan-400" : "bg-white border-slate-200 text-blue-600 shadow-xs"
                         }`}>
                           <IconLock className="w-4 h-4" />
                         </div>
-                        <h3 className="font-bold text-sm sm:text-base tracking-tight">
-                          Unlock Full Batch Results &amp; Rankings
-                        </h3>
-                        <p className="text-xs opacity-65 max-w-md mx-auto leading-relaxed">
-                          Public preview displays top departmental ranks. Sign in with your USN to view the full directory, detailed marksheet, and subject-level percentiles.
-                        </p>
-                        <div className="pt-1">
+                        <div className="space-y-1">
+                          <h3 className="font-bold text-base sm:text-lg tracking-tight">
+                            Unlock your academic profile
+                          </h3>
+                          <p className={`text-xs sm:text-sm max-w-md mx-auto leading-relaxed ${isObsidian ? "text-slate-400" : "text-slate-600"}`}>
+                            Sign in with your USN to see your rank, detailed marks, and compare with peers.
+                          </p>
+                        </div>
+                        <div className="pt-1.5">
                           <button
                             type="button"
-                            className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs inline-flex items-center gap-1.5"
+                            className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm inline-flex items-center gap-2 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                           >
                             <IconKey className="w-3.5 h-3.5" />
-                            <span>Sign In / Claim Your USN</span>
+                            <span>Sign In with USN</span>
                           </button>
                         </div>
                       </div>
@@ -1098,30 +1102,32 @@ export default function Dashboard() {
                         sfx.playMechanicalClick();
                         setIsAuthModalOpen(true);
                       }}
-                      className={`p-5 sm:p-6 rounded-2xl border border-dashed cursor-pointer text-center space-y-2.5 transition-all hover:border-solid active:scale-[0.99] ${
+                      className={`p-6 sm:p-7 rounded-2xl sm:rounded-3xl border border-dashed cursor-pointer text-center space-y-3 transition-all hover:border-solid active:scale-[0.99] group ${
                         isObsidian
                           ? "bg-white/[0.02] border-white/15 hover:bg-white/[0.04] text-white"
-                          : "bg-slate-50/60 border-slate-300 hover:bg-slate-100/60 text-slate-800"
+                          : "bg-slate-50/70 border-slate-300 hover:bg-slate-100/70 text-slate-800"
                       }`}
                     >
-                      <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border ${
-                        isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-white border-slate-200 text-slate-700"
+                      <div className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center border transition-transform group-hover:scale-105 ${
+                        isObsidian ? "bg-white/5 border-white/10 text-cyan-400" : "bg-white border-slate-200 text-blue-600 shadow-xs"
                       }`}>
                         <IconLock className="w-4 h-4" />
                       </div>
-                      <h3 className="font-bold text-sm sm:text-base tracking-tight">
-                        Unlock Full Batch Results &amp; Rankings
-                      </h3>
-                      <p className="text-xs opacity-65 max-w-md mx-auto leading-relaxed">
-                        Public preview displays top departmental ranks. Sign in with your USN to view the full directory, detailed marksheet, and subject-level percentiles.
-                      </p>
-                      <div className="pt-1">
+                      <div className="space-y-1">
+                        <h3 className="font-bold text-base sm:text-lg tracking-tight">
+                          Unlock your academic profile
+                        </h3>
+                        <p className={`text-xs sm:text-sm max-w-md mx-auto leading-relaxed ${isObsidian ? "text-slate-400" : "text-slate-600"}`}>
+                          Sign in with your USN to see your rank, detailed marks, and compare with peers.
+                        </p>
+                      </div>
+                      <div className="pt-1.5">
                         <button
                           type="button"
-                          className="px-4 py-2 rounded-xl text-xs font-medium bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 shadow-xs inline-flex items-center gap-1.5"
+                          className="px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm inline-flex items-center gap-2 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                         >
                           <IconKey className="w-3.5 h-3.5" />
-                          <span>Sign In / Claim Your USN</span>
+                          <span>Sign In with USN</span>
                         </button>
                       </div>
                     </div>

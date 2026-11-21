@@ -207,7 +207,7 @@ export default function Navbar({
                 onToggleTheme();
               }}
               title="Toggle Light / Dark theme"
-              className={`p-1.5 sm:px-2.5 sm:py-2 rounded-xl border transition-all flex items-center gap-1 shrink-0 ${
+              className={`p-1.5 sm:px-2.5 sm:py-2 rounded-xl border transition-all flex items-center gap-1 shrink-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${
                 isObsidian
                   ? "bg-slate-900 border-slate-800 text-slate-200 hover:text-white"
                   : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
@@ -229,7 +229,7 @@ export default function Navbar({
                   onOpenAuth?.();
                 }}
                 title={`Signed in as ${studentSession.name} (${studentSession.usn})`}
-                className={`flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold transition-all shrink-0 ${
+                className={`flex items-center gap-1 px-2 py-1.5 sm:px-2.5 sm:py-1.5 rounded-xl border text-[11px] sm:text-xs font-semibold transition-all shrink-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${
                   isObsidian
                     ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300 hover:bg-emerald-900/40"
                     : "bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100"
@@ -244,7 +244,7 @@ export default function Navbar({
                   onSignOut?.();
                 }}
                 title="Sign Out"
-                className={`p-1.5 rounded-xl border text-[10px] sm:text-[11px] transition-all shrink-0 ${
+                className={`p-1.5 rounded-xl border text-[10px] sm:text-[11px] transition-all shrink-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-rose-500 ${
                   isObsidian
                     ? "bg-slate-900 border-slate-800 text-zinc-400 hover:text-rose-400 hover:border-rose-500/30"
                     : "bg-slate-100 border-slate-200 text-zinc-600 hover:text-rose-600 hover:border-rose-300"
@@ -259,7 +259,7 @@ export default function Navbar({
                 sfx.playMechanicalClick();
                 onOpenAuth?.();
               }}
-              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-medium text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs active:scale-[0.98] transition-all shrink-0"
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-semibold text-xs rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs active:scale-[0.98] transition-all shrink-0 cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-emerald-400"
             >
               <IconKey className="w-3.5 h-3.5" />
               <span className="text-[11px] sm:text-xs">Login</span>
@@ -270,7 +270,7 @@ export default function Navbar({
           <Link
             href="/admin"
             onClick={() => sfx.playMechanicalClick()}
-            className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-medium text-xs rounded-xl transition-all shadow-xs shrink-0 ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 font-medium text-xs rounded-xl transition-all shadow-xs shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${
               isObsidian
                 ? "bg-slate-900 hover:bg-slate-800 text-slate-100 border border-white/10"
                 : "bg-slate-900 hover:bg-slate-800 text-white"

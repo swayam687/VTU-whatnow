@@ -18,8 +18,11 @@ export default function PrivacyPage() {
   useEffect(() => {
     try {
       const savedTheme = localStorage.getItem("vtu_theme");
-      if (savedTheme === "light") {
-        setIsObsidian(false);
+      const obsidian = savedTheme !== "paper";
+      setIsObsidian(obsidian);
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.toggle("dark", obsidian);
+        document.body.className = obsidian ? "theme-obsidian dark" : "theme-paper";
       }
       const rawSession = sessionStorage.getItem("vtu_student_session");
       if (rawSession) {
@@ -35,7 +38,11 @@ export default function PrivacyPage() {
     const next = !isObsidian;
     setIsObsidian(next);
     try {
-      localStorage.setItem("vtu_theme", next ? "obsidian" : "light");
+      localStorage.setItem("vtu_theme", next ? "obsidian" : "paper");
+      if (typeof document !== "undefined") {
+        document.documentElement.classList.toggle("dark", next);
+        document.body.className = next ? "theme-obsidian dark" : "theme-paper";
+      }
     } catch {
       // ignore
     }
@@ -134,7 +141,7 @@ export default function PrivacyPage() {
                   sfx.playMechanicalClick();
                   setIsAuthModalOpen(true);
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-all shadow-xs shrink-0 inline-flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-all shadow-sm shrink-0 inline-flex items-center gap-1.5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 active:scale-[0.98]"
               >
                 <IconKey className="w-3.5 h-3.5" />
                 <span>Log In With USN to Configure</span>

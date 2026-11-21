@@ -702,9 +702,9 @@ def create_rescrape_request(
     db.refresh(entry)
 
     resp_msg = (
-        f"Data deletion request submitted for USN {clean_usn}. The administrator will review and hide your profile."
+        "Deletion request sent to admin. Your data will be deleted in 24 hours."
         if req.request_type == "DATA_DELETION"
-        else f"Update request queued for USN {clean_usn}! Admin has been notified to re-scrape your semester results."
+        else f"Update request sent! Admin has been notified to refresh results for USN {clean_usn}."
     )
 
     return {

@@ -29,7 +29,24 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                var savedTheme = localStorage.getItem('vtu_theme');
+                var isObsidian = savedTheme !== 'paper';
+                if (isObsidian) {
+                  document.documentElement.classList.add('dark');
+                } else {
+                  document.documentElement.classList.remove('dark');
+                }
+              } catch(e) {}
+            `,
+          }}
+        />
+      </head>
       <body className="min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
         <main className="flex-1 w-full flex flex-col">
           {children}
