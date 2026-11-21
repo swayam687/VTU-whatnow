@@ -437,11 +437,10 @@ export default function PixelAvatarModal({
       }}
     >
       <div
-        className={`relative max-w-lg w-full rounded-2xl sm:rounded-3xl border shadow-2xl p-4 sm:p-6 space-y-4 my-auto transition-all ${
-          isObsidian
-            ? "bg-[#0c0e12] border-slate-800 text-white"
-            : "bg-white border-slate-200 text-slate-900"
-        }`}
+        className={`relative max-w-lg w-full rounded-2xl sm:rounded-3xl border shadow-2xl p-4 sm:p-6 space-y-4 my-auto transition-all ${isObsidian
+          ? "bg-[#0c0e12] border-slate-800 text-white"
+          : "bg-white border-slate-200 text-slate-900"
+          }`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -590,11 +589,10 @@ export default function PixelAvatarModal({
                 sfx.playMechanicalClick();
                 setActiveTool("pencil");
               }}
-              className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition-all ${
-                activeTool === "pencil"
-                  ? "border-amber-500 bg-amber-500/20 text-amber-300 shadow-xs"
-                  : "border-inherit opacity-70 hover:opacity-100 hover:bg-white/5"
-              }`}
+              className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition-all ${activeTool === "pencil"
+                ? "border-amber-500 bg-amber-500/20 text-amber-300 shadow-xs"
+                : "border-inherit opacity-70 hover:opacity-100 hover:bg-white/5"
+                }`}
             >
               <IconPencil className="w-3.5 h-3.5" />
               <span>Draw</span>
@@ -605,11 +603,10 @@ export default function PixelAvatarModal({
                 sfx.playMechanicalClick();
                 setActiveTool("eraser");
               }}
-              className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition-all ${
-                activeTool === "eraser"
-                  ? "border-rose-500 bg-rose-500/20 text-rose-300 shadow-xs"
-                  : "border-inherit opacity-70 hover:opacity-100 hover:bg-white/5"
-              }`}
+              className={`px-2.5 py-1 text-xs rounded-lg border font-semibold flex items-center gap-1.5 transition-all ${activeTool === "eraser"
+                ? "border-rose-500 bg-rose-500/20 text-rose-300 shadow-xs"
+                : "border-inherit opacity-70 hover:opacity-100 hover:bg-white/5"
+                }`}
             >
               <IconEraser className="w-3.5 h-3.5" />
               <span>Eraser</span>

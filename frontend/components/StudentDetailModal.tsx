@@ -389,18 +389,18 @@ export default function StudentDetailModal({
 
                   {/* Row 2: USN badge, branch, and action buttons */}
                   <div className="flex items-center gap-2 flex-wrap mt-1">
-                    <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 font-bold font-mono text-xs text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10 tracking-wider">
+                    <span className="shrink-0 px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 font-bold font-mono text-xs text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10 tracking-wider">
                       {usn}
                     </span>
-                    <span className="text-xs font-mono opacity-40">•</span>
-                    <span className="text-xs font-semibold opacity-75">{student?.branch || "ENG"}</span>
+                    <span className="shrink-0 text-xs font-mono opacity-40">•</span>
+                    <span className="shrink-0 text-xs font-semibold opacity-75">{student?.branch || "ENG"}</span>
 
                     {isMyVerifiedProfile && (
-                      <div className="flex items-center gap-1.5 ml-auto sm:ml-2">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <button
                           type="button"
                           onClick={onOpenPixelModal}
-                          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                          className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
                           title="Edit your 10x10 custom pixel art avatar"
                         >
                           <IconPencil className="w-2.5 h-2.5" />
@@ -412,7 +412,7 @@ export default function StudentDetailModal({
                             sfx.playMechanicalClick();
                             setIsPrivacyModalOpen(true);
                           }}
-                          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 hover:bg-cyan-500/20 transition-colors cursor-pointer"
+                          className="shrink-0 inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 hover:bg-cyan-500/20 transition-colors cursor-pointer"
                           title="Manage your privacy and data visibility"
                         >
                           <IconShield className="w-2.5 h-2.5" />
