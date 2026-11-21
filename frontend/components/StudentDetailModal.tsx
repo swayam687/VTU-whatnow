@@ -314,9 +314,48 @@ export default function StudentDetailModal({
     }
   };
 
-  // FLIP Shared-Element Expansion on mount - slower, smoother window-like expansion
+  // Stable refs for navigation callbacks and flags so effects don't re-run
+  const onNavigatePrevRef = useRef(onNavigatePrev);
+  onNavigatePrevRef.current = onNavigatePrev;
+  const onNavigateNextRef = useRef(onNavigateNext);
+  onNavigateNextRef.current = onNavigateNext;
+  const hasPrevRef = useRef(hasPrev);
+  hasPrevRef.current = hasPrev;
+  const hasNextRef = useRef(hasNext);
+  hasNextRef.current = hasNext;
+
+  // Track if FLIP mount animation has already played to prevent glitchy re-animation on data load
+  const hasAnimatedMountRef = useRef(false);
+
+  // Keyboard Escape & Arrow navigation handlers
   useEffect(() => {
-    if (!isOpen || !modalRef.current) return;
+    if (!isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        handleModalClose();
+      } else if (e.key === "ArrowLeft" && onNavigatePrevRef.current && hasPrevRef.current) {
+        sfx.playMechanicalClick();
+        onNavigatePrevRef.current();
+      } else if (e.key === "ArrowRight" && onNavigateNextRef.current && hasNextRef.current) {
+        sfx.playMechanicalClick();
+        onNavigateNextRef.current();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen]);
+
+  // FLIP Shared-Element Expansion on mount - runs ONLY ONCE when modal opens
+  useEffect(() => {
+    if (!isOpen || !modalRef.current) {
+      hasAnimatedMountRef.current = false;
+      return;
+    }
+
+    // Guard: Prevent re-animating/flashing when state or student props update!
+    if (hasAnimatedMountRef.current) return;
+    hasAnimatedMountRef.current = true;
 
     // Lock background page scroll
     const origOverflow = document.body.style.overflow;
@@ -372,25 +411,10 @@ export default function StudentDetailModal({
       });
     }
 
-    // Keyboard Escape & Arrow navigation handlers
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        handleModalClose();
-      } else if (e.key === "ArrowLeft" && onNavigatePrev && hasPrev) {
-        sfx.playMechanicalClick();
-        onNavigatePrev();
-      } else if (e.key === "ArrowRight" && onNavigateNext && hasNext) {
-        sfx.playMechanicalClick();
-        onNavigateNext();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-
     return () => {
       document.body.style.overflow = origOverflow;
-      window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, originRect, onNavigatePrev, onNavigateNext, hasPrev, hasNext]);
+  }, [isOpen]);
 
   if (!isOpen || !usn) return null;
 
