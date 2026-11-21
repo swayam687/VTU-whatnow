@@ -12,6 +12,8 @@ import {
   IconLinkedIn,
   IconRotateCcw,
   IconShield,
+  IconArrowLeft,
+  IconArrowRight,
 } from "./Icons";
 import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";
@@ -161,6 +163,12 @@ interface StudentDetailModalProps {
   onOpenAuth: () => void;
   onOpenPixelModal: () => void;
   onRetry: (usn: string) => void;
+  onNavigatePrev?: () => void;
+  onNavigateNext?: () => void;
+  hasPrev?: boolean;
+  hasNext?: boolean;
+  currentIndex?: number;
+  totalStudents?: number;
 }
 
 export default function StudentDetailModal({
@@ -181,6 +189,12 @@ export default function StudentDetailModal({
   onOpenAuth,
   onOpenPixelModal,
   onRetry,
+  onNavigatePrev,
+  onNavigateNext,
+  hasPrev = false,
+  hasNext = false,
+  currentIndex,
+  totalStudents,
 }: StudentDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -188,7 +202,15 @@ export default function StudentDetailModal({
   const [isRescrapeModalOpen, setIsRescrapeModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
-  // Character-by-character sequential scramble hook over 2.0s
+  // History popstate and hardware back button tracking
+  const isClosingViaHistoryRef = useRef(false);
+  const isHistoryPushedRef = useRef(false);
+
+  // Touch Swipe-Down to dismiss gesture
+  const touchStartY = useRef<number | null>(null);
+  const touchDeltaY = useRef<number>(0);
+
+  // Character-by-character sequential scramble hook over 1.3s
   const { displayChars, isScrambleComplete } = useSequentialUSNScramble(usn, isOpen);
 
   // Smooth closing transition handler (collapses back into origin element smoothly)
@@ -196,6 +218,15 @@ export default function StudentDetailModal({
     if (isClosing) return;
     sfx.playMechanicalClick();
     setIsClosing(true);
+
+    // If closed via UI action (not popstate), pop the pushed history entry
+    if (isHistoryPushedRef.current && !isClosingViaHistoryRef.current) {
+      if (typeof window !== "undefined" && window.history.state?.modal === "student-detail") {
+        isHistoryPushedRef.current = false;
+        window.history.back();
+      }
+    }
+    isClosingViaHistoryRef.current = false;
 
     if (originRect && modalRef.current && backdropRef.current) {
       const modalEl = modalRef.current;
@@ -221,6 +252,66 @@ export default function StudentDetailModal({
       setIsClosing(false);
       onClose();
     }, 320);
+  };
+
+  // Hardware / Android / Swipe Back Button support via History API
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Push state once when modal opens
+    window.history.pushState({ modal: "student-detail" }, "");
+    isHistoryPushedRef.current = true;
+    isClosingViaHistoryRef.current = false;
+
+    const handlePopState = () => {
+      isClosingViaHistoryRef.current = true;
+      isHistoryPushedRef.current = false;
+      handleModalClose();
+    };
+
+    window.addEventListener("popstate", handlePopState);
+
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+      if (isHistoryPushedRef.current && typeof window !== "undefined" && window.history.state?.modal === "student-detail") {
+        isHistoryPushedRef.current = false;
+        window.history.back();
+      }
+    };
+  }, [isOpen]);
+
+  // Touch handlers for pull-down to dismiss gesture
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartY.current = e.touches[0].clientY;
+    touchDeltaY.current = 0;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (touchStartY.current === null || !modalRef.current) return;
+    const currentY = e.touches[0].clientY;
+    const delta = currentY - touchStartY.current;
+    if (delta > 0) {
+      touchDeltaY.current = delta;
+      // Visual feedback: rubberband card downward
+      modalRef.current.style.transform = `translate3d(0, ${Math.min(delta * 0.6, 110)}px, 0)`;
+      modalRef.current.style.transition = "none";
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartY.current === null || !modalRef.current) return;
+    const delta = touchDeltaY.current;
+    touchStartY.current = null;
+    touchDeltaY.current = 0;
+
+    if (delta > 65) {
+      // Swiped down sufficiently -> trigger smooth close
+      handleModalClose();
+    } else {
+      // Snap back smoothly
+      modalRef.current.style.transition = "transform 250ms cubic-bezier(0.16, 1, 0.3, 1)";
+      modalRef.current.style.transform = "translate3d(0, 0, 0)";
+    }
   };
 
   // FLIP Shared-Element Expansion on mount - slower, smoother window-like expansion
@@ -281,10 +372,16 @@ export default function StudentDetailModal({
       });
     }
 
-    // Keyboard Escape handler
+    // Keyboard Escape & Arrow navigation handlers
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         handleModalClose();
+      } else if (e.key === "ArrowLeft" && onNavigatePrev && hasPrev) {
+        sfx.playMechanicalClick();
+        onNavigatePrev();
+      } else if (e.key === "ArrowRight" && onNavigateNext && hasNext) {
+        sfx.playMechanicalClick();
+        onNavigateNext();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
@@ -293,7 +390,7 @@ export default function StudentDetailModal({
       document.body.style.overflow = origOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen, originRect]);
+  }, [isOpen, originRect, onNavigatePrev, onNavigateNext, hasPrev, hasNext]);
 
   if (!isOpen || !usn) return null;
 
@@ -317,13 +414,36 @@ export default function StudentDetailModal({
             : "bg-white border-slate-200 text-slate-900"
         }`}
       >
+        {/* Mobile Swipe-Down Handle & Touch Drag Bar */}
+        <div
+          className="sm:hidden pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          <div className="w-10 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700/80 transition-colors" />
+        </div>
+
         {/* Modal Header */}
         <div
-          className={`px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between ${
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          className={`px-3 sm:px-6 py-2.5 sm:py-4 border-b flex items-center justify-between gap-2 select-none ${
             isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
           }`}
         >
-          <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
+            {/* Mobile Left Back Arrow (Natural thumb reach) */}
+            <button
+              type="button"
+              onClick={handleModalClose}
+              className="sm:hidden p-2 -ml-1 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white rounded-xl active:bg-slate-200 dark:active:bg-slate-800 transition-colors shrink-0 flex items-center justify-center cursor-pointer"
+              title="Back to search results"
+              aria-label="Back to search results"
+            >
+              <IconArrowLeft className="w-5 h-5" />
+            </button>
             {/* Identicon - Clean avatar box without any overlapping fingerprint text */}
             <div
               className={`transition-all duration-300 ease-out flex-shrink-0 ${
@@ -794,6 +914,79 @@ export default function StudentDetailModal({
               </div>
             </div>
           )}
+        </div>
+
+        {/* Modal Bottom Thumb-Friendly Navigation Bar */}
+        <div
+          className={`px-3 sm:px-6 py-2.5 sm:py-3 border-t flex items-center justify-between gap-2 shrink-0 ${
+            isObsidian ? "border-slate-800/90 bg-[#08090b]/95" : "border-slate-200/90 bg-white/95"
+          } backdrop-blur-md`}
+        >
+          {/* Previous Student Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigatePrev && hasPrev) {
+                sfx.playMechanicalClick();
+                onNavigatePrev();
+              }
+            }}
+            disabled={!hasPrev || !onNavigatePrev}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              hasPrev && onNavigatePrev
+                ? isObsidian
+                  ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
+                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
+                : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
+            }`}
+            title="View previous student (or press Left Arrow)"
+          >
+            <IconArrowLeft className="w-3.5 h-3.5" />
+            <span className="hidden xs:inline text-[11px]">Prev</span>
+          </button>
+
+          {/* Central Thumb-Friendly "Back to Results" pill */}
+          <button
+            type="button"
+            onClick={handleModalClose}
+            className={`flex-1 max-w-[220px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer ${
+              isObsidian
+                ? "bg-white/10 hover:bg-white/15 text-white border border-white/15 hover:border-white/25 shadow-black/40"
+                : "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/10"
+            }`}
+            title="Close marksheet and return to list"
+          >
+            <IconArrowLeft className="w-3.5 h-3.5 sm:hidden" />
+            <span>Back to Results</span>
+            {currentIndex && totalStudents ? (
+              <span className="text-[10px] font-mono opacity-60 hidden sm:inline ml-1">
+                ({currentIndex}/{totalStudents})
+              </span>
+            ) : null}
+          </button>
+
+          {/* Next Student Button */}
+          <button
+            type="button"
+            onClick={() => {
+              if (onNavigateNext && hasNext) {
+                sfx.playMechanicalClick();
+                onNavigateNext();
+              }
+            }}
+            disabled={!hasNext || !onNavigateNext}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
+              hasNext && onNavigateNext
+                ? isObsidian
+                  ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
+                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
+                : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
+            }`}
+            title="View next student (or press Right Arrow)"
+          >
+            <span className="hidden xs:inline text-[11px]">Next</span>
+            <IconArrowRight className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 

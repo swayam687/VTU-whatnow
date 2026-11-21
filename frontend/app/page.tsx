@@ -1226,26 +1226,46 @@ export default function Dashboard() {
         />
       )}
 
-      {/* Student Marksheet Detail Modal with Smooth Shared Element Transition */}
-      <StudentDetailModal
-        isOpen={Boolean(selectedUsn)}
-        usn={selectedUsn}
-        student={detailStudent}
-        isLoading={detailLoading}
-        isCached={isDetailCached}
-        cachedAge={cachedAge}
-        myUsn={myUsn}
-        studentSession={studentSession}
-        originRect={modalOriginRect}
-        compareUsns={compareUsns}
-        isObsidian={isObsidian}
-        onClose={handleCloseDetail}
-        onToggleCompare={handleToggleCompare}
-        onCompareWithMe={handleCompareWithMe}
-        onOpenAuth={() => setIsAuthModalOpen(true)}
-        onOpenPixelModal={() => setIsPixelModalOpen(true)}
-        onRetry={(u) => handleOpenDetail(u)}
-      />
+      {/* Student Marksheet Detail Modal with Smooth Shared Element Transition & Prev/Next Navigation */}
+      {(() => {
+        const currentIndex =
+          selectedUsn && students.length > 0
+            ? students.findIndex((s) => s.usn.toUpperCase() === selectedUsn.toUpperCase())
+            : -1;
+        const prevUsn = currentIndex > 0 ? students[currentIndex - 1]?.usn : null;
+        const nextUsn =
+          currentIndex >= 0 && currentIndex < students.length - 1
+            ? students[currentIndex + 1]?.usn
+            : null;
+
+        return (
+          <StudentDetailModal
+            isOpen={Boolean(selectedUsn)}
+            usn={selectedUsn}
+            student={detailStudent}
+            isLoading={detailLoading}
+            isCached={isDetailCached}
+            cachedAge={cachedAge}
+            myUsn={myUsn}
+            studentSession={studentSession}
+            originRect={modalOriginRect}
+            compareUsns={compareUsns}
+            isObsidian={isObsidian}
+            onClose={handleCloseDetail}
+            onToggleCompare={handleToggleCompare}
+            onCompareWithMe={handleCompareWithMe}
+            onOpenAuth={() => setIsAuthModalOpen(true)}
+            onOpenPixelModal={() => setIsPixelModalOpen(true)}
+            onRetry={(u) => handleOpenDetail(u)}
+            onNavigatePrev={prevUsn ? () => handleOpenDetail(prevUsn) : undefined}
+            onNavigateNext={nextUsn ? () => handleOpenDetail(nextUsn) : undefined}
+            hasPrev={Boolean(prevUsn)}
+            hasNext={Boolean(nextUsn)}
+            currentIndex={currentIndex >= 0 ? currentIndex + 1 : undefined}
+            totalStudents={students.length > 0 ? students.length : undefined}
+          />
+        );
+      })()}
 
       {/* Mobile Bottom Navigation Bar (Thumb Zone) */}
       <nav
