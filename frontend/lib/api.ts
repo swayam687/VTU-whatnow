@@ -11,7 +11,7 @@ export function getApiBase(): string {
   return DEFAULT_API_URL;
 }
 
-const API_BASE = DEFAULT_API_URL;
+const API_BASE = getApiBase();
 
 export interface Mark {
   id: number;

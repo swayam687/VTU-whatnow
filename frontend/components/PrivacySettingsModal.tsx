@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { PrivacySettings, fetchStudentPrivacy, updateStudentPrivacy } from "../lib/api";
-import { IconClose, IconShield, IconCheck, IconLock } from "./Icons";
+import { IconClose, IconShield, IconCheck } from "./Icons";
 import { sfx } from "../lib/sfx";
 
 interface PrivacySettingsModalProps {

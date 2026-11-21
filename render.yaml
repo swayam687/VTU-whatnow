@@ -19,6 +19,7 @@ services:
       # VTU Semester Result Portal URLs (index.php is the form entry)
       VTU_URL_SEM1: https://results.vtu.ac.in/D25J26Ecbcs/index.php
       VTU_URL_SEM2: https://results.vtu.ac.in/MJ26cbcs/index.php
+      VTU_URL_MAKEUP: https://results.vtu.ac.in/SME26cbcs/index.php
 
       # Delay between student scrapes in seconds (to mimic human behavior)
       DELAY_MIN: "2"

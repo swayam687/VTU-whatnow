@@ -6,7 +6,6 @@ Usage:
     python restore_db.py --file backups/vtuwhatnow_backup_XXXX.json --confirm
 """
 
-import os
 import sys
 import json
 import argparse
@@ -66,7 +65,7 @@ def restore_backup(backup_file_path: Path, dry_run: bool = True):
                 try:
                     conn.execute(text(insert_sql), row)
                     inserted_count += 1
-                except Exception as e:
+                except Exception:
                     # In case of duplicates or missing constraint
                     continue
             print(f"  ✓ '{table_name}': {inserted_count}/{len(rows)} records restored.")

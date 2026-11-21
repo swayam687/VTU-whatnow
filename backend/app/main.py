@@ -46,29 +46,23 @@ from .schemas import (
     DisputeCreateRequest,
     DisputeOut,
     DisputeReviewRequest,
-    LoginLogOut,
     CompareLogCreate,
-    CompareLogOut,
     StudentSessionVerifyResponse,
     MissingUSNReportCreate,
-    MissingUSNReportOut,
     AvatarUpdateRequest,
     RescrapeRequestCreate,
-    RescrapeRequestOut,
     RescrapeStatusResponse,
     RescrapeActionRequest,
     StudentSemesterAudit,
     SemesterAuditResponse,
     PrivacySettingsUpdate,
     PrivacySettingsOut,
-    AdminMarkItem,
     AdminMarksUpsertRequest,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
 
 from contextlib import asynccontextmanager
-import threading
 
 # -------------------------------------------------------------
 # Cryptographic Password Hashing & Session Management
@@ -1061,7 +1055,6 @@ def get_admin_login_logs(db: Session = Depends(get_db)):
     logs = db.query(LoginLog).order_by(desc(LoginLog.login_at)).limit(150).all()
     total_logins = db.query(LoginLog).count()
 
-    from sqlalchemy import distinct, func
     unique_count = db.query(distinct(LoginLog.usn)).count()
 
     frequency = (

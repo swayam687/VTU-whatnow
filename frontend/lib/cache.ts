@@ -7,7 +7,6 @@ import { Student } from "./api";
 
 const CACHE_PREFIX = "vtu_cache_student_";
 const STUDENTS_LIST_KEY = "vtu_cache_students_list";
-const MY_MARKSHEET_KEY = "vtu_cache_my_marksheet";
 
 export interface CachedItem<T> {
   data: T;

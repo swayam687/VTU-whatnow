@@ -29,7 +29,8 @@ TABLES_TO_BACKUP = [
     "login_logs",
     "usn_disputes",
     "comparison_logs",
-    "missing_usn_reports"
+    "missing_usn_reports",
+    "rescrape_requests",
 ]
 
 
@@ -96,7 +97,7 @@ def show_stats():
             try:
                 cnt = conn.execute(text(f"SELECT COUNT(*) FROM {table}")).scalar()
                 print(f"  • {table.ljust(22)} : {cnt:,} rows")
-            except Exception as e:
+            except Exception:
                 print(f"  • {table.ljust(22)} : (table not found or empty)")
 
 

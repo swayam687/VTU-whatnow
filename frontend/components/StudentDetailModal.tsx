@@ -12,7 +12,6 @@ import {
   IconLinkedIn,
   IconRotateCcw,
   IconShield,
-  IconLock,
 } from "./Icons";
 import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";

@@ -26,8 +26,6 @@ import {
   IconSearch,
   IconClose,
   IconCompare,
-  IconGitHub,
-  IconLinkedIn,
   IconInstallApp,
   IconShield,
   IconKey,
@@ -35,11 +33,9 @@ import {
   IconBolt,
   IconTrophy,
   IconArrowRight,
-  IconGraduationCap,
   IconFileText,
   IconGrid,
   IconTable,
-  IconWifiOff,
   IconPencil,
 } from "../components/Icons";
 import DenseStudentTable from "../components/DenseStudentTable";
