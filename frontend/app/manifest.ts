@@ -1,0 +1,48 @@
+import { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'VTU WhatNow',
+    short_name: 'WhatNow',
+    description: 'Fast semester results explorer, branch leaderboards and subject analytics for VTU engineering students.',
+    start_url: '/',
+    id: '/',
+    scope: '/',
+    display: 'standalone',
+    background_color: '#000000',
+    theme_color: '#000000',
+    orientation: 'portrait-primary',
+    icons: [
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/icon-192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/icon-512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/logo.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'any',
+      },
+    ],
+  };
+}

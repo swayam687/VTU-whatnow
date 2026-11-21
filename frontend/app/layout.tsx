@@ -53,6 +53,15 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `
+              if ('serviceWorker' in navigator) {
+                if (document.readyState === 'complete') {
+                  navigator.serviceWorker.register('/sw.js', { scope: '/' });
+                } else {
+                  window.addEventListener('load', function() {
+                    navigator.serviceWorker.register('/sw.js', { scope: '/' });
+                  });
+                }
+              }
               try {
                 var savedTheme = localStorage.getItem('vtu_theme');
                 var isObsidian = savedTheme !== 'paper';
