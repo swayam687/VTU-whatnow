@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
 import SplashScreen from "../components/SplashScreen";
+import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -19,8 +20,16 @@ export const metadata: Metadata = {
     title: "VTU WhatNow",
   },
   icons: {
-    icon: "/logo.png",
-    apple: "/logo.png",
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/logo.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+      { url: "/logo.png" },
+    ],
   },
 };
 
@@ -32,9 +41,15 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/logo.png" />
+        <link rel="manifest" href="/manifest.json" />
+        <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+        <link rel="icon" type="image/png" sizes="512x512" href="/icon-512.png" />
+        <link rel="apple-touch-icon" href="/icon-192.png" />
+        <link rel="apple-touch-icon" sizes="512x512" href="/icon-512.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="theme-color" content="#000000" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -52,6 +67,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
+        <ServiceWorkerRegister />
         <SplashScreen />
         <main className="flex-1 w-full flex flex-col">
           {children}
