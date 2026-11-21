@@ -28,6 +28,7 @@ export interface Student {
   show_my_backlogs?: boolean;
   has_pending_subjects?: string | null;
   is_my_profile?: boolean;
+  is_hidden?: boolean;
   marks?: Mark[];
 }
 
@@ -131,6 +132,7 @@ export async function fetchStudents(params?: {
   search?: string;
   sort?: string;
   token?: string;
+  adminKey?: string;
 }): Promise<Student[]> {
   try {
     const query = new URLSearchParams();
@@ -139,6 +141,9 @@ export async function fetchStudents(params?: {
     if (params?.sort) query.set("sort", params.sort);
 
     const headers: Record<string, string> = {};
+    if (params?.adminKey) {
+      headers["X-Admin-Key"] = params.adminKey;
+    }
     const token = params?.token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
     if (token) {
       headers["X-Student-Token"] = token;
@@ -684,10 +689,11 @@ export interface RescrapeRequestRecord {
   usn: string;
   name: string;
   branch: string;
-  request_type: "REVALUATION" | "MISSING_SEMESTER" | "RE_EXAM" | "CORRECTION" | string;
+  request_type: "REVALUATION" | "MISSING_SEMESTER" | "RE_EXAM" | "DATA_DELETION" | string;
   target_semester: string;
   subject_codes?: string;
   custom_url?: string;
+  vtu_link?: string;
   message?: string;
   status: "pending" | "in_progress" | "resolved" | "rejected" | string;
   created_at?: string;
@@ -734,9 +740,10 @@ export async function submitRescrapeRequest(
     name?: string;
     branch?: string;
     request_type: string;
-    target_semester: string;
+    target_semester?: string;
     subject_codes?: string;
     custom_url?: string;
+    vtu_link?: string;
     message?: string;
   },
   token?: string
@@ -790,7 +797,7 @@ export async function fetchAdminRescrapeRequests(
 
 export async function actionAdminRescrapeRequest(
   requestId: number,
-  action: "resolve" | "reject" | "scrape_now",
+  action: "resolve" | "reject" | "scrape_now" | "hide_student" | "unhide_student",
   adminNotes: string | undefined,
   adminKey: string
 ): Promise<{ ok: boolean; message: string }> {
@@ -831,6 +838,24 @@ export async function recalculateCumulativeTotals(
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || "Failed to recalculate cumulative totals");
+  }
+  return res.json();
+}
+
+export async function toggleAdminStudentVisibility(
+  usn: string,
+  hidden: boolean,
+  adminKey: string
+): Promise<{ ok: boolean; usn: string; is_hidden: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/students/${encodeURIComponent(usn.trim().toUpperCase())}/visibility?hidden=${hidden}`, {
+    method: "PATCH",
+    headers: {
+      "X-Admin-Key": adminKey,
+    },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to update student visibility");
   }
   return res.json();
 }

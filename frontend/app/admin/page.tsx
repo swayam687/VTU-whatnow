@@ -37,6 +37,7 @@ import {
   actionAdminRescrapeRequest,
   fetchAdminSemesterAudit,
   recalculateCumulativeTotals,
+  toggleAdminStudentVisibility,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -239,7 +240,7 @@ export default function AdminPanel() {
 
   // Load Students
   const loadStudentRecords = () => {
-    fetchStudents({ sort: "recent" })
+    fetchStudents({ sort: "recent", adminKey: adminKey || undefined })
       .then((data) => setAllStudents(data))
       .catch(() => {});
   };
@@ -362,7 +363,7 @@ export default function AdminPanel() {
 
   const handleRescrapeAction = async (
     id: number,
-    action: "resolve" | "reject" | "scrape_now",
+    action: "resolve" | "reject" | "scrape_now" | "hide_student" | "unhide_student",
     notes?: string
   ) => {
     if (!adminKey) return;
@@ -376,12 +377,29 @@ export default function AdminPanel() {
       if (action === "scrape_now") {
         setActiveTab("scraper");
       }
+      if (action === "hide_student" || action === "unhide_student") {
+        loadStudentRecords();
+      }
       sfx.playSonar();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to execute request action";
       setActionError(msg);
     } finally {
       setActionLoadingId(null);
+    }
+  };
+
+  const handleToggleVisibility = async (usn: string, hidden: boolean) => {
+    if (!adminKey) return;
+    sfx.playClick();
+    try {
+      const res = await toggleAdminStudentVisibility(usn, hidden, adminKey);
+      setActionSuccessMsg(res.message);
+      loadStudentRecords();
+      sfx.playSonar();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to toggle visibility";
+      alert(msg);
     }
   };
 
@@ -1701,6 +1719,11 @@ export default function AdminPanel() {
                         <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.2 rounded bg-slate-100 uppercase">
                           {s.branch}
                         </span>
+                        {s.is_hidden && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100 border border-amber-300 px-1.5 py-0.2 rounded uppercase">
+                            Hidden
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                         <span className="font-mono text-xs text-slate-400">{s.usn}</span>
@@ -1732,6 +1755,19 @@ export default function AdminPanel() {
                       >
                         {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
                       </span>
+
+                      <button
+                        type="button"
+                        onClick={() => handleToggleVisibility(s.usn, !s.is_hidden)}
+                        title={s.is_hidden ? `Unhide ${s.name} (Restore to public view)` : `Hide ${s.name} (Remove from public view)`}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                          s.is_hidden
+                            ? "bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
+                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                        }`}
+                      >
+                        {s.is_hidden ? "Unhide" : "Hide Record"}
+                      </button>
 
                       <button
                         type="button"
@@ -2097,14 +2133,20 @@ export default function AdminPanel() {
 
                           {/* Request Reason & Subject Code */}
                           <div className="flex items-center gap-2 flex-wrap text-xs">
-                            <span className="font-semibold text-slate-800 bg-slate-100 px-2 py-0.5 rounded">
+                            <span className={`font-semibold px-2 py-0.5 rounded ${
+                              r.request_type === "DATA_DELETION"
+                                ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                : "text-slate-800 bg-slate-100"
+                            }`}>
                               {r.request_type === "REVALUATION"
                                 ? "Revaluation Passed"
                                 : r.request_type === "MISSING_SEMESTER"
                                 ? "Missing Semester"
                                 : r.request_type === "RE_EXAM"
                                 ? "Makeup Exam"
-                                : "Correction"}
+                                : r.request_type === "DATA_DELETION"
+                                ? "Data Deletion Request"
+                                : "Update Request"}
                             </span>
                             {r.subject_codes && (
                               <span className="font-mono text-slate-600 text-[11px]">
@@ -2113,19 +2155,24 @@ export default function AdminPanel() {
                             )}
                           </div>
 
-                          {/* Custom URL if provided */}
-                          {r.custom_url && (
-                            <div className="p-2 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
-                              <span className="text-[11px] font-mono text-slate-600 truncate max-w-[220px]">
-                                {r.custom_url}
-                              </span>
+                          {/* VTU Link / Custom URL if provided */}
+                          {(r.vtu_link || r.custom_url) && (
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
+                              <div className="min-w-0 flex-1 mr-2">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                                  VTU Result Link:
+                                </span>
+                                <span className="text-[11px] font-mono text-slate-700 truncate block">
+                                  {r.vtu_link || r.custom_url}
+                                </span>
+                              </div>
                               <a
-                                href={r.custom_url}
+                                href={r.vtu_link || r.custom_url}
                                 target="_blank"
                                 rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 shrink-0"
+                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 shrink-0 px-2 py-1 bg-white border border-slate-200 rounded-lg shadow-xs"
                               >
-                                <span>Open</span>
+                                <span>Open Link</span>
                                 <IconExternalLink className="w-3 h-3" />
                               </a>
                             </div>
@@ -2155,34 +2202,60 @@ export default function AdminPanel() {
                           {/* Action Buttons */}
                           {r.status === "pending" || r.status === "in_progress" ? (
                             <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
-                              <button
-                                type="button"
-                                disabled={actionLoadingId === r.id}
-                                onClick={() => handleRescrapeAction(r.id, "scrape_now")}
-                                className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
-                              >
-                                <IconBolt className="w-3.5 h-3.5" />
-                                <span>{actionLoadingId === r.id ? "Launching..." : "Scrape Now"}</span>
-                              </button>
+                              {r.request_type === "DATA_DELETION" ? (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleRescrapeAction(r.id, "hide_student")}
+                                    className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-rose-600 hover:bg-rose-700 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                                  >
+                                    <IconShield className="w-3.5 h-3.5" />
+                                    <span>{actionLoadingId === r.id ? "Hiding..." : "Hide Record"}</span>
+                                  </button>
 
-                              <button
-                                type="button"
-                                disabled={actionLoadingId === r.id}
-                                onClick={() => handleRescrapeAction(r.id, "resolve")}
-                                className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
-                              >
-                                ✓ Done
-                              </button>
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleRescrapeAction(r.id, "reject")}
+                                    className="py-2 px-3 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                                    title="Dismiss / Reject request"
+                                  >
+                                    ✕ Dismiss
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleRescrapeAction(r.id, "scrape_now")}
+                                    className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                                  >
+                                    <IconBolt className="w-3.5 h-3.5" />
+                                    <span>{actionLoadingId === r.id ? "Launching..." : "Scrape Now"}</span>
+                                  </button>
 
-                              <button
-                                type="button"
-                                disabled={actionLoadingId === r.id}
-                                onClick={() => handleRescrapeAction(r.id, "reject")}
-                                className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
-                                title="Dismiss / Reject request"
-                              >
-                                ✕
-                              </button>
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleRescrapeAction(r.id, "resolve")}
+                                    className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
+                                  >
+                                    ✓ Done
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    disabled={actionLoadingId === r.id}
+                                    onClick={() => handleRescrapeAction(r.id, "reject")}
+                                    className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                                    title="Dismiss / Reject request"
+                                  >
+                                    ✕
+                                  </button>
+                                </>
+                              )}
                             </div>
                           ) : (
                             <div className="text-[11px] text-slate-500 font-medium pt-1 border-t border-slate-100 flex items-center justify-between">

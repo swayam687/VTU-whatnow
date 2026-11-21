@@ -33,6 +33,7 @@ class StudentBase(BaseModel):
     show_my_backlogs: bool = True
     has_pending_subjects: Optional[str] = None
     is_my_profile: bool = False
+    is_hidden: bool = False
 
 class PrivacySettingsUpdate(BaseModel):
     show_my_backlogs: Optional[bool] = None
@@ -243,10 +244,11 @@ class RescrapeRequestCreate(BaseModel):
     usn: str
     name: Optional[str] = ""
     branch: Optional[str] = ""
-    request_type: str = "REVALUATION"  # "REVALUATION", "MISSING_SEMESTER", "RE_EXAM", "CORRECTION"
-    target_semester: str = "1"  # "1", "2", "all"
+    request_type: str = "REVALUATION"  # "REVALUATION", "MISSING_SEMESTER", "RE_EXAM", "DATA_DELETION"
+    target_semester: Optional[str] = "1"  # "1", "2", "all"
     subject_codes: Optional[str] = ""
     custom_url: Optional[str] = ""
+    vtu_link: Optional[str] = None
     message: Optional[str] = ""
 
 
@@ -259,6 +261,7 @@ class RescrapeRequestOut(BaseModel):
     target_semester: str
     subject_codes: Optional[str] = ""
     custom_url: Optional[str] = ""
+    vtu_link: Optional[str] = ""
     message: str
     status: str
     created_at: Optional[str] = None
@@ -277,7 +280,7 @@ class RescrapeStatusResponse(BaseModel):
 
 
 class RescrapeActionRequest(BaseModel):
-    action: str  # "resolve", "reject", "scrape_now"
+    action: str  # "resolve", "reject", "scrape_now", "hide_student", "unhide_student"
     admin_notes: Optional[str] = ""
 
 

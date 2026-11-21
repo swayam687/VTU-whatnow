@@ -322,34 +322,41 @@ export default function StudentDetailModal({
           ) : (
             <>
               {/* Summary Metric Tiles */}
-              <div className="grid grid-cols-3 gap-2 text-center">
+              {/* Key Metrics Grid - Ultra-compact on mobile, spacious on desktop */}
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 text-center">
                 <div
-                  className={`p-2.5 sm:p-3 rounded-xl border ${
+                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
                     isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
                   }`}
                 >
-                  <p className="text-[10px] uppercase font-semibold opacity-50">Score</p>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
+                  <p className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-60 tracking-tight sm:tracking-normal truncate">
+                    Score
+                  </p>
+                  <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                     {student.total_marks}
-                    <span className="text-[10px] font-normal opacity-50 ml-0.5">
+                    <span className="text-[9px] sm:text-[10px] font-normal opacity-50 ml-0.5">
                       /{student.max_marks || 100}
                     </span>
                   </p>
                 </div>
+
                 <div
-                  className={`p-2.5 sm:p-3 rounded-xl border ${
+                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
                     isObsidian
                       ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
                       : "bg-blue-50/60 border-blue-100 text-blue-700"
                   }`}
                 >
-                  <p className="text-[10px] uppercase font-semibold opacity-80">Percentage</p>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
+                  <p className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate">
+                    Percentage
+                  </p>
+                  <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                     {student.percentage.toFixed(1)}%
                   </p>
                 </div>
+
                 <div
-                  className={`p-2.5 sm:p-3 rounded-xl border ${
+                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
                     (student.show_my_backlogs || isMyVerifiedProfile) && student.total_backlogs > 0
                       ? isObsidian
                         ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
@@ -359,8 +366,14 @@ export default function StudentDetailModal({
                       : "bg-emerald-50 border-emerald-200 text-emerald-700"
                   }`}
                 >
-                  <p className="text-[10px] uppercase font-semibold opacity-80">Re-attempts / Pending</p>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5">
+                  <p
+                    className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate"
+                    title="Re-attempts / Pending"
+                  >
+                    <span className="sm:hidden">Re-attempts</span>
+                    <span className="hidden sm:inline">Re-attempts / Pending</span>
+                  </p>
+                  <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                     {(student.show_my_backlogs || isMyVerifiedProfile) && student.total_backlogs > 0
                       ? `${student.total_backlogs} Pending`
                       : "All Clear"}

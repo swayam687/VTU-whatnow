@@ -31,6 +31,7 @@ class Student(Base):
     show_my_marks = Column(Boolean, default=True)
     show_my_backlogs = Column(Boolean, default=True)  # default on
     allow_comparison = Column(Boolean, default=True)
+    is_hidden = Column(Boolean, default=False)  # Soft hide for data deletion requests / admin control
 
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")
 
@@ -142,6 +143,7 @@ class RescrapeRequest(Base):
     target_semester = Column(String, default="1")  # "1", "2", "all"
     subject_codes = Column(String, nullable=True, default="")  # e.g. "21MAT11, 21PHY12"
     custom_url = Column(String, nullable=True, default="")  # Student provided VTU results / reval link
+    vtu_link = Column(String, nullable=True, default="")  # Specific reval/makeup results link
     message = Column(String, default="")
     status = Column(String, default="pending")  # "pending", "in_progress", "resolved", "rejected"
     created_at = Column(DateTime, default=datetime.utcnow)

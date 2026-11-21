@@ -228,17 +228,15 @@ export default function StudentAuthModal({
       }}
     >
       <div
-        className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden transition-all duration-200 ${
-          isObsidian
+        className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden transition-all duration-200 ${isObsidian
             ? "bg-[#0f1115] border-white/10 text-white"
             : "bg-white border-zinc-200 text-zinc-900"
-        }`}
+          }`}
       >
         {/* Modal Header */}
         <div
-          className={`flex items-center justify-between px-5 py-4 border-b ${
-            isObsidian ? "border-white/10 bg-white/[0.02]" : "border-zinc-100 bg-zinc-50/50"
-          }`}
+          className={`flex items-center justify-between px-5 py-4 border-b ${isObsidian ? "border-white/10 bg-white/[0.02]" : "border-zinc-100 bg-zinc-50/50"
+            }`}
         >
           <div className="flex items-center space-x-2.5">
             <span className="text-xl">
@@ -257,9 +255,8 @@ export default function StudentAuthModal({
           </div>
           <button
             onClick={handleClose}
-            className={`p-2 rounded-xl transition-colors ${
-              isObsidian ? "hover:bg-white/10 text-zinc-400" : "hover:bg-zinc-100 text-zinc-500"
-            }`}
+            className={`p-2 rounded-xl transition-colors ${isObsidian ? "hover:bg-white/10 text-zinc-400" : "hover:bg-zinc-100 text-zinc-500"
+              }`}
           >
             <IconClose className="w-5 h-5" />
           </button>
@@ -314,11 +311,10 @@ export default function StudentAuthModal({
                     onBlur={() => handleCheckUsn(usn)}
                     placeholder="e.g. 1DB22CS001"
                     maxLength={10}
-                    className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
-                      isObsidian
+                    className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${isObsidian
                         ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
                         : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
-                    }`}
+                      }`}
                     required
                   />
                   {checkingUsn && (
@@ -448,11 +444,10 @@ export default function StudentAuthModal({
                           : "Create a password (min 4 chars)"
                       }
                       minLength={4}
-                      className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${
-                        isObsidian
+                      className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${isObsidian
                           ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
                           : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
-                      }`}
+                        }`}
                       required
                     />
                   </div>
@@ -490,8 +485,8 @@ export default function StudentAuthModal({
                     {loading
                       ? "Authenticating..."
                       : authStatus?.is_claimed
-                      ? "Unlock Results & Rankings"
-                      : "Claim USN & Create Password"}
+                        ? "Unlock Results & Rankings"
+                        : "Claim USN & Create Password"}
                   </button>
 
                   <div className="pt-2 text-center">
@@ -513,9 +508,8 @@ export default function StudentAuthModal({
           ) : (
             /* Dispute / Ownership Form */
             <form onSubmit={handleDisputeSubmit} className="space-y-4">
-              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
-                isObsidian ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
-              }`}>
+              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${isObsidian ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
+                }`}>
                 📸 <strong>Selfie Verification:</strong> To ensure privacy and prevent unauthorized account takeover, take or upload a selfie. The admin will verify your identity against the college records and approve your ownership.
               </div>
 
@@ -530,11 +524,10 @@ export default function StudentAuthModal({
                   onChange={(e) => setUsn(e.target.value.toUpperCase())}
                   placeholder="e.g. 1DB22CS001"
                   maxLength={10}
-                  className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
-                    isObsidian
+                  className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${isObsidian
                       ? "bg-white/5 border-white/10 text-white focus:border-emerald-500"
                       : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500"
-                  }`}
+                    }`}
                   required
                 />
               </div>
@@ -550,11 +543,10 @@ export default function StudentAuthModal({
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="Create new password (min 4 chars)"
                   minLength={4}
-                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${
-                    isObsidian
+                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${isObsidian
                       ? "bg-white/5 border-white/10 text-white focus:border-emerald-500"
                       : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500"
-                  }`}
+                    }`}
                   required
                 />
               </div>
@@ -577,11 +569,10 @@ export default function StudentAuthModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className={`flex-1 py-2.5 px-3.5 rounded-xl border text-xs font-medium flex items-center justify-center space-x-2 transition-all ${
-                      isObsidian
+                    className={`flex-1 py-2.5 px-3.5 rounded-xl border text-xs font-medium flex items-center justify-center space-x-2 transition-all ${isObsidian
                         ? "bg-white/5 border-white/10 hover:bg-white/10 text-white"
                         : "bg-zinc-100 border-zinc-300 hover:bg-zinc-200 text-zinc-800"
-                    }`}
+                      }`}
                   >
                     <span>📷</span>
                     <span>{selfiePreview ? "Change Photo" : "Take / Choose Selfie"}</span>

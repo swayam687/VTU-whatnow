@@ -36,6 +36,7 @@ export default function RescrapeRequestModal({
 
   const [requestType, setRequestType] = useState<string>("REVALUATION");
   const [targetSemester, setTargetSemester] = useState<string>("1");
+  const [vtuLink, setVtuLink] = useState<string>("");
 
   const [checkingStatus, setCheckingStatus] = useState<boolean>(true);
   const [pendingRequest, setPendingRequest] = useState<RescrapeRequestRecord | null>(null);
@@ -97,7 +98,8 @@ export default function RescrapeRequestModal({
           name: student?.name || studentSession?.name || "",
           branch: student?.branch || studentSession?.branch || "",
           request_type: requestType,
-          target_semester: targetSemester,
+          target_semester: requestType === "DATA_DELETION" ? "all" : targetSemester,
+          vtu_link: (requestType === "REVALUATION" || requestType === "RE_EXAM") ? (vtuLink.trim() || undefined) : undefined,
         },
         studentSession?.token
       );
@@ -229,15 +231,32 @@ export default function RescrapeRequestModal({
                       ? "Missing Semester Result"
                       : pendingRequest.request_type === "RE_EXAM"
                       ? "Makeup / Re-exam Passed"
-                      : "Correction / Disparity"}
+                      : pendingRequest.request_type === "DATA_DELETION"
+                      ? "Request Data Deletion"
+                      : "Marksheet Update"}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="opacity-60">Target Semester:</span>
-                  <span className="font-semibold">
-                    {pendingRequest.target_semester === "all" ? "Both Semesters" : `Semester ${pendingRequest.target_semester}`}
-                  </span>
-                </div>
+                {pendingRequest.target_semester && pendingRequest.request_type !== "DATA_DELETION" && (
+                  <div className="flex justify-between items-center text-[11px]">
+                    <span className="opacity-60">Target Semester:</span>
+                    <span className="font-semibold">
+                      {pendingRequest.target_semester === "all" ? "Both Semesters" : `Semester ${pendingRequest.target_semester}`}
+                    </span>
+                  </div>
+                )}
+                {(pendingRequest.vtu_link || pendingRequest.custom_url) && (
+                  <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-700/20">
+                    <span className="opacity-60">Result Link:</span>
+                    <a
+                      href={pendingRequest.vtu_link || pendingRequest.custom_url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-mono text-cyan-400 hover:underline truncate max-w-[200px]"
+                    >
+                      {pendingRequest.vtu_link || pendingRequest.custom_url}
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="pt-2">
@@ -276,9 +295,9 @@ export default function RescrapeRequestModal({
                       desc: "Cleared backlog in supplementary exams",
                     },
                     {
-                      id: "CORRECTION",
-                      title: "Correction / Disparity",
-                      desc: "Marks disparity or other correction",
+                      id: "DATA_DELETION",
+                      title: "Request Data Deletion",
+                      desc: "Request administrator to hide your academic profile from public view",
                     },
                   ].map((opt) => (
                     <button
@@ -319,37 +338,87 @@ export default function RescrapeRequestModal({
                 </div>
               </div>
 
-              {/* Question 2: Target Semester to Scrape */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1.5">
-                  Target Semester to Scrape
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[
-                    { id: "1", label: "Semester 1" },
-                    { id: "2", label: "Semester 2" },
-                    { id: "all", label: "Both Semesters" },
-                  ].map((sem) => (
-                    <button
-                      key={sem.id}
-                      type="button"
-                      onClick={() => {
-                        sfx.playMechanicalClick();
-                        setTargetSemester(sem.id);
-                      }}
-                      className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
-                        targetSemester === sem.id
-                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs border-transparent font-bold"
-                          : isObsidian
-                          ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
-                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      {sem.label}
-                    </button>
-                  ))}
+              {/* Optional VTU Result Link Input for Revaluation or Re-exam */}
+              {(requestType === "REVALUATION" || requestType === "RE_EXAM") && (
+                <div
+                  className={`p-3.5 rounded-2xl border space-y-1.5 transition-all ${
+                    isObsidian
+                      ? "bg-slate-900/60 border-slate-800"
+                      : "bg-slate-50 border-slate-200"
+                  }`}
+                >
+                  <label className="block text-xs font-semibold">
+                    Paste VTU Result Link{" "}
+                    <span className="text-[10px] font-normal opacity-60">
+                      (Optional but recommended)
+                    </span>
+                  </label>
+                  <input
+                    type="url"
+                    value={vtuLink}
+                    onChange={(e) => setVtuLink(e.target.value)}
+                    placeholder="https://results.vtu.ac.in/..."
+                    className={`w-full px-3 py-2 text-xs rounded-xl border outline-none font-mono transition-all ${
+                      isObsidian
+                        ? "bg-slate-950/60 border-slate-700 text-white focus:border-cyan-400"
+                        : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                    }`}
+                  />
+                  <p className="text-[11px] opacity-65 leading-relaxed">
+                    Go to the VTU results website, select your specific Revaluation or Makeup exam link, and paste the URL here. This helps admins process your update faster.
+                  </p>
                 </div>
-              </div>
+              )}
+
+              {/* Question 2: Target Semester to Scrape or Data Deletion Notice */}
+              {requestType === "DATA_DELETION" ? (
+                <div
+                  className={`p-3.5 rounded-2xl border text-xs leading-relaxed space-y-1 ${
+                    isObsidian
+                      ? "bg-rose-950/20 border-rose-800/40 text-rose-300"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
+                >
+                  <p className="font-bold flex items-center gap-1.5">
+                    <IconShield className="w-3.5 h-3.5 text-rose-400" />
+                    <span>Public Profile Soft-Hide Notice</span>
+                  </p>
+                  <p className="text-[11px] opacity-80 leading-relaxed">
+                    Submitting this request alerts the administrator to completely hide your profile from all public search results, campus leaderboards, and peer comparisons. Faculty and administrative records will retain institutional data securely.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1.5">
+                    Target Semester to Scrape
+                  </label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {[
+                      { id: "1", label: "Semester 1" },
+                      { id: "2", label: "Semester 2" },
+                      { id: "all", label: "Both Semesters" },
+                    ].map((sem) => (
+                      <button
+                        key={sem.id}
+                        type="button"
+                        onClick={() => {
+                          sfx.playMechanicalClick();
+                          setTargetSemester(sem.id);
+                        }}
+                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
+                          targetSemester === sem.id
+                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs border-transparent font-bold"
+                            : isObsidian
+                            ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
+                            : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                        }`}
+                      >
+                        {sem.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Alert / Error / Success Messages */}
               {errorMsg && (
@@ -370,11 +439,17 @@ export default function RescrapeRequestModal({
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={isSubmitting || !requestType || !targetSemester}
+                  disabled={isSubmitting || !requestType || (requestType !== "DATA_DELETION" && !targetSemester)}
                   className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100 transition-transform active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-xs flex items-center justify-center gap-2"
                 >
                   <IconRotateCcw className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
-                  <span>{isSubmitting ? "Submitting Request..." : "Submit Request to Admin"}</span>
+                  <span>
+                    {isSubmitting
+                      ? "Submitting Request..."
+                      : requestType === "DATA_DELETION"
+                      ? "Submit Data Deletion Request"
+                      : "Submit Request to Admin"}
+                  </span>
                 </button>
                 <p className="text-[10px] opacity-50 text-center mt-2 leading-relaxed">
                   Only 1 active request per USN is permitted to protect scraper server resources.

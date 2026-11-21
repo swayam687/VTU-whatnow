@@ -167,6 +167,7 @@ def init_db():
                     ("show_my_marks", "ALTER TABLE students ADD COLUMN show_my_marks BOOLEAN DEFAULT TRUE;"),
                     ("show_my_backlogs", "ALTER TABLE students ADD COLUMN show_my_backlogs BOOLEAN DEFAULT TRUE;"),
                     ("allow_comparison", "ALTER TABLE students ADD COLUMN allow_comparison BOOLEAN DEFAULT TRUE;"),
+                    ("is_hidden", "ALTER TABLE students ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE;"),
                 ]
                 for col_name, sql_stmt in columns_to_ensure:
                     if col_name not in existing_cols:
@@ -189,6 +190,7 @@ def init_db():
                     ("show_my_marks", "BOOLEAN DEFAULT TRUE"),
                     ("show_my_backlogs", "BOOLEAN DEFAULT TRUE"),
                     ("allow_comparison", "BOOLEAN DEFAULT TRUE"),
+                    ("is_hidden", "BOOLEAN DEFAULT FALSE"),
                 ]:
                     try:
                         with engine.begin() as conn:
@@ -614,6 +616,7 @@ def format_rescrape_out(r: RescrapeRequest) -> dict:
         "target_semester": r.target_semester,
         "subject_codes": r.subject_codes or "",
         "custom_url": r.custom_url or "",
+        "vtu_link": getattr(r, "vtu_link", None) or r.custom_url or "",
         "message": r.message or "",
         "status": r.status,
         "created_at": to_utc_iso(r.created_at),
@@ -679,6 +682,7 @@ def create_rescrape_request(
     student_name = req.name.strip() if req.name else (student.name if student else clean_usn)
     student_branch = req.branch.strip().upper() if req.branch else (student.branch if student else "")
 
+    vtu_link_val = (req.vtu_link or req.custom_url or "").strip()
     entry = RescrapeRequest(
         usn=clean_usn,
         name=student_name,
@@ -686,7 +690,8 @@ def create_rescrape_request(
         request_type=req.request_type,
         target_semester=req.target_semester or "1",
         subject_codes=req.subject_codes.strip() if req.subject_codes else "",
-        custom_url=req.custom_url.strip() if req.custom_url else "",
+        custom_url=vtu_link_val,
+        vtu_link=vtu_link_val,
         message=req.message.strip() if req.message else "",
         status="pending",
         created_at=datetime.utcnow(),
@@ -696,9 +701,15 @@ def create_rescrape_request(
     db.commit()
     db.refresh(entry)
 
+    resp_msg = (
+        f"Data deletion request submitted for USN {clean_usn}. The administrator will review and hide your profile."
+        if req.request_type == "DATA_DELETION"
+        else f"Update request queued for USN {clean_usn}! Admin has been notified to re-scrape your semester results."
+    )
+
     return {
         "ok": True,
-        "message": f"Update request queued for USN {clean_usn}! Admin has been notified to re-scrape your semester results.",
+        "message": resp_msg,
         "id": entry.id,
         "request": format_rescrape_out(entry)
     }
@@ -791,8 +802,45 @@ def handle_admin_rescrape_action(
             "message": f"Launched scraper for {item.usn} (Sem {target_sem})! Monitor progress in the Scraper tab."
         }
 
+    elif req.action == "hide_student":
+        student = db.query(Student).filter(Student.usn == item.usn).first()
+        if student:
+            student.is_hidden = True
+        item.status = "resolved"
+        item.resolved_at = datetime.utcnow()
+        item.admin_notes = req.admin_notes or "Profile hidden from public view per data deletion request."
+        db.commit()
+        return {"ok": True, "message": f"Student {item.usn} profile has been hidden from public views."}
+
+    elif req.action == "unhide_student":
+        student = db.query(Student).filter(Student.usn == item.usn).first()
+        if student:
+            student.is_hidden = False
+        db.commit()
+        return {"ok": True, "message": f"Student {item.usn} profile is now visible in public views."}
+
     else:
         raise HTTPException(status_code=400, detail=f"Unknown action: {req.action}")
+
+
+@app.patch("/api/admin/students/{usn}/visibility", dependencies=[Depends(require_admin)])
+def toggle_student_visibility(
+    usn: str,
+    hidden: bool = Query(..., description="Whether to hide the student profile from public views"),
+    db: Session = Depends(get_db)
+):
+    clean_usn = usn.strip().upper()
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+    student.is_hidden = hidden
+    db.commit()
+    return {
+        "ok": True,
+        "usn": clean_usn,
+        "is_hidden": student.is_hidden,
+        "message": f"Student {clean_usn} is now {'hidden from' if hidden else 'visible in'} public views."
+    }
 
 
 @app.get("/api/admin/semester-audit", response_model=SemesterAuditResponse, dependencies=[Depends(require_admin)])
@@ -1219,6 +1267,7 @@ def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_adm
         "show_my_backlogs": is_backlogs_enabled,
         "has_pending_subjects": pending_str,
         "is_my_profile": is_owner,
+        "is_hidden": bool(s.is_hidden) if s.is_hidden is not None else False,
         "marks": public_marks,
     }
 
@@ -1230,11 +1279,13 @@ def get_students(
     sort: Optional[str] = Query("percentage", description="Sort by: percentage, total_marks, usn, backlogs"),
     limit: Optional[int] = Query(100, ge=1, le=500),
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
     response: Response = None,
     db: Session = Depends(get_db)
 ):
     current_usn = verify_session_token(x_student_token, db)
-    is_authenticated = bool(current_usn)
+    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_authenticated = bool(current_usn or is_admin)
 
     # If client supplied a student token that is no longer valid (e.g. ownership dispute approved)
     if x_student_token and not is_authenticated and response:
@@ -1242,6 +1293,11 @@ def get_students(
         response.headers["X-Is-Authenticated"] = "false"
 
     query = db.query(Student)
+
+    # Visibility Rule: Hidden students are excluded from public views.
+    # Faculty / Admin dashboards see ALL students (including hidden ones).
+    if not is_admin:
+        query = query.filter((Student.is_hidden == False) | (Student.is_hidden == None))
 
     if branch and branch.upper() != "ALL":
         query = query.filter(Student.branch == branch.upper())
@@ -1429,6 +1485,9 @@ def get_student(
         raise HTTPException(status_code=404, detail="Student not found.")
     current_usn = verify_session_token(x_student_token, db)
     is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_owner = bool(current_usn and current_usn.strip().upper() == clean_usn)
+    if student.is_hidden and not (is_admin or is_owner):
+        raise HTTPException(status_code=404, detail="Student profile is hidden from public view.")
     return sanitize_student_record(student, current_usn, is_admin=is_admin)
 
 
@@ -1554,7 +1613,7 @@ def get_branches(db: Session = Depends(get_db)):
     for (b,) in branches:
         if not b:
             continue
-        students = db.query(Student).filter(Student.branch == b).all()
+        students = db.query(Student).filter(Student.branch == b, (Student.is_hidden == False) | (Student.is_hidden == None)).all()
         total_students = len(students)
         avg_pct = round(sum(s.percentage for s in students) / total_students, 2) if total_students else 0.0
         total_backlogs = sum(s.total_backlogs for s in students)
@@ -1577,7 +1636,7 @@ def get_leaderboard(
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Student)
+    query = db.query(Student).filter((Student.is_hidden == False) | (Student.is_hidden == None))
     if branch and branch.upper() != "ALL":
         query = query.filter(Student.branch == branch.upper())
     
@@ -1588,7 +1647,7 @@ def get_leaderboard(
 @app.get("/api/analytics/backlogs", response_model=BacklogAnalytics)
 def get_backlog_analytics(db: Session = Depends(get_db)):
     """Computes branch-wise and subject-wise backlog mortality analytics."""
-    students = db.query(Student).all()
+    students = db.query(Student).filter((Student.is_hidden == False) | (Student.is_hidden == None)).all()
     marks = db.query(Mark).all()
     subjects = {s.code: s.name for s in db.query(Subject).all()}
     student_branch_map = {s.usn: s.branch for s in students}
