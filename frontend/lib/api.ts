@@ -1,4 +1,17 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const DEFAULT_API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export function getApiBase(): string {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL;
+  }
+  if (typeof window !== "undefined") {
+    const host = window.location.hostname || "localhost";
+    return `http://${host}:8000`;
+  }
+  return DEFAULT_API_URL;
+}
+
+const API_BASE = DEFAULT_API_URL;
 
 export interface Mark {
   id: number;
@@ -755,17 +768,46 @@ export async function submitRescrapeRequest(
       ? sessionStorage.getItem("vtu_student_token") || ""
       : "");
 
-  const res = await fetch(`${API_BASE}/api/rescrape/request`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(activeToken ? { "X-Student-Token": activeToken } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
+  const baseUrl = getApiBase();
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl}/api/rescrape/request`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(activeToken ? { "X-Student-Token": activeToken } : {}),
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    // If connection failed (e.g. localhost vs 127.0.0.1 loopback difference on Windows), try alternate loopback
+    const altUrl = baseUrl.includes("localhost")
+      ? baseUrl.replace("localhost", "127.0.0.1")
+      : baseUrl.includes("127.0.0.1")
+      ? baseUrl.replace("127.0.0.1", "localhost")
+      : null;
+
+    if (altUrl) {
+      try {
+        res = await fetch(`${altUrl}/api/rescrape/request`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(activeToken ? { "X-Student-Token": activeToken } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+      } catch {
+        throw new Error("Unable to connect to the server. Please check your backend connection and try again.");
+      }
+    } else {
+      throw new Error("Unable to connect to the server. Please check your backend connection and try again.");
+    }
+  }
+
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Failed to submit update request");
+    throw new Error(data.detail || "Failed to submit request");
   }
   return res.json();
 }

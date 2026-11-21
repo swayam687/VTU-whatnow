@@ -126,25 +126,31 @@ export default function PrivacyPage() {
               <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                 1
               </span>
-              <span>Sign in with your USN.</span>
+              <span>Log in using your own USN.</span>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                 2
               </span>
-              <span>Go to your Profile Settings.</span>
+              <span>Click &ldquo;View Marksheet&rdquo; on your student card.</span>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                 3
               </span>
-              <span>Click &ldquo;Request updation&rdquo;.</span>
+              <span>Click &ldquo;Request Update&rdquo; at the top of your marksheet.</span>
             </li>
             <li className="flex items-start gap-2.5">
               <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
                 4
               </span>
-              <span>Your request is sent to the admin, and your data will be permanently deleted within 24 hours.</span>
+              <span>Find and select the &ldquo;Request Data Deletion&rdquo; option.</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                5
+              </span>
+              <span>Click &ldquo;Submit&rdquo; &mdash; your request is sent to the admin, and your data will be permanently hidden within 24 hours.</span>
             </li>
           </ol>
 

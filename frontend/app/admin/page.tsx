@@ -2198,7 +2198,7 @@ export default function AdminPanel() {
                           <div className="flex items-center gap-2 flex-wrap text-xs">
                             <span className={`font-semibold px-2 py-0.5 rounded ${
                               r.request_type === "DATA_DELETION"
-                                ? "bg-rose-100 text-rose-800 border border-rose-200"
+                                ? "bg-rose-100 text-rose-800 border border-rose-300 font-bold"
                                 : "text-slate-800 bg-slate-100"
                             }`}>
                               {r.request_type === "REVALUATION"
@@ -2208,7 +2208,7 @@ export default function AdminPanel() {
                                 : r.request_type === "RE_EXAM"
                                 ? "Makeup Exam"
                                 : r.request_type === "DATA_DELETION"
-                                ? "Data Deletion Request"
+                                ? "Deletion Request"
                                 : "Update Request"}
                             </span>
                             {r.subject_codes && (
@@ -2299,11 +2299,11 @@ export default function AdminPanel() {
                                   <button
                                     type="button"
                                     disabled={actionLoadingId === r.id}
-                                    onClick={() => handleRescrapeAction(r.id, "reject")}
-                                    className="py-2 px-3 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
-                                    title="Dismiss / Reject request"
+                                    onClick={() => handleRescrapeAction(r.id, "reject", "Ignored by admin")}
+                                    className="py-2 px-3 text-xs font-medium rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-center cursor-pointer"
+                                    title="Ignore deletion request"
                                   >
-                                    ✕ Dismiss
+                                    ✕ Ignore
                                   </button>
                                 </>
                               ) : (
@@ -2342,7 +2342,9 @@ export default function AdminPanel() {
                           ) : (
                             <div className="text-[11px] text-slate-500 font-medium pt-1 border-t border-slate-100 flex items-center justify-between">
                               <span className={r.status === "resolved" ? "text-emerald-600 font-semibold" : "text-slate-400"}>
-                                {r.status === "resolved" ? "✓ Resolved" : "✕ Rejected"}
+                                {r.status === "resolved"
+                                  ? (r.request_type === "DATA_DELETION" ? "✓ Hidden" : "✓ Resolved")
+                                  : (r.request_type === "DATA_DELETION" ? "✕ Ignored" : "✕ Rejected")}
                               </span>
                               {r.resolved_at && (
                                 <span className="font-mono text-[10px] text-slate-400">

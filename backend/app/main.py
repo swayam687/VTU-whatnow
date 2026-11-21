@@ -178,6 +178,16 @@ def init_db():
                         except Exception as col_err:
                             print(f"⚠️ Could not add column '{col_name}': {col_err}")
 
+            if "rescrape_requests" in existing_tables:
+                rescrape_cols = {c["name"] for c in insp.get_columns("rescrape_requests")}
+                if "vtu_link" not in rescrape_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE rescrape_requests ADD COLUMN vtu_link VARCHAR DEFAULT '';"))
+                        print("✅ Added column 'vtu_link' to rescrape_requests table.")
+                    except Exception as col_err:
+                        print(f"⚠️ Could not add column 'vtu_link': {col_err}")
+
             # 3. For PostgreSQL (e.g. Supabase on Render), guarantee idempotency with IF NOT EXISTS
             if engine.dialect.name == "postgresql":
                 for col_name, col_def in [
@@ -197,6 +207,11 @@ def init_db():
                             conn.execute(text(f"ALTER TABLE students ADD COLUMN IF NOT EXISTS {col_name} {col_def};"))
                     except Exception:
                         pass
+                try:
+                    with engine.begin() as conn:
+                        conn.execute(text("ALTER TABLE rescrape_requests ADD COLUMN IF NOT EXISTS vtu_link VARCHAR DEFAULT '';"))
+                except Exception:
+                    pass
         except Exception as insp_err:
             print(f"⚠️ Column inspection notice: {insp_err}")
 
@@ -328,14 +343,16 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 
-# CORS setup
+# CORS setup - dynamically allows localhost, 127.0.0.1, LAN IPs, and production origins with credentials
 origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if origins else ["*"],
+    allow_origins=origins if (origins and "*" not in origins) else [],
+    allow_origin_regex=r"^https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
@@ -652,11 +669,34 @@ def create_rescrape_request(
     ).order_by(desc(RescrapeRequest.created_at)).first()
 
     if existing_active:
-        sub_date = existing_active.created_at.strftime("%d %b %Y, %I:%M %p") if existing_active.created_at else "recently"
-        raise HTTPException(
-            status_code=400,
-            detail=f"A request for USN {clean_usn} is already in the queue (submitted {sub_date}). The admin has been notified and will scrape your updated results soon!"
-        )
+        if req.request_type == "DATA_DELETION":
+            if existing_active.request_type == "DATA_DELETION":
+                sub_date = existing_active.created_at.strftime("%d %b %Y, %I:%M %p") if existing_active.created_at else "recently"
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"A deletion request for USN {clean_usn} is already pending (submitted {sub_date}). The administrator will process it within 24 hours."
+                )
+            else:
+                # Upgrade previous pending update request to DATA_DELETION
+                existing_active.request_type = "DATA_DELETION"
+                existing_active.status = "pending"
+                existing_active.target_semester = "all"
+                existing_active.message = req.message.strip() if req.message else "Data deletion requested."
+                existing_active.created_at = datetime.utcnow()
+                db.commit()
+                db.refresh(existing_active)
+                return {
+                    "ok": True,
+                    "message": "Deletion request sent to admin. Your data will be deleted in 24 hours.",
+                    "id": existing_active.id,
+                    "request": format_rescrape_out(existing_active)
+                }
+        else:
+            sub_date = existing_active.created_at.strftime("%d %b %Y, %I:%M %p") if existing_active.created_at else "recently"
+            raise HTTPException(
+                status_code=400,
+                detail=f"A request for USN {clean_usn} is already in the queue (submitted {sub_date}). The admin has been notified and will review your update soon!"
+            )
 
     # 2. Rate limit by client IP (max 5 requests per day)
     client_ip = request.headers.get("x-forwarded-for")
