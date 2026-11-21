@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { Student, AuthSession } from "../lib/api";
 import {
   IconClose,
@@ -17,13 +17,130 @@ import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";
 import PrivacySettingsModal from "./PrivacySettingsModal";
 import { sfx } from "../lib/sfx";
-import DecryptedText from "./DecryptedText";
 
 export interface OriginRect {
   left: number;
   top: number;
   width: number;
   height: number;
+}
+
+interface CharScramble {
+  char: string;
+  isLocked: boolean;
+}
+
+/**
+ * Custom hook that scrambles a USN character-by-character sequentially:
+ * - Digits step sequentially: 0 -> 1, 0 -> 1 -> 2, 0 -> ... -> 5, etc.
+ * - Letters step sequentially: A -> B -> ... -> R, A -> ... -> M, etc.
+ * - Staggered locking takes exactly 2.0s (2000ms).
+ */
+function useSequentialUSNScramble(targetUsn: string | null, isActive: boolean) {
+  const [displayChars, setDisplayChars] = useState<CharScramble[]>([]);
+  const [isScrambleComplete, setIsScrambleComplete] = useState(false);
+
+  useEffect(() => {
+    if (!isActive || !targetUsn) {
+      setDisplayChars([]);
+      setIsScrambleComplete(false);
+      return;
+    }
+
+    const cleanUsn = targetUsn.trim().toUpperCase();
+    const len = cleanUsn.length;
+    const TOTAL_MS = 2000;
+
+    // Build the natural progression sequence for each character
+    const charSequences: string[][] = [];
+    const lockTimes: number[] = [];
+
+    for (let i = 0; i < len; i++) {
+      const ch = cleanUsn[i];
+      let seq: string[] = [];
+
+      if (ch >= "0" && ch <= "9") {
+        const targetDigit = parseInt(ch, 10);
+        if (targetDigit === 0) {
+          seq = ["7", "8", "9", "0"];
+        } else {
+          for (let d = 0; d <= targetDigit; d++) {
+            seq.push(String(d));
+          }
+        }
+      } else if (ch >= "A" && ch <= "Z") {
+        const targetCode = ch.charCodeAt(0);
+        if (ch === "A") {
+          seq = ["Y", "Z", "A"];
+        } else {
+          for (let code = 65; code <= targetCode; code++) {
+            seq.push(String.fromCharCode(code));
+          }
+        }
+      } else {
+        seq = [ch];
+      }
+
+      charSequences.push(seq);
+
+      // Stagger lock times from 450ms up to 1950ms so positions resolve smoothly
+      const minLock = 450;
+      const maxLock = 1950;
+      const lockT = len <= 1 ? TOTAL_MS : minLock + (i / (len - 1)) * (maxLock - minLock);
+      lockTimes.push(lockT);
+    }
+
+    // Set initial frame
+    setDisplayChars(charSequences.map((seq) => ({ char: seq[0], isLocked: false })));
+    setIsScrambleComplete(false);
+
+    const startTime = performance.now();
+    let animId: number;
+    let lastTick = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+
+      // Throttle updates to ~35ms so the human eye can clearly read each sequential step
+      if (now - lastTick >= 35 || elapsed >= TOTAL_MS) {
+        lastTick = now;
+
+        const nextChars: CharScramble[] = [];
+        let allLocked = true;
+
+        for (let i = 0; i < len; i++) {
+          const isLocked = elapsed >= lockTimes[i];
+          if (isLocked) {
+            nextChars.push({ char: cleanUsn[i], isLocked: true });
+          } else {
+            allLocked = false;
+            const seq = charSequences[i];
+            const progress = Math.max(0, Math.min(1, elapsed / lockTimes[i]));
+            const seqIdx = Math.min(seq.length - 1, Math.floor(progress * seq.length));
+            nextChars.push({ char: seq[seqIdx], isLocked: false });
+          }
+        }
+
+        setDisplayChars(nextChars);
+
+        if (elapsed >= TOTAL_MS || allLocked) {
+          setIsScrambleComplete(true);
+          sfx.playSonarChime();
+          return;
+        }
+      }
+
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [targetUsn, isActive]);
+
+  return { displayChars, isScrambleComplete };
 }
 
 interface StudentDetailModalProps {
@@ -71,7 +188,10 @@ export default function StudentDetailModal({
   const [isRescrapeModalOpen, setIsRescrapeModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
-  // Smooth closing transition handler (collapses back into origin element)
+  // Character-by-character sequential scramble hook over 2.0s
+  const { displayChars, isScrambleComplete } = useSequentialUSNScramble(usn, isOpen);
+
+  // Smooth closing transition handler (collapses back into origin element smoothly)
   const handleModalClose = () => {
     if (isClosing) return;
     sfx.playMechanicalClick();
@@ -89,21 +209,21 @@ export default function StudentDetailModal({
         originRect.top + originRect.height / 2 - (targetRect.top + targetRect.height / 2);
 
       modalEl.style.transition =
-        "transform 240ms cubic-bezier(0.32, 0, 0.67, 0), opacity 200ms ease-in, border-radius 240ms ease";
+        "transform 320ms cubic-bezier(0.32, 0, 0.67, 0), opacity 260ms ease-in, border-radius 320ms ease";
       modalEl.style.transform = `translate3d(${deltaX}px, ${deltaY}px, 0) scale(${scaleX}, ${scaleY})`;
       modalEl.style.opacity = "0";
 
-      backdropRef.current.style.transition = "opacity 240ms ease-in";
+      backdropRef.current.style.transition = "opacity 320ms ease-in";
       backdropRef.current.style.opacity = "0";
     }
 
     setTimeout(() => {
       setIsClosing(false);
       onClose();
-    }, 240);
+    }, 320);
   };
 
-  // FLIP Shared-Element Expansion on mount
+  // FLIP Shared-Element Expansion on mount - slower, smoother window-like expansion
   useEffect(() => {
     if (!isOpen || !modalRef.current) return;
 
@@ -138,24 +258,24 @@ export default function StudentDetailModal({
       // Force browser reflow to commit initial inverted frame
       modalEl.getBoundingClientRect();
 
-      // Play: animate out into full centered modal with a spring curve
+      // Play: animate out into full centered modal like an expansive window
       requestAnimationFrame(() => {
         modalEl.style.transition =
-          "transform 360ms cubic-bezier(0.16, 1, 0.3, 1), opacity 220ms cubic-bezier(0.16, 1, 0.3, 1)";
+          "transform 550ms cubic-bezier(0.16, 1, 0.3, 1), opacity 400ms cubic-bezier(0.16, 1, 0.3, 1), border-radius 550ms ease";
         modalEl.style.transform = "translate3d(0, 0, 0) scale(1, 1)";
         modalEl.style.opacity = "1";
       });
     } else {
       // Fallback spring scale if no origin rect was recorded
       modalEl.style.transformOrigin = "center center";
-      modalEl.style.transform = "scale(0.95)";
+      modalEl.style.transform = "scale(0.92)";
       modalEl.style.opacity = "0";
       modalEl.style.transition = "none";
       modalEl.getBoundingClientRect();
 
       requestAnimationFrame(() => {
         modalEl.style.transition =
-          "transform 280ms cubic-bezier(0.16, 1, 0.3, 1), opacity 200ms ease-out";
+          "transform 500ms cubic-bezier(0.16, 1, 0.3, 1), opacity 380ms ease-out";
         modalEl.style.transform = "scale(1)";
         modalEl.style.opacity = "1";
       });
@@ -185,7 +305,7 @@ export default function StudentDetailModal({
     <div
       ref={backdropRef}
       onClick={handleModalClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm overflow-y-auto transition-opacity duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm overflow-y-auto transition-opacity duration-300"
       style={{ opacity: 0 }}
     >
       <div
@@ -203,67 +323,103 @@ export default function StudentDetailModal({
             isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
           }`}
         >
-          <div className="flex items-center gap-3">
-            <Identicon
-              usn={usn}
-              percentage={student?.percentage}
-              totalBacklogs={student?.total_backlogs}
-              customPixelArt={student?.avatar_pixel_art}
-              size={42}
-              showFingerprint
-              isEditable={isMyVerifiedProfile}
-              onEditClick={onOpenPixelModal}
-            />
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="font-bold text-sm sm:text-base leading-tight">
-                  {student?.name || "Student Marksheet"}
-                </h2>
-                {isMyVerifiedProfile && (
-                  <>
-                    <button
-                      onClick={onOpenPixelModal}
-                      className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
-                      title="Edit your 10x10 custom pixel art avatar"
-                    >
-                      <IconPencil className="w-2.5 h-2.5" />
-                      <span>Edit Avatar</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        sfx.playMechanicalClick();
-                        setIsPrivacyModalOpen(true);
-                      }}
-                      className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 hover:bg-cyan-500/20 transition-colors cursor-pointer"
-                      title="Manage your privacy and data visibility"
-                    >
-                      <IconShield className="w-2.5 h-2.5" />
-                      <span>Privacy Settings</span>
-                    </button>
-                  </>
-                )}
-                {isCached && (
-                  <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                    <span>⚡️</span>
-                    <span>0ms Cached ({cachedAge || "saved"})</span>
-                  </span>
-                )}
-              </div>
-              <div className="text-xs opacity-75 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
-                <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 font-bold text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10">
-                  <DecryptedText
-                    text={usn || "UNKNOWN"}
-                    speed={35}
-                    maxIterations={10}
-                    animateOn="view"
-                    revealDirection="start"
-                    characters="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ#$%"
-                    className="font-mono font-bold tracking-wider"
-                  />
-                </span>
-                <span className="opacity-40">•</span>
-                <span>{student?.branch || "ENG"}</span>
-              </div>
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            {/* Identicon - Staged reveal after 2s sequential scramble */}
+            <div
+              className={`transition-all duration-500 ease-out flex-shrink-0 ${
+                isScrambleComplete
+                  ? "opacity-100 scale-100 translate-x-0 w-[42px] h-[42px]"
+                  : "opacity-0 scale-75 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
+              }`}
+            >
+              {isScrambleComplete && (
+                <Identicon
+                  usn={usn}
+                  percentage={student?.percentage}
+                  totalBacklogs={student?.total_backlogs}
+                  customPixelArt={student?.avatar_pixel_art}
+                  size={42}
+                  showFingerprint
+                  isEditable={isMyVerifiedProfile}
+                  onEditClick={onOpenPixelModal}
+                />
+              )}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              {!isScrambleComplete ? (
+                /* While Scrambling: Prominently show character-by-character sequential decode */
+                <div className="flex flex-col gap-1 py-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-cyan-400 font-semibold flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping inline-block" />
+                      Decrypting USN Record...
+                    </span>
+                  </div>
+                  <div className="inline-flex items-center gap-0.5 sm:gap-1 px-3 py-1.5 rounded-xl bg-slate-900/95 border border-cyan-500/40 shadow-lg shadow-cyan-950/40 max-w-fit">
+                    {displayChars.map((item, idx) => (
+                      <span
+                        key={idx}
+                        className={`inline-block w-4 sm:w-5 text-center font-mono font-bold text-sm sm:text-base tabular-nums transition-colors duration-150 ${
+                          item.isLocked
+                            ? "text-cyan-300 font-extrabold"
+                            : "text-amber-400 font-medium animate-pulse"
+                        }`}
+                      >
+                        {item.char}
+                      </span>
+                    ))}
+                    <span className="text-[10px] font-mono text-cyan-400/80 ml-2 border-l border-cyan-500/30 pl-2 hidden sm:inline">
+                      2.0s
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                /* After 2s: Smoothly reveal student Name, badges, and locked USN */
+                <div className="transition-all duration-500 ease-out opacity-100 translate-y-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h2 className="font-bold text-sm sm:text-base leading-tight truncate">
+                      {student?.name || "Student Marksheet"}
+                    </h2>
+                    {isMyVerifiedProfile && (
+                      <>
+                        <button
+                          onClick={onOpenPixelModal}
+                          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
+                          title="Edit your 10x10 custom pixel art avatar"
+                        >
+                          <IconPencil className="w-2.5 h-2.5" />
+                          <span>Edit Avatar</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            sfx.playMechanicalClick();
+                            setIsPrivacyModalOpen(true);
+                          }}
+                          className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-cyan-500/10 border border-cyan-500/25 text-cyan-400 hover:bg-cyan-500/20 transition-colors cursor-pointer"
+                          title="Manage your privacy and data visibility"
+                        >
+                          <IconShield className="w-2.5 h-2.5" />
+                          <span>Privacy Settings</span>
+                        </button>
+                      </>
+                    )}
+                    {isCached && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                        <span>⚡️</span>
+                        <span>0ms Cached ({cachedAge || "saved"})</span>
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-xs opacity-75 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                    <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 font-bold text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10 tracking-wider">
+                      {usn}
+                    </span>
+                    <span className="opacity-40">•</span>
+                    <span>{student?.branch || "ENG"}</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -298,7 +454,29 @@ export default function StudentDetailModal({
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
-          {isLoading && !student ? (
+          {!isScrambleComplete ? (
+            /* During 2-second scramble delay: High-tech decryption status */
+            <div className="py-14 sm:py-20 flex flex-col items-center justify-center text-center space-y-4">
+              <div className="relative w-14 h-14 flex items-center justify-center">
+                <div className="absolute inset-0 rounded-2xl border-2 border-cyan-500/25 border-t-cyan-400 animate-spin" />
+                <span className="font-mono text-xs text-cyan-400 font-bold">VTU</span>
+              </div>
+              <div className="space-y-1.5">
+                <p className="text-xs font-mono font-semibold tracking-wider text-cyan-400/90 uppercase">
+                  Decrypting Student Record...
+                </p>
+                <p className="text-[11px] opacity-50 font-mono">
+                  Synthesizing provisional marksheet for seat number {usn}
+                </p>
+              </div>
+              {/* Skeleton placeholders */}
+              <div className="w-full max-w-md grid grid-cols-3 gap-2 pt-2 animate-pulse">
+                <div className="h-14 rounded-xl bg-slate-800/20 dark:bg-white/[0.03] border border-slate-800/40" />
+                <div className="h-14 rounded-xl bg-slate-800/20 dark:bg-white/[0.03] border border-slate-800/40" />
+                <div className="h-14 rounded-xl bg-slate-800/20 dark:bg-white/[0.03] border border-slate-800/40" />
+              </div>
+            </div>
+          ) : isLoading && !student ? (
             <div className="space-y-3 py-6">
               <div className="h-6 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
               <div className="h-16 bg-slate-100 dark:bg-slate-900 rounded animate-pulse" />
@@ -319,7 +497,7 @@ export default function StudentDetailModal({
               </button>
             </div>
           ) : (
-            <>
+            <div className="space-y-4 sm:space-y-5 transition-all duration-500 ease-out opacity-100 translate-y-0">
               {/* Summary Metric Tiles */}
               {/* Key Metrics Grid - Ultra-compact on mobile, spacious on desktop */}
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 text-center">
@@ -611,7 +789,7 @@ export default function StudentDetailModal({
                   </table>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>

@@ -7,6 +7,7 @@ import {
   loginOrRegisterStudent,
   submitUsnDispute,
   reportMissingUsn,
+  setStoredStudentSession,
   AuthStatus,
   AuthSession,
 } from "../lib/api";
@@ -174,10 +175,8 @@ export default function StudentAuthModal({
     setError(null);
     try {
       const session = await loginOrRegisterStudent(usn.trim(), password.trim());
-      // Enforce session-based storage: only persists until tab/browser is closed
-      sessionStorage.setItem("vtu_student_token", session.token);
-      sessionStorage.setItem("vtu_student_session", JSON.stringify(session));
-      sessionStorage.setItem("vtu_student_usn", session.usn);
+      // Persist authenticated student session across page reloads and mobile sleep cycles
+      setStoredStudentSession(session);
 
       sfx.playMechanicalClick();
       onSuccess(session);

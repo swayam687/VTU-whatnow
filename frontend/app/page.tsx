@@ -21,6 +21,9 @@ import {
   AuthSession,
   logStudentComparison,
   verifyStudentSession,
+  getStoredStudentToken,
+  getStoredStudentSession,
+  clearStoredStudentSession,
 } from "../lib/api";
 import {
   IconSearch,
@@ -157,25 +160,24 @@ export default function Dashboard() {
     return students.find((s) => s.usn.toUpperCase() === targetUsn) || null;
   }, [students, studentSession, myUsn]);
 
-  // Restore authenticated session from sessionStorage on mount (resets on tab/browser close)
+  // Restore authenticated session from localStorage/sessionStorage on mount
   useEffect(() => {
     try {
-      const storedSession = sessionStorage.getItem("vtu_student_session");
+      const storedSession = getStoredStudentSession();
       if (storedSession) {
-        const parsed = JSON.parse(storedSession) as AuthSession;
-        // Cryptographically verify session validity with backend
-        verifyStudentSession(parsed.token).then((res) => {
-          if (!res.valid) {
-            // Password was changed or ownership transferred -> Kick out imposter immediately
-            sessionStorage.removeItem("vtu_student_token");
-            sessionStorage.removeItem("vtu_student_session");
-            sessionStorage.removeItem("vtu_student_usn");
-            localStorage.removeItem("vtu_my_usn");
+        // Optimistically restore session immediately so mobile users never experience sudden logout
+        setStudentSession(storedSession);
+        setMyUsn(storedSession.usn);
+
+        // Verify session validity with backend in the background
+        verifyStudentSession(storedSession.token).then((res) => {
+          if (res.revoked) {
+            // Password was changed or USN deleted/hidden by admin
+            clearStoredStudentSession();
             setStudentSession(null);
             setMyUsn("");
-          } else {
-            setStudentSession(parsed);
-            setMyUsn(parsed.usn);
+          } else if (res.valid && res.usn) {
+            setMyUsn(res.usn);
           }
         });
       }
@@ -185,10 +187,7 @@ export default function Dashboard() {
 
     // Active listener: Kick out user immediately if token is invalidated on the server (e.g. USN hidden/deleted)
     const handleRevocation = () => {
-      sessionStorage.removeItem("vtu_student_token");
-      sessionStorage.removeItem("vtu_student_session");
-      sessionStorage.removeItem("vtu_student_usn");
-      localStorage.removeItem("vtu_my_usn");
+      clearStoredStudentSession();
       setStudentSession(null);
       setMyUsn("");
       loadStudentsData(null);
@@ -197,12 +196,13 @@ export default function Dashboard() {
 
     window.addEventListener("vtu:session-revoked", handleRevocation);
 
-    // Also re-verify on window focus (e.g. user returns to tab or admin altered status)
+    // Also re-verify on window focus (e.g. user returns to tab)
     const handleFocus = () => {
-      const activeToken = sessionStorage.getItem("vtu_student_token");
+      const activeToken = getStoredStudentToken();
       if (activeToken) {
         verifyStudentSession(activeToken).then((res) => {
-          if (!res.valid) {
+          // CRUCIAL: Only revoke if explicitly revoked (401), NOT on network lag or offline
+          if (res.revoked) {
             handleRevocation();
           }
         });
@@ -228,10 +228,7 @@ export default function Dashboard() {
   };
 
   const handleSignOut = () => {
-    sessionStorage.removeItem("vtu_student_token");
-    sessionStorage.removeItem("vtu_student_session");
-    sessionStorage.removeItem("vtu_student_usn");
-    localStorage.removeItem("vtu_my_usn");
+    clearStoredStudentSession();
     setStudentSession(null);
     setMyUsn("");
     loadStudentsData(null);
@@ -308,7 +305,7 @@ export default function Dashboard() {
 
     const effectiveToken = authToken !== undefined 
       ? (authToken || undefined) 
-      : (studentSession?.token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") || undefined : undefined));
+      : (studentSession?.token || getStoredStudentToken() || undefined);
 
     Promise.all([
       fetchStudents({ branch: activeBranch, search: "", sort: sortBy, token: effectiveToken }),

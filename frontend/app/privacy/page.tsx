@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import Navbar from "../../components/Navbar";
-import { AuthSession } from "../../lib/api";
+import { AuthSession, getStoredStudentSession, clearStoredStudentSession } from "../../lib/api";
 import { sfx } from "../../lib/sfx";
 import StudentAuthModal from "../../components/StudentAuthModal";
 import PrivacySettingsModal from "../../components/PrivacySettingsModal";
@@ -24,9 +24,9 @@ export default function PrivacyPage() {
         document.documentElement.classList.toggle("dark", obsidian);
         document.body.className = obsidian ? "theme-obsidian dark" : "theme-paper";
       }
-      const rawSession = sessionStorage.getItem("vtu_student_session");
+      const rawSession = getStoredStudentSession();
       if (rawSession) {
-        setStudentSession(JSON.parse(rawSession));
+        setStudentSession(rawSession);
       }
     } catch {
       // ignore
@@ -60,9 +60,7 @@ export default function PrivacyPage() {
         studentSession={studentSession}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         onSignOut={() => {
-          sessionStorage.removeItem("vtu_student_token");
-          sessionStorage.removeItem("vtu_student_session");
-          sessionStorage.removeItem("vtu_student_usn");
+          clearStoredStudentSession();
           setStudentSession(null);
         }}
       />

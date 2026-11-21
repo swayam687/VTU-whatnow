@@ -85,6 +85,55 @@ export interface AuthSession {
   login_count: number;
 }
 
+export function getStoredStudentToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem("vtu_student_token") || sessionStorage.getItem("vtu_student_token") || null;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredStudentSession(): AuthSession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem("vtu_student_session") || sessionStorage.getItem("vtu_student_session");
+    if (!raw) return null;
+    return JSON.parse(raw) as AuthSession;
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredStudentSession(session: AuthSession) {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("vtu_student_token", session.token);
+    localStorage.setItem("vtu_student_session", JSON.stringify(session));
+    localStorage.setItem("vtu_student_usn", session.usn);
+    localStorage.setItem("vtu_my_usn", session.usn);
+    sessionStorage.setItem("vtu_student_token", session.token);
+    sessionStorage.setItem("vtu_student_session", JSON.stringify(session));
+    sessionStorage.setItem("vtu_student_usn", session.usn);
+  } catch {
+    // ignore
+  }
+}
+
+export function clearStoredStudentSession() {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.removeItem("vtu_student_token");
+    localStorage.removeItem("vtu_student_session");
+    localStorage.removeItem("vtu_student_usn");
+    sessionStorage.removeItem("vtu_student_token");
+    sessionStorage.removeItem("vtu_student_session");
+    sessionStorage.removeItem("vtu_student_usn");
+  } catch {
+    // ignore
+  }
+}
+
 export interface DisputeRecord {
   id: number;
   usn: string;
@@ -158,7 +207,7 @@ export async function fetchStudents(params?: {
     if (params?.adminKey) {
       headers["X-Admin-Key"] = params.adminKey;
     }
-    const token = params?.token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+    const token = params?.token || getStoredStudentToken();
     if (token) {
       headers["X-Student-Token"] = token;
     }
@@ -170,9 +219,7 @@ export async function fetchStudents(params?: {
 
     if (res.headers.get("X-Token-Revoked") === "true") {
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("vtu_student_token");
-        sessionStorage.removeItem("vtu_student_session");
-        sessionStorage.removeItem("vtu_student_usn");
+        clearStoredStudentSession();
         window.dispatchEvent(new CustomEvent("vtu:session-revoked"));
       }
     }
@@ -187,7 +234,7 @@ export async function fetchStudents(params?: {
 
 export async function fetchStudent(usn: string, token?: string): Promise<Student> {
   const headers: Record<string, string> = {};
-  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  const effectiveToken = token || getStoredStudentToken();
   if (effectiveToken) {
     headers["X-Student-Token"] = effectiveToken;
   }
@@ -206,7 +253,7 @@ export interface PrivacySettings {
 
 export async function fetchStudentPrivacy(usn: string, token?: string): Promise<PrivacySettings> {
   const headers: Record<string, string> = {};
-  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  const effectiveToken = token || getStoredStudentToken();
   if (effectiveToken) headers["X-Student-Token"] = effectiveToken;
 
   const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}/privacy`, {
@@ -223,7 +270,7 @@ export async function updateStudentPrivacy(
   token?: string
 ): Promise<PrivacySettings> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  const effectiveToken = token || getStoredStudentToken();
   if (effectiveToken) headers["X-Student-Token"] = effectiveToken;
 
   const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}/privacy`, {
@@ -259,7 +306,7 @@ export async function updateStudentAvatar(
   token?: string
 ): Promise<{ ok: boolean; message: string; pixel_art: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  const effectiveToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") || "" : "");
+  const effectiveToken = token || getStoredStudentToken() || "";
   if (effectiveToken) {
     headers["X-Student-Token"] = effectiveToken;
   }
@@ -621,7 +668,7 @@ export async function logStudentComparison(payload: {
 }): Promise<void> {
   try {
     const headers: Record<string, string> = { "Content-Type": "application/json" };
-    const token = typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null;
+    const token = getStoredStudentToken();
     if (token) headers["X-Student-Token"] = token;
 
     await fetch(`${API_BASE}/api/compare/log`, {
@@ -648,8 +695,10 @@ export async function verifyStudentSession(token?: string): Promise<{
   usn?: string;
   name?: string;
   branch?: string;
+  revoked?: boolean;
+  networkError?: boolean;
 }> {
-  const activeToken = token || (typeof window !== "undefined" ? sessionStorage.getItem("vtu_student_token") : null);
+  const activeToken = token || getStoredStudentToken();
   if (!activeToken) return { valid: false };
 
   try {
@@ -658,14 +707,19 @@ export async function verifyStudentSession(token?: string): Promise<{
       cache: "no-store",
     });
     if (!res.ok) {
-      if (res.status === 401 && typeof window !== "undefined") {
-        window.dispatchEvent(new Event("vtu:session-revoked"));
+      if (res.status === 401) {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new Event("vtu:session-revoked"));
+        }
+        return { valid: false, revoked: true };
       }
       return { valid: false };
     }
     return await res.json();
   } catch {
-    return { valid: false };
+    // CRUCIAL: On mobile devices, phone sleep, background tab switching, or backend cold start,
+    // fetch throws TypeError (Failed to fetch). Do NOT treat this as session revocation!
+    return { valid: true, networkError: true };
   }
 }
 
@@ -768,11 +822,7 @@ export async function submitRescrapeRequest(
   },
   token?: string
 ): Promise<{ ok: boolean; message: string; id: number; request: RescrapeRequestRecord }> {
-  const activeToken =
-    token ||
-    (typeof window !== "undefined"
-      ? sessionStorage.getItem("vtu_student_token") || ""
-      : "");
+  const activeToken = token || getStoredStudentToken() || "";
 
   const baseUrl = getApiBase();
   let res: Response;
