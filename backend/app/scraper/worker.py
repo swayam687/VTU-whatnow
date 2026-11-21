@@ -152,6 +152,8 @@ class ScraperWorker:
             # Normalization: VTU results entry form is always index.php
             if "resultpage.php" in target_url:
                 target_url = target_url.replace("resultpage.php", "index.php")
+            elif not target_url.endswith(".php"):
+                target_url = target_url.rstrip("/") + "/index.php"
 
             job_manager.log(f"Connecting to VTU results portal: {target_url}")
 
@@ -381,7 +383,11 @@ class ScraperWorker:
             job_manager.finish(f"Scraper error: {err_msg}")
 
     def _save_result(self, parsed: dict, semester: str):
-        """Persists extracted student and mark records in database."""
+        """
+        Persists extracted student and mark records in database using intelligent upsert.
+        Safely merges multi-semester makeup (e.g. SME26cbcs) and revaluation exams without
+        wiping out previously cleared semester subjects.
+        """
         db = SessionLocal()
         try:
             usn = parsed["student"]["usn"].strip().upper()
@@ -397,8 +403,6 @@ class ScraperWorker:
             student.name = name
             student.branch = branch
             student.batch = batch
-            # Clear previous marks for this student and semester to prevent duplicate records
-            db.query(Mark).filter(Mark.usn == usn, Mark.semester == semester).delete()
 
             for m in parsed["marks"]:
                 code = m["subject_code"].strip().upper()
@@ -409,17 +413,45 @@ class ScraperWorker:
                 elif m["subject_name"] and not subj.name:
                     subj.name = m["subject_name"]
 
-                mark = Mark(
-                    usn=usn,
-                    subject_code=code,
-                    semester=semester,
-                    internal_marks=m["internal_marks"],
-                    external_marks=m["external_marks"],
-                    total=m["total"],
-                    max_marks=m["max_marks"],
-                    status=m["status"],
-                )
-                db.add(mark)
+                mark_sem = str(m.get("semester") or semester or "1").strip()
+
+                # Intelligent upsert per (usn, subject_code)
+                existing = db.query(Mark).filter(Mark.usn == usn, Mark.subject_code == code).first()
+                if existing:
+                    # If this attempt is passed (P), always upgrade/update to passed
+                    if m["status"] == "P":
+                        existing.semester = mark_sem
+                        existing.internal_marks = m["internal_marks"]
+                        existing.external_marks = m["external_marks"]
+                        existing.total = m["total"]
+                        existing.max_marks = m["max_marks"]
+                        existing.status = "P"
+                    elif existing.status != "P":
+                        # Neither is P: retain the better score attempt
+                        if m["total"] >= (existing.total or 0):
+                            existing.semester = mark_sem
+                            existing.internal_marks = m["internal_marks"]
+                            existing.external_marks = m["external_marks"]
+                            existing.total = m["total"]
+                            existing.max_marks = m["max_marks"]
+                            existing.status = m["status"]
+
+                    # Clean up any duplicate records for the same (usn, subject_code)
+                    dups = db.query(Mark).filter(Mark.usn == usn, Mark.subject_code == code, Mark.id != existing.id).all()
+                    for d in dups:
+                        db.delete(d)
+                else:
+                    new_mark = Mark(
+                        usn=usn,
+                        subject_code=code,
+                        semester=mark_sem,
+                        internal_marks=m["internal_marks"],
+                        external_marks=m["external_marks"],
+                        total=m["total"],
+                        max_marks=m["max_marks"],
+                        status=m["status"],
+                    )
+                    db.add(new_mark)
 
             db.flush()
 

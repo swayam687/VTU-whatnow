@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     # Official VTU Results Entry URLs
     VTU_URL_SEM1: str = "https://results.vtu.ac.in/D25J26Ecbcs/index.php"
     VTU_URL_SEM2: str = "https://results.vtu.ac.in/MJ26cbcs/index.php"
+    VTU_URL_MAKEUP: str = "https://results.vtu.ac.in/SME26cbcs/index.php"
     
     # Scraping politeness delays (in seconds)
     DELAY_MIN: int = 2

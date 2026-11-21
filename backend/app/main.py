@@ -61,6 +61,8 @@ from .schemas import (
     SemesterAuditResponse,
     PrivacySettingsUpdate,
     PrivacySettingsOut,
+    AdminMarkItem,
+    AdminMarksUpsertRequest,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -836,7 +838,7 @@ def handle_admin_rescrape_action(
             target_sem = item.target_semester
         else:
             target_sem = "1"
-        custom_url = item.custom_url.strip() if item.custom_url else None
+        custom_url = (item.vtu_link or item.custom_url or "").strip() or None
 
         started = scraper_worker.start(
             start_usn=item.usn,
@@ -1171,10 +1173,17 @@ def get_semester_links(db: Session = Depends(get_db)):
                 semester="2",
                 is_default=False
             )
+            default_3 = SemesterLink(
+                title="UG Summer / Makeup Exam 2026 (SME26cbcs)",
+                url=settings.VTU_URL_MAKEUP,
+                semester="2",
+                is_default=False
+            )
             db.add(default_1)
             db.add(default_2)
+            db.add(default_3)
             db.commit()
-            links = [default_1, default_2]
+            links = [default_1, default_2, default_3]
         return links
     except Exception as e:
         print(f"Error fetching semester links: {e}")
@@ -1630,6 +1639,88 @@ def update_student_socials(usn: str, data: StudentUpdate, db: Session = Depends(
     
     db.commit()
     return {"message": "Social profiles updated successfully.", "student": student}
+
+
+@app.post("/api/admin/students/{usn}/marks", dependencies=[Depends(require_admin)])
+def upsert_student_marks(
+    usn: str,
+    req: AdminMarksUpsertRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Allows admin to upsert subject marks directly for a student (e.g. for makeup/reval exams).
+    Recalculates cumulative degree stats safely without data loss.
+    """
+    clean_usn = usn.strip().upper()
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    for m in req.marks:
+        code = m.subject_code.strip().upper()
+        subj = db.query(Subject).filter(Subject.code == code).first()
+        if not subj:
+            subj = Subject(code=code, name=m.subject_name or code)
+            db.add(subj)
+        elif m.subject_name and not subj.name:
+            subj.name = m.subject_name
+
+        existing = db.query(Mark).filter(Mark.usn == clean_usn, Mark.subject_code == code).first()
+        if existing:
+            existing.semester = str(m.semester)
+            existing.internal_marks = m.internal_marks
+            existing.external_marks = m.external_marks
+            existing.total = m.total
+            existing.max_marks = m.max_marks
+            existing.status = m.status
+            dups = db.query(Mark).filter(Mark.usn == clean_usn, Mark.subject_code == code, Mark.id != existing.id).all()
+            for d in dups:
+                db.delete(d)
+        else:
+            new_mark = Mark(
+                usn=clean_usn,
+                subject_code=code,
+                semester=str(m.semester),
+                internal_marks=m.internal_marks,
+                external_marks=m.external_marks,
+                total=m.total,
+                max_marks=m.max_marks,
+                status=m.status,
+            )
+            db.add(new_mark)
+
+    db.flush()
+
+    # Recalculate student statistics across all distinct subjects
+    all_marks = db.query(Mark).filter(Mark.usn == clean_usn).all()
+    if all_marks:
+        effective_subjects = {}
+        for m in all_marks:
+            code = m.subject_code.strip().upper()
+            if code not in effective_subjects:
+                effective_subjects[code] = m
+            else:
+                existing = effective_subjects[code]
+                if m.status == "P" and existing.status != "P":
+                    effective_subjects[code] = m
+                elif m.status == "P" and existing.status == "P" and m.total > existing.total:
+                    effective_subjects[code] = m
+                elif m.status != "P" and existing.status != "P" and m.total > existing.total:
+                    effective_subjects[code] = m
+
+        final_marks = list(effective_subjects.values())
+        student.total_marks = sum(m.total for m in final_marks)
+        student.max_marks = sum(m.max_marks for m in final_marks)
+        student.total_backlogs = sum(1 for m in final_marks if m.status in ("F", "A"))
+        student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
+
+    db.commit()
+    db.refresh(student)
+    return {
+        "ok": True,
+        "message": f"Successfully updated {len(req.marks)} mark(s) for {clean_usn}.",
+        "student": sanitize_student_record(student, clean_usn, is_admin=True)
+    }
 
 
 @app.post("/api/students/{usn}/avatar")

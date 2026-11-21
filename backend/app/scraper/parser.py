@@ -1,13 +1,37 @@
 import re
 from bs4 import BeautifulSoup
-from typing import Dict, Any
+from typing import Dict, Any, Optional
+
+def infer_semester_from_code(code: str) -> Optional[str]:
+    """
+    Infers the semester digit from standard VTU CBCS subject codes.
+    Examples:
+      - 1BMATS201, 1BPHYS102, 1BCEDS103, 1BESC104E -> group 1 matches '2' or '1'
+      - 21MAT21, 22MATS21, 21PHY12 -> matches '2' or '1'
+      - BCS301, BCS401 -> matches '3' or '4'
+    """
+    clean = code.strip().upper()
+    # Pattern 1: e.g. 1BMATS201 -> semester 2; 1BMATS101 -> semester 1; BCS301 -> semester 3
+    m = re.search(r"([1-8])\d{2}[A-Z]?$", clean)
+    if m:
+        return m.group(1)
+    # Pattern 2: e.g. 21MAT21, 22MATS11 -> 4th/5th char semester digit
+    m = re.search(r"\d{2}[A-Z]+([1-8])\d", clean)
+    if m:
+        return m.group(1)
+    # Pattern 3: e.g. MAT21, CS31
+    m = re.search(r"^[A-Z]{2,}([1-8])\d{1,2}", clean)
+    if m:
+        return m.group(1)
+    return None
 
 def parse_vtu_html(html: str) -> Dict[str, Any]:
     """
     Parses VTU CBCS Result HTML page and extracts:
     - student info: USN, name
-    - marks list: subject_code, subject_name, internal, external, total, max_marks, status
+    - marks list: subject_code, subject_name, semester, internal, external, total, max_marks, status
     - aggregate stats: total_marks, max_marks, percentage, backlogs
+    Supports multi-semester results (Summer/Makeup examinations like SME26cbcs and Revaluation).
     """
     soup = BeautifulSoup(html, "html.parser")
     student: Dict[str, Any] = {"usn": "", "name": ""}
@@ -19,6 +43,8 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
             tag.has_attr("class") and any("divtablerow" in c.lower() for c in tag["class"])
         )
     )
+
+    current_semester = None
 
     for row in all_rows:
         cells = [
@@ -33,7 +59,20 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
 
         row_str = " ".join(cells)
 
-        # 1. Extract Student Info
+        # 1. Track Semester section header if present in row text
+        sem_match = re.search(r"Semester\s*:\s*([1-8])", row_str, re.I) or re.search(r"\bSem(?:ester)?\s+([1-8])\b", row_str, re.I)
+        if sem_match:
+            current_semester = sem_match.group(1)
+
+        # Also check preceding DOM nodes if not yet set in this row
+        if not sem_match:
+            prev_sem_node = row.find_previous(string=re.compile(r"Semester\s*:\s*([1-8])", re.I))
+            if prev_sem_node:
+                pm = re.search(r"Semester\s*:\s*([1-8])", str(prev_sem_node), re.I)
+                if pm:
+                    current_semester = pm.group(1)
+
+        # 2. Extract Student Info
         if "University Seat Number" in row_str or "USN" in row_str:
             for cell in cells:
                 m = re.search(r"([0-9][A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{3})", cell, re.I)
@@ -48,7 +87,7 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
                     student["name"] = clean
                     break
 
-        # 2. Extract Marks row
+        # 3. Extract Marks row
         # Layout 1: [Code, Name, Int, Ext, Total, Result, Date...]
         # Layout 2: [Sl No, Code, Name, Int, Ext, Total, Result, Date...]
         if len(cells) >= 5:
@@ -91,9 +130,14 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
                     else:
                         internal, external, total = 0, 0, 0
 
+                    # Semester resolution: DOM header > subject code pattern > default '1'
+                    inferred_sem = infer_semester_from_code(code)
+                    mark_semester = current_semester or inferred_sem or "1"
+
                     marks.append({
                         "subject_code": code,
                         "subject_name": name,
+                        "semester": mark_semester,
                         "internal_marks": internal,
                         "external_marks": external,
                         "total": total,

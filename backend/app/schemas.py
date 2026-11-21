@@ -12,6 +12,19 @@ class MarkBase(BaseModel):
     status: str
     semester: str
 
+class AdminMarkItem(BaseModel):
+    subject_code: str
+    subject_name: Optional[str] = ""
+    semester: str = "1"
+    internal_marks: int = 0
+    external_marks: int = 0
+    total: int = 0
+    max_marks: int = 100
+    status: str = "P"
+
+class AdminMarksUpsertRequest(BaseModel):
+    marks: List[AdminMarkItem]
+
 class MarkOut(MarkBase):
     id: int
     class Config:
