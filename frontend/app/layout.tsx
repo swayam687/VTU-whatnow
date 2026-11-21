@@ -1,6 +1,6 @@
 import "./globals.css";
 import type { Metadata, Viewport } from "next";
-import SplashScreen from "../components/SplashScreen";
+
 import ServiceWorkerRegister from "../components/ServiceWorkerRegister";
 
 export const viewport: Viewport = {
@@ -77,7 +77,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen flex flex-col antialiased selection:bg-blue-500 selection:text-white">
         <ServiceWorkerRegister />
-        <SplashScreen />
+
         <main className="flex-1 w-full flex flex-col">
           {children}
         </main>

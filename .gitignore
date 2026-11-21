@@ -20,6 +20,7 @@ venv.bak/
 # Databases & Local SQLite files
 *.sqlite
 *.sqlite3
+*.db
 # Allow pre-seeded database to be deployed to Render
 !backend/vtuwhatnow.db
 
