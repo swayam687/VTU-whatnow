@@ -22,7 +22,7 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
 
     for row in all_rows:
         cells = [
-            c.get_text(strip=True) for c in row.find_all(
+            re.sub(r"[\s\xa0]+", " ", c.get_text()).strip() for c in row.find_all(
                 lambda tag: tag.name in ["td", "th"] or (
                     tag.has_attr("class") and any("divtablecell" in c.lower() for c in tag["class"])
                 )
@@ -51,15 +51,18 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
         # 2. Extract Marks row
         # Layout 1: [Code, Name, Int, Ext, Total, Result, Date...]
         # Layout 2: [Sl No, Code, Name, Int, Ext, Total, Result, Date...]
-        if len(cells) >= 6:
+        if len(cells) >= 5:
             subj_idx = -1
-            if re.match(r"^[0-9A-Z]{5,10}$", cells[0].upper()) and not cells[0].isdigit():
+            clean_c0 = re.sub(r"[\s\xa0\.\-]+", "", cells[0].upper())
+            clean_c1 = re.sub(r"[\s\xa0\.\-]+", "", cells[1].upper()) if len(cells) > 1 else ""
+
+            if re.match(r"^[0-9A-Z]{4,12}$", clean_c0) and not clean_c0.isdigit():
                 subj_idx = 0
-            elif len(cells) > 1 and re.match(r"^[0-9A-Z]{5,10}$", cells[1].upper()) and not cells[1].isdigit():
+            elif clean_c1 and re.match(r"^[0-9A-Z]{4,12}$", clean_c1) and not clean_c1.isdigit():
                 subj_idx = 1
 
             if subj_idx != -1:
-                code = cells[subj_idx].strip().upper()
+                code = re.sub(r"[\s\xa0]+", "", cells[subj_idx].upper())
                 if not any(h in code for h in ["CODE", "SUB", "SL", "SI", "SUBJECT"]):
                     name = cells[subj_idx + 1].strip() if len(cells) > subj_idx + 1 else code
                     

@@ -297,7 +297,18 @@ export default function DenseStudentTable({
 
                   {/* Re-attempts / Pending Subjects */}
                   <td className="py-2.5 px-3 text-center">
-                    {(s.show_my_backlogs || isMyProfile) && hasBacklogs ? (
+                    {!isMyProfile && s.show_my_backlogs === false ? (
+                      <span
+                        className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                          isObsidian
+                            ? "bg-slate-900 text-slate-400 border-slate-800"
+                            : "bg-slate-100 text-slate-600 border-slate-200"
+                        }`}
+                        title="Student opted to hide pending subjects status"
+                      >
+                        Hidden
+                      </span>
+                    ) : hasBacklogs ? (
                       <span
                         className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
                           isObsidian

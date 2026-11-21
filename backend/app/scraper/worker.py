@@ -16,7 +16,7 @@ if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and sys.platform != "win32":
         render_cache.mkdir(parents=True, exist_ok=True)
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = str(render_cache)
 
-from playwright.async_api import async_playwright
+from playwright.async_api import BrowserContext, Page, async_playwright
 
 from ..config import settings
 from ..database import SessionLocal
@@ -186,13 +186,16 @@ class ScraperWorker:
                 )
                 page: Page = await context.new_page()
 
-                # Handle VTU JavaScript alerts
+                # Handle VTU JavaScript alerts asynchronously
                 last_alert_msg = {"text": ""}
-                def handle_dialog(dialog):
+                async def handle_dialog(dialog):
                     last_alert_msg["text"] = dialog.message
-                    job_manager.log(f"VTU Alert: {dialog.message}")
-                    asyncio.create_task(dialog.accept())
-                page.on("dialog", handle_dialog)
+                    job_manager.log(f"🔔 VTU Alert: {dialog.message}")
+                    try:
+                        await dialog.accept()
+                    except Exception:
+                        pass
+                page.on("dialog", lambda dialog: asyncio.create_task(handle_dialog(dialog)))
 
                 for idx, usn in enumerate(usn_list):
                     if not job_manager.is_running:
@@ -207,14 +210,15 @@ class ScraperWorker:
                     success = False
 
                     while retries > 0 and job_manager.is_running and not success:
+                        active_page = page
                         try:
                             last_alert_msg["text"] = ""
-                            await page.goto(target_url, wait_until="domcontentloaded", timeout=25000)
+                            await page.goto(target_url, wait_until="domcontentloaded", timeout=35000)
 
-                            # Find USN input field
+                            # Find USN input field (support standard VTU names and IDs)
                             usn_input = await page.wait_for_selector(
-                                'input[name="lns"], input[name="usn"], #usn, #lns, input[placeholder*="USN" i], input[type="text"]',
-                                timeout=10000
+                                'input[name="lns"], input[name="usn"], input[name="USN"], #usn, #lns, input[placeholder*="USN" i], input[type="text"]',
+                                timeout=12000
                             )
                             if not usn_input:
                                 job_manager.log("❌ Could not find USN input box on portal page.")
@@ -227,7 +231,7 @@ class ScraperWorker:
                             # Locate Captcha image
                             captcha_el = await page.wait_for_selector(
                                 'img[src*="captcha" i], img[src*="code" i], img[id*="captcha" i], #captchaimg, form img',
-                                timeout=8000
+                                timeout=10000
                             )
                             if not captcha_el:
                                 job_manager.log("❌ No captcha image found on portal page.")
@@ -253,7 +257,7 @@ class ScraperWorker:
 
                             # Fill captcha field
                             captcha_input = await page.query_selector(
-                                'input[name="captchacode"], input[name="captcha"], input[id="captchacode"], input[id="captcha"], input[placeholder*="captcha" i]'
+                                'input[name="captchacode"], input[name="captcha"], input[name*="code" i], input[id="captchacode"], input[id="captcha"], input[placeholder*="captcha" i]'
                             )
                             if captcha_input:
                                 await captcha_input.fill("")
@@ -261,7 +265,7 @@ class ScraperWorker:
 
                             # Locate submit button
                             submit_btn = await page.query_selector(
-                                'input[type="submit"], button[type="submit"], #submit, input[value*="SUBMIT" i]'
+                                'input[type="submit"], button[type="submit"], #submit, input[value*="SUBMIT" i], button:has-text("Submit"), input[id="submit"]'
                             )
 
                             # Click submit and properly wait for navigation or new tab
@@ -272,17 +276,25 @@ class ScraperWorker:
 
                             # Wait for page navigation / response
                             try:
-                                await page.wait_for_load_state("load", timeout=12000)
+                                await page.wait_for_load_state("load", timeout=15000)
                             except Exception:
                                 pass
 
                             await asyncio.sleep(1.5)
 
                             # Check if a new popup tab opened
-                            active_page = page
                             if len(context.pages) > 1:
                                 active_page = context.pages[-1]
                                 job_manager.log(f"Switched to result popup tab: {active_page.url}")
+
+                            # Wait up to 6s for the result table or marks section to render
+                            try:
+                                await active_page.wait_for_selector(
+                                    "table, .divTable, .divTableRow, b:has-text('Semester'), text='University Seat Number'",
+                                    timeout=6000
+                                )
+                            except Exception:
+                                pass
 
                             # Check if JavaScript alert popped up
                             alert_lower = last_alert_msg["text"].lower()
@@ -297,7 +309,8 @@ class ScraperWorker:
 
                             # Get content and parse
                             content = await active_page.content()
-                            job_manager.log(f"Result URL: {active_page.url} (title: '{await active_page.title()}')")
+                            page_title = await active_page.title()
+                            job_manager.log(f"Result URL: {active_page.url} (title: '{page_title}')")
 
                             # Check for in-page error messages
                             text_lower = content.lower()
@@ -324,18 +337,30 @@ class ScraperWorker:
                                 try:
                                     with open("debug_vtu_response.html", "w", encoding="utf-8") as f:
                                         f.write(content)
-                                    job_manager.log(f"ℹ️ Could not extract marks table (saved debug snapshot). URL: {active_page.url}")
+                                    job_manager.log(f"ℹ️ Could not extract marks table (saved debug snapshot to debug_vtu_response.html). URL: {active_page.url}")
                                 except Exception:
                                     pass
 
-                                job_manager.log(f"ℹ️ Results not published or table structure different for {usn}.")
-                                success = True  # Move to next USN
+                                if "not yet available" in text_lower or "check the usn" in text_lower or "not available" in text_lower:
+                                    job_manager.log(f"ℹ️ Results not published or student absent for {usn}.")
+                                    success = True
+                                else:
+                                    job_manager.log(f"ℹ️ No marks parsed for {usn}. If portal was slow, retrying...")
+                                    retries -= 1
 
                         except Exception as err:
                             err_str = str(err).strip() or type(err).__name__
                             job_manager.log(f"⚠️ Error on {usn} (attempt {4-retries}): {err_str}")
+                            traceback.print_exc()
                             retries -= 1
                             await asyncio.sleep(2)
+                        finally:
+                            # Close popup tab to prevent leaking tabs across USN loop
+                            if active_page != page:
+                                try:
+                                    await active_page.close()
+                                except Exception:
+                                    pass
 
                     # Politeness delay before next USN
                     if job_manager.is_running and idx + 1 < len(usn_list):

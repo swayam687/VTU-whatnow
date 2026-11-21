@@ -1,3 +1,4 @@
+from datetime import datetime
 import threading
 from typing import List, Optional
 
@@ -21,6 +22,8 @@ class JobManager:
         self.logs: List[str] = []
 
     def log(self, message: str):
+        timestamp = datetime.now().strftime("%H:%M:%S")
+        print(f"[{timestamp}][SCRAPER] {message}", flush=True)
         self.status_message = message
         self.logs.append(message)
         if len(self.logs) > 50:

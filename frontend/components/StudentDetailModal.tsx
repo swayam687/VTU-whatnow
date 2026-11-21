@@ -355,30 +355,44 @@ export default function StudentDetailModal({
                   </p>
                 </div>
 
-                <div
-                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
-                    (student.show_my_backlogs || isMyVerifiedProfile) && student.total_backlogs > 0
-                      ? isObsidian
-                        ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
-                        : "bg-rose-50 border-rose-200 text-rose-700"
-                      : isObsidian
-                      ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
-                      : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                  }`}
-                >
-                  <p
-                    className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate"
-                    title="Re-attempts / Pending"
-                  >
-                    <span className="sm:hidden">Re-attempts</span>
-                    <span className="hidden sm:inline">Re-attempts / Pending</span>
-                  </p>
-                  <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
-                    {(student.show_my_backlogs || isMyVerifiedProfile) && student.total_backlogs > 0
-                      ? `${student.total_backlogs} Pending`
-                      : "All Clear"}
-                  </p>
-                </div>
+                {/* Pending / Re-attempts Tile */}
+                {(() => {
+                  const isHidden = !isMyVerifiedProfile && student.show_my_backlogs === false;
+                  const hasBacklogs = student.total_backlogs > 0;
+
+                  return (
+                    <div
+                      className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
+                        isHidden
+                          ? isObsidian
+                            ? "bg-slate-900/60 border-slate-800 text-slate-400"
+                            : "bg-slate-50 border-slate-200 text-slate-600"
+                          : hasBacklogs
+                          ? isObsidian
+                            ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
+                            : "bg-rose-50 border-rose-200 text-rose-700"
+                          : isObsidian
+                          ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
+                          : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      }`}
+                    >
+                      <p
+                        className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate"
+                        title="Re-attempts / Pending"
+                      >
+                        <span className="sm:hidden">Re-attempts</span>
+                        <span className="hidden sm:inline">Re-attempts / Pending</span>
+                      </p>
+                      <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                        {isHidden
+                          ? "Hidden"
+                          : hasBacklogs
+                          ? `${student.total_backlogs} Pending`
+                          : "All Clear"}
+                      </p>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Head-to-Head Comparison Banner */}

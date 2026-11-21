@@ -7,7 +7,7 @@ import { AuthSession } from "../../lib/api";
 import { sfx } from "../../lib/sfx";
 import StudentAuthModal from "../../components/StudentAuthModal";
 import PrivacySettingsModal from "../../components/PrivacySettingsModal";
-import { IconShield, IconKey, IconLock, IconCheck, IconClose } from "../../components/Icons";
+import { IconShield, IconKey, IconCheck, IconClose } from "../../components/Icons";
 
 export default function PrivacyPage() {
   const [isObsidian, setIsObsidian] = useState(true);
@@ -67,21 +67,21 @@ export default function PrivacyPage() {
         }}
       />
 
-      <div className="flex-1 max-w-4xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12">
+      <div className="flex-1 max-w-3xl w-full mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Breadcrumb & Header */}
-        <div className="mb-8">
+        <div className="mb-6">
           <Link
             href="/"
             onClick={() => sfx.playMechanicalClick()}
-            className={`inline-flex items-center gap-1.5 text-xs font-medium mb-4 transition-colors ${
+            className={`inline-flex items-center gap-1.5 text-xs font-medium mb-3 transition-colors ${
               isObsidian ? "text-slate-400 hover:text-white" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             <span>←</span>
-            <span>Back to Results Intelligence</span>
+            <span>Back to Results Explorer</span>
           </Link>
 
-          <div className="flex items-center gap-2.5 mb-2">
+          <div className="flex items-center gap-2 mb-2">
             <span
               className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full border ${
                 isObsidian
@@ -89,40 +89,69 @@ export default function PrivacyPage() {
                   : "bg-blue-50 text-blue-700 border-blue-200"
               }`}
             >
-              Consent &amp; Transparency Policy
+              Privacy &amp; Data Transparency
             </span>
-            <span className="text-xs opacity-50 font-mono">Updated November 2026</span>
           </div>
 
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Data Privacy, Student Consent &amp; Transparency
+            Privacy Policy &amp; Data Deletion
           </h1>
-          <p className="text-sm opacity-70 mt-2 max-w-2xl leading-relaxed">
-            VTU WhatNow is an independent, student-run academic analytics project built to provide
-            transparent departmental insights. Here is everything we store, why it is stored, and
-            how you maintain 100% control over your public record.
+          <p className="text-xs sm:text-sm opacity-75 mt-1.5 leading-relaxed">
+            VTU WhatNow is a student-run academic analytics project. Data is sourced directly from VTU&apos;s public examination results portal.
           </p>
         </div>
 
-        {/* Direct Action Callout */}
-        <div
-          className={`p-5 rounded-2xl border mb-10 transition-all ${
+        {/* 1. CRITICAL CALLOUT: HOW TO DELETE YOUR DATA */}
+        <section
+          className={`p-5 sm:p-6 rounded-2xl sm:rounded-3xl border mb-6 transition-all ${
             isObsidian
-              ? "bg-[#0d1117] border-white/10 text-white"
-              : "bg-white border-slate-200 text-slate-900 shadow-sm"
+              ? "bg-rose-950/20 border-rose-800/50 text-rose-100 shadow-xl shadow-rose-950/10"
+              : "bg-rose-50/70 border-rose-200 text-rose-950 shadow-sm"
           }`}
         >
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-sm font-bold tracking-tight flex items-center gap-2">
-                <IconShield className="w-4 h-4 text-cyan-400" />
-                <span>Self-Service Student Privacy Controls</span>
-              </h2>
-              <p className="text-xs opacity-70 mt-1 max-w-lg leading-relaxed">
-                You do not need to email an administrator to hide your name or marks. Verified students
-                can immediately toggle their public visibility directly from their dashboard.
-              </p>
+          <div className="flex items-center gap-2.5 mb-3">
+            <div className="w-8 h-8 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center font-bold text-sm">
+              🗑️
             </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold tracking-tight text-rose-600 dark:text-rose-300">
+                How to delete your data:
+              </h2>
+              <p className="text-xs opacity-80">Simple self-service request to remove your profile.</p>
+            </div>
+          </div>
+
+          <ol className="space-y-2 mt-3 text-xs sm:text-sm font-medium">
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                1
+              </span>
+              <span>Sign in with your USN.</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                2
+              </span>
+              <span>Go to your Profile Settings.</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                3
+              </span>
+              <span>Click &ldquo;Request updation&rdquo;.</span>
+            </li>
+            <li className="flex items-start gap-2.5">
+              <span className="w-5 h-5 rounded-full bg-rose-500/20 text-rose-500 dark:text-rose-300 font-mono font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                4
+              </span>
+              <span>Your request is sent to the admin, and your data will be permanently deleted within 24 hours.</span>
+            </li>
+          </ol>
+
+          <div className="mt-4 pt-3 border-t border-rose-500/20 flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-[11px] opacity-75">
+              Want to manage privacy settings instead?
+            </span>
             {studentSession ? (
               <button
                 type="button"
@@ -130,9 +159,9 @@ export default function PrivacyPage() {
                   sfx.playMechanicalClick();
                   setIsPrivacyModalOpen(true);
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-400 text-slate-950 transition-all shadow-xs shrink-0"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs cursor-pointer"
               >
-                Manage My Privacy Settings ({studentSession.usn})
+                Manage Privacy Controls ({studentSession.usn})
               </button>
             ) : (
               <button
@@ -141,202 +170,100 @@ export default function PrivacyPage() {
                   sfx.playMechanicalClick();
                   setIsAuthModalOpen(true);
                 }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-all shadow-sm shrink-0 inline-flex items-center gap-1.5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 active:scale-[0.98]"
+                className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-rose-600 hover:bg-rose-700 text-white shadow-xs inline-flex items-center gap-1.5 cursor-pointer"
               >
                 <IconKey className="w-3.5 h-3.5" />
-                <span>Log In With USN to Configure</span>
+                <span>Sign In to Request Deletion</span>
               </button>
             )}
           </div>
-        </div>
+        </section>
 
-        {/* Content Sections */}
-        <div className="space-y-8 text-xs sm:text-sm leading-relaxed">
-          {/* Section 1 */}
-          <section
-            className={`p-5 rounded-2xl border ${
+        {/* 2. WHAT WE STORE VS NEVER COLLECT */}
+        <section className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+          <div
+            className={`p-4 rounded-2xl border ${
               isObsidian ? "bg-[#0c0e12] border-slate-800/90" : "bg-white border-slate-200 shadow-xs"
             }`}
           >
-            <h2 className="font-bold text-sm sm:text-base tracking-tight mb-2 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold">
-                1
-              </span>
-              <span>Project Provenance &amp; Academic Data Source</span>
-            </h2>
-            <p className="opacity-80 leading-relaxed mb-3">
-              VTU WhatNow is a peer analytics software system maintained independently by engineering
-              students. It is not owned, operated, or endorsed by Visvesvaraya Technological
-              University (VTU).
-            </p>
-            <p className="opacity-80 leading-relaxed">
-              All academic examination records displayed on this platform are collected strictly from
-              VTU&apos;s publicly reachable university examination results portal (<code>results.vtu.ac.in</code>).
-              Because the university publishes results indexed by University Seat Number (USN), our system
-              synthesizes aggregate departmental distributions, class rankings, and subject pass percentages
-              to assist students in understanding departmental benchmarks.
-            </p>
-          </section>
-
-          {/* Section 2 */}
-          <section
-            className={`p-5 rounded-2xl border ${
-              isObsidian ? "bg-[#0c0e12] border-slate-800/90" : "bg-white border-slate-200 shadow-xs"
-            }`}
-          >
-            <h2 className="font-bold text-sm sm:text-base tracking-tight mb-2 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold">
-                2
-              </span>
-              <span>What Data We Store vs What We Never Collect</span>
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-              <div
-                className={`p-3.5 rounded-xl border ${
-                  isObsidian ? "bg-white/[0.02] border-white/10" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 text-emerald-500 font-bold text-xs uppercase mb-2">
-                  <IconCheck className="w-4 h-4" />
-                  <span>Publicly Published Academic Data We Store</span>
-                </div>
-                <ul className="space-y-1.5 opacity-80 text-xs list-disc pl-4">
-                  <li>University Seat Number (USN)</li>
-                  <li>Student Name (as registered with VTU)</li>
-                  <li>Branch Code (CSE, DS, AIML, CY, ISE, ECE)</li>
-                  <li>Semester Breakdown &amp; Subject Codes</li>
-                  <li>Internal, External, and Total Subject Marks</li>
-                  <li>Calculated Semester Percentage &amp; Class Rank</li>
-                  <li>Optional student-added social handles (GitHub, LinkedIn)</li>
-                </ul>
-              </div>
-
-              <div
-                className={`p-3.5 rounded-xl border ${
-                  isObsidian ? "bg-white/[0.02] border-white/10" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                <div className="flex items-center gap-1.5 text-rose-500 font-bold text-xs uppercase mb-2">
-                  <IconClose className="w-4 h-4" />
-                  <span>Confidential Data We NEVER Collect</span>
-                </div>
-                <ul className="space-y-1.5 opacity-80 text-xs list-disc pl-4">
-                  <li>No VTU login passwords or credentials</li>
-                  <li>No personal phone numbers or SMS data</li>
-                  <li>No personal email addresses</li>
-                  <li>No residential addresses or government ID numbers</li>
-                  <li>No payment or financial transaction details</li>
-                  <li>No third-party tracking or behavioral advertising cookies</li>
-                </ul>
-              </div>
+            <div className="flex items-center gap-1.5 text-emerald-500 font-bold text-xs uppercase mb-2">
+              <IconCheck className="w-4 h-4" />
+              <span>Public Academic Data Stored</span>
             </div>
-          </section>
+            <ul className="space-y-1 text-xs opacity-80 list-disc pl-4">
+              <li>University Seat Number (USN)</li>
+              <li>Student Name (from university records)</li>
+              <li>Branch &amp; Semester Subject Marks</li>
+              <li>Calculated Semester Percentage &amp; Rank</li>
+            </ul>
+          </div>
 
-          {/* Section 3 */}
-          <section
-            className={`p-5 rounded-2xl border ${
+          <div
+            className={`p-4 rounded-2xl border ${
               isObsidian ? "bg-[#0c0e12] border-slate-800/90" : "bg-white border-slate-200 shadow-xs"
             }`}
           >
-            <h2 className="font-bold text-sm sm:text-base tracking-tight mb-2 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold">
-                3
-              </span>
-              <span>Examination Records &amp; Backlog Privacy Controls</span>
-            </h2>
-            <p className="opacity-80 leading-relaxed mb-4">
-              All student names, USNs, examination marks, and departmental percentiles are transparent academic
-              records sourced from VTU’s public results portal. To preserve individual dignity, students have
-              direct control over whether pending subjects (re-attempts) are publicly flagged:
-            </p>
-            <div className="space-y-3">
-              <div
-                className={`p-3.5 rounded-xl border ${
-                  isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold font-mono text-xs">Public Examination Records (Name, Marks, Rank)</span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-500">Always Public</span>
-                </div>
-                <p className="text-xs opacity-70 mt-1">
-                  University seat numbers, student names, semester marks, percentages, and batch ranks remain
-                  authentic and transparent for unbiased college analytics. Peer comparison is active across
-                  all records.
-                </p>
-              </div>
-
-              <div
-                className={`p-3.5 rounded-xl border ${
-                  isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-bold font-mono text-xs">show_my_backlogs (Pending Subjects / Re-attempts)</span>
-                  <span className="text-[10px] uppercase font-bold text-emerald-500">Default: ON (Public)</span>
-                </div>
-                <p className="text-xs opacity-70 mt-1">
-                  Default is <strong>ON</strong>. When ON, your public badge displays your pending re-attempts count,
-                  and subjects pending re-attempt are marked with result &ldquo;F&rdquo; in your marks breakdown. If opted out
-                  (OFF), your public badge displays &ldquo;All Clear&rdquo; and failed subjects are filtered from public view.
-                  Verified account owners always see all their authentic scores regardless of toggle setting.
-                </p>
-              </div>
+            <div className="flex items-center gap-1.5 text-rose-500 font-bold text-xs uppercase mb-2">
+              <IconClose className="w-4 h-4" />
+              <span>Never Collected</span>
             </div>
-          </section>
+            <ul className="space-y-1 text-xs opacity-80 list-disc pl-4">
+              <li>No phone numbers or email addresses</li>
+              <li>No passwords or VTU portal credentials</li>
+              <li>No financial or residential details</li>
+              <li>No third-party ad tracking cookies</li>
+            </ul>
+          </div>
+        </section>
 
-          {/* Section 4 */}
-          <section
-            className={`p-5 rounded-2xl border ${
-              isObsidian ? "bg-[#0c0e12] border-slate-800/90" : "bg-white border-slate-200 shadow-xs"
-            }`}
-          >
-            <h2 className="font-bold text-sm sm:text-base tracking-tight mb-2 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold">
-                4
-              </span>
-              <span>Re-attempts &amp; Backlog Protection Standards</span>
+        {/* 3. PENDING SUBJECTS PRIVACY (SHOW / HIDE) */}
+        <section
+          className={`p-5 rounded-2xl border mb-6 ${
+            isObsidian ? "bg-[#0c0e12] border-slate-800/90" : "bg-white border-slate-200 shadow-xs"
+          }`}
+        >
+          <div className="flex items-center gap-2 mb-2">
+            <IconShield className="w-4 h-4 text-cyan-400" />
+            <h2 className="font-bold text-sm sm:text-base tracking-tight">
+              Pending Subjects Privacy Control
             </h2>
-            <p className="opacity-80 leading-relaxed mb-3">
-              We strictly adhere to student-first dignity guidelines. Terminology throughout our UI
-              uses &ldquo;Pending Subjects&rdquo; or &ldquo;Re-attempts&rdquo; rather than stigmatizing labels.
-            </p>
-            <p className="opacity-80 leading-relaxed">
-              Institutional aggregations (such as departmental subject pass percentages or difficult subject
-              curves) are computed strictly across anonymous statistics without ever exposing or linking
-              individual student identities to subject backlogs.
-            </p>
-          </section>
+          </div>
+          <p className="text-xs opacity-75 leading-relaxed mb-3">
+            Students can toggle their pending subjects visibility from their privacy settings at any time:
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div
+              className={`p-3 rounded-xl border ${
+                isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
+              }`}
+            >
+              <div className="flex items-center justify-between font-semibold mb-1">
+                <span>Default: ON</span>
+                <span className="text-[10px] uppercase font-bold text-emerald-500">Public</span>
+              </div>
+              <p className="opacity-70 text-[11px] leading-relaxed">
+                Displays re-attempts count pill and pending subjects in marks breakdown.
+              </p>
+            </div>
 
-          {/* Section 5 */}
-          <section
-            className={`p-5 rounded-2xl border ${
-              isObsidian ? "bg-[#0c0e12] border-slate-800/90" : "bg-white border-slate-200 shadow-xs"
-            }`}
-          >
-            <h2 className="font-bold text-sm sm:text-base tracking-tight mb-2 flex items-center gap-2">
-              <span className="w-5 h-5 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center text-xs font-mono font-bold">
-                5
-              </span>
-              <span>Complete Data Takedown &amp; Unlisting Requests</span>
-            </h2>
-            <p className="opacity-80 leading-relaxed mb-3">
-              If you wish to have your USN permanently unlisted from VTU WhatNow without using the
-              self-service dashboard, you can file a quick unlisting request:
-            </p>
-            <ol className="list-decimal pl-4 space-y-1.5 opacity-80">
-              <li>Log in to your account and submit an unlisting request from the settings menu, OR</li>
-              <li>Submit an ownership dispute / support ticket directly from the login dialog with proof of college ID.</li>
-            </ol>
-            <p className="opacity-80 leading-relaxed mt-3">
-              Takedown requests submitted with valid college credentials are honored and processed
-              within 48 hours.
-            </p>
-          </section>
-        </div>
+            <div
+              className={`p-3 rounded-xl border ${
+                isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
+              }`}
+            >
+              <div className="flex items-center justify-between font-semibold mb-1">
+                <span>Opted Out: OFF</span>
+                <span className="text-[10px] uppercase font-bold text-slate-400">Protected</span>
+              </div>
+              <p className="opacity-70 text-[11px] leading-relaxed">
+                Public badge displays &ldquo;Hidden&rdquo; instead of &ldquo;All Clear&rdquo;, keeping status private.
+              </p>
+            </div>
+          </div>
+        </section>
 
-        {/* Footer info */}
-        <div className="mt-12 pt-6 border-t border-inherit flex flex-col sm:flex-row items-center justify-between gap-4 text-xs opacity-60">
+        {/* Footer */}
+        <div className="pt-6 border-t border-inherit flex flex-col sm:flex-row items-center justify-between gap-4 text-xs opacity-60">
           <p>© {new Date().getFullYear()} VTU WhatNow • Student-run Open Analytics</p>
           <div className="flex items-center gap-4">
             <Link href="/" className="hover:underline">Dashboard</Link>

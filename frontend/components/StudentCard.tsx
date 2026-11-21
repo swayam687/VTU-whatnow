@@ -25,33 +25,52 @@ export default function StudentCard({
   isObsidian = false,
   isMyProfile = false,
 }: StudentCardProps) {
-  // Backlog control: only displayed if student opted in (show_my_backlogs) or on their own verified profile
-  const shouldShowBacklogs = Boolean(student.show_my_backlogs || isMyProfile);
+  // Backlog control: if student opted to hide pending subjects, show "Hidden" publicly.
+  // Only show "All Clear" if show_my_backlogs is true (or verified owner) AND total_backlogs === 0.
+  const isHiddenByStudent = !isMyProfile && student.show_my_backlogs === false;
   const hasBacklogs = student.total_backlogs > 0;
   const isTopper = student.percentage >= 80 && !hasBacklogs;
 
-  // Status pill: shows "Re-attempts" or "Pending" if opted-in and has backlogs, otherwise "All Clear"
-  const pendingStatusBadge = shouldShowBacklogs && hasBacklogs ? (
-    <span
-      className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-        isObsidian
-          ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-          : "bg-rose-50 text-rose-700 border-rose-200"
-      }`}
-    >
-      {student.total_backlogs} Re-attempt{student.total_backlogs > 1 ? "s" : ""}
-    </span>
-  ) : (
-    <span
-      className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
-        isObsidian
-          ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
-          : "bg-emerald-50 text-emerald-700 border-emerald-200"
-      }`}
-    >
-      All Clear
-    </span>
-  );
+  // Status pill: "Hidden" if opted out, "Re-attempts" if has backlogs, "All Clear" ONLY if 0 backlogs & opted in
+  let pendingStatusBadge: React.ReactNode;
+  if (isHiddenByStudent) {
+    pendingStatusBadge = (
+      <span
+        className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+          isObsidian
+            ? "bg-slate-900 text-slate-400 border-slate-800"
+            : "bg-slate-100 text-slate-600 border-slate-200"
+        }`}
+        title="Student opted to hide pending subjects status"
+      >
+        Hidden
+      </span>
+    );
+  } else if (hasBacklogs) {
+    pendingStatusBadge = (
+      <span
+        className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+          isObsidian
+            ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
+            : "bg-rose-50 text-rose-700 border-rose-200"
+        }`}
+      >
+        {student.total_backlogs} Re-attempt{student.total_backlogs > 1 ? "s" : ""}
+      </span>
+    );
+  } else {
+    pendingStatusBadge = (
+      <span
+        className={`inline-block text-[9px] font-bold px-2 py-0.5 rounded-full border ${
+          isObsidian
+            ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
+            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+        }`}
+      >
+        All Clear
+      </span>
+    );
+  }
 
   return (
     <div className="w-full flex flex-col h-full">
