@@ -265,8 +265,21 @@ export default function StudentAuthModal({
         {/* Modal Body */}
         <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs sm:text-sm leading-relaxed">
-              ⚠️ {error}
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs sm:text-sm leading-relaxed space-y-2">
+              <p>⚠️ {error}</p>
+              {error.toLowerCase().includes("selfie") && mode === "auth" && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setMode("dispute");
+                    setError(null);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-xs transition-colors cursor-pointer"
+                >
+                  <span>📸 Send Selfie Verification Now →</span>
+                </button>
+              )}
             </div>
           )}
 
@@ -325,12 +338,35 @@ export default function StudentAuthModal({
                 </div>
 
                 {authStatus?.exists ? (
-                  <div className="mt-2 text-xs flex items-center justify-between">
-                    <span className={authStatus.is_claimed ? "text-amber-400" : "text-emerald-400"}>
-                      {authStatus.name} ({authStatus.branch}) •{" "}
-                      {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
-                    </span>
-                  </div>
+                  authStatus.is_hidden ? (
+                    <div className="mt-3 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 space-y-2">
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <span>🚫</span>
+                        <span>USN Deleted / Hidden</span>
+                      </div>
+                      <p className="text-xs leading-relaxed opacity-95">
+                        USN deleted, request admin to add this USN data again and send your selfie to verify that you are the owner of the USN.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playMechanicalClick();
+                          setMode("dispute");
+                          setError(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-xs transition-colors cursor-pointer"
+                      >
+                        <span>📸 Send Selfie Verification to Admin →</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs flex items-center justify-between">
+                      <span className={authStatus.is_claimed ? "text-amber-400" : "text-emerald-400"}>
+                        {authStatus.name} ({authStatus.branch}) •{" "}
+                        {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
+                      </span>
+                    </div>
+                  )
                 ) : authStatus && !authStatus.exists ? (
                   <div className="mt-3">
                     {missingReportSuccess ? (
@@ -420,8 +456,8 @@ export default function StudentAuthModal({
                 ) : null}
               </div>
 
-              {/* Password Field & Submit (Only when USN exists or not yet typed) */}
-              {(!authStatus || authStatus.exists) && (
+              {/* Password Field & Submit (Only when USN exists and is not hidden, or not yet checked) */}
+              {(!authStatus || (authStatus.exists && !authStatus.is_hidden)) && (
                 <>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">

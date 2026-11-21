@@ -130,6 +130,11 @@ export default function AdminPanel() {
   const [missingReportsLoading, setMissingReportsLoading] = useState(false);
   const [missingFilter, setMissingFilter] = useState<"all" | "pending" | "resolved">("pending");
 
+  // Records visibility filter & direct toggle
+  const [recordsVisibilityFilter, setRecordsVisibilityFilter] = useState<"all" | "visible" | "hidden">("all");
+  const [directUsnToToggle, setDirectUsnToToggle] = useState<string>("");
+  const [directUsnLoading, setDirectUsnLoading] = useState<boolean>(false);
+
   // Login Logs & Comparison state
   const [loginLogsData, setLoginLogsData] = useState<LoginLogsData | null>(null);
   const [logsLoading, setLogsLoading] = useState(false);
@@ -802,6 +807,8 @@ export default function AdminPanel() {
   };
 
   const filteredStoredStudents = allStudents.filter((s) => {
+    if (recordsVisibilityFilter === "visible" && s.is_hidden) return false;
+    if (recordsVisibilityFilter === "hidden" && !s.is_hidden) return false;
     if (!studentSearch.trim()) return true;
     const q = studentSearch.toLowerCase().trim();
     return s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q) || s.branch.toLowerCase().includes(q);
@@ -1736,12 +1743,78 @@ export default function AdminPanel() {
       {/* ------------------------------------------------------------- */}
       {activeTab === "records" && (
         <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          {/* Quick Direct USN Visibility Controller */}
+          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5">
             <div>
-              <h2 className="font-bold text-slate-900 text-base">
-                Permanent Student Records in Supabase ({allStudents.length})
-              </h2>
-              <p className="text-xs text-slate-400">Search students, manage GitHub/LinkedIn links, or delete records.</p>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                <IconShield className="w-4 h-4 text-slate-700" />
+                <span>On-Demand USN Visibility Controller (Hide &amp; Unhide Specific USN)</span>
+              </h3>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Enter any specific student USN to instantly hide them from public view (revoking any active login session), or restore/unhide their data.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="text"
+                value={directUsnToToggle}
+                onChange={(e) => setDirectUsnToToggle(e.target.value.toUpperCase())}
+                placeholder="Enter exact USN (e.g. 1RM25CD052)..."
+                className="px-3 py-1.5 text-xs font-mono rounded-xl border border-slate-300 bg-white text-slate-900 outline-none w-64 focus:ring-2 focus:ring-slate-900"
+              />
+              <button
+                type="button"
+                disabled={!directUsnToToggle.trim() || directUsnLoading}
+                onClick={async () => {
+                  if (!directUsnToToggle.trim()) return;
+                  setDirectUsnLoading(true);
+                  await handleToggleVisibility(directUsnToToggle.trim(), true);
+                  setDirectUsnLoading(false);
+                }}
+                className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                🚫 Hide USN
+              </button>
+              <button
+                type="button"
+                disabled={!directUsnToToggle.trim() || directUsnLoading}
+                onClick={async () => {
+                  if (!directUsnToToggle.trim()) return;
+                  setDirectUsnLoading(true);
+                  await handleToggleVisibility(directUsnToToggle.trim(), false);
+                  setDirectUsnLoading(false);
+                }}
+                className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              >
+                ✅ Unhide USN
+              </button>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {[
+                { id: "all", label: `All Records (${allStudents.length})` },
+                { id: "visible", label: `Visible (${allStudents.filter((s) => !s.is_hidden).length})` },
+                { id: "hidden", label: `Hidden / Deleted (${allStudents.filter((s) => s.is_hidden).length})` },
+              ].map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    setRecordsVisibilityFilter(f.id as "all" | "visible" | "hidden");
+                  }}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
+                    recordsVisibilityFilter === f.id
+                      ? "bg-slate-900 text-white"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
             </div>
 
             <div className="relative w-full sm:w-64">
@@ -1822,14 +1895,14 @@ export default function AdminPanel() {
                       <button
                         type="button"
                         onClick={() => handleToggleVisibility(s.usn, !s.is_hidden)}
-                        title={s.is_hidden ? `Unhide ${s.name} (Restore to public view)` : `Hide ${s.name} (Remove from public view)`}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold transition-colors ${
+                        title={s.is_hidden ? `Unhide ${s.name} (${s.usn}) - Restore to public view` : `Hide ${s.name} (${s.usn}) - Remove from public view`}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
                           s.is_hidden
-                            ? "bg-amber-100 text-amber-800 hover:bg-amber-200 border border-amber-300"
-                            : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            : "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300"
                         }`}
                       >
-                        {s.is_hidden ? "Unhide" : "Hide Record"}
+                        {s.is_hidden ? "✅ Unhide" : "🚫 Hide USN"}
                       </button>
 
                       <button

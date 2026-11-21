@@ -187,7 +187,7 @@ export default function Dashboard() {
       // ignore
     }
 
-    // Active listener: Kick out user immediately if token is invalidated on the server
+    // Active listener: Kick out user immediately if token is invalidated on the server (e.g. USN hidden/deleted)
     const handleRevocation = () => {
       sessionStorage.removeItem("vtu_student_token");
       sessionStorage.removeItem("vtu_student_session");
@@ -196,11 +196,28 @@ export default function Dashboard() {
       setStudentSession(null);
       setMyUsn("");
       loadStudentsData(null);
-      alert("⚠️ Your session has been terminated because ownership of this USN was verified and transferred to another user. Please log in with the new password.");
+      alert("⚠️ Your session has ended because this USN was deleted/hidden by admin. To restore access, send your selfie photo verification to the admin.");
     };
 
     window.addEventListener("vtu:session-revoked", handleRevocation);
-    return () => window.removeEventListener("vtu:session-revoked", handleRevocation);
+
+    // Also re-verify on window focus (e.g. user returns to tab or admin altered status)
+    const handleFocus = () => {
+      const activeToken = sessionStorage.getItem("vtu_student_token");
+      if (activeToken) {
+        verifyStudentSession(activeToken).then((res) => {
+          if (!res.valid) {
+            handleRevocation();
+          }
+        });
+      }
+    };
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      window.removeEventListener("vtu:session-revoked", handleRevocation);
+      window.removeEventListener("focus", handleFocus);
+    };
   }, []);
 
   const handleAuthSuccess = (session: AuthSession) => {

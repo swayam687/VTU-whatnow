@@ -72,6 +72,7 @@ export interface AuthStatus {
   is_claimed: boolean;
   name?: string;
   branch?: string;
+  is_hidden?: boolean;
 }
 
 export interface AuthSession {
@@ -656,7 +657,12 @@ export async function verifyStudentSession(token?: string): Promise<{
       headers: { "X-Student-Token": activeToken },
       cache: "no-store",
     });
-    if (!res.ok) return { valid: false };
+    if (!res.ok) {
+      if (res.status === 401 && typeof window !== "undefined") {
+        window.dispatchEvent(new Event("vtu:session-revoked"));
+      }
+      return { valid: false };
+    }
     return await res.json();
   } catch {
     return { valid: false };

@@ -133,6 +133,7 @@ class AuthStatusResponse(BaseModel):
     is_claimed: bool
     name: Optional[str] = ""
     branch: Optional[str] = ""
+    is_hidden: Optional[bool] = False
 
 class AuthLoginRequest(BaseModel):
     usn: str

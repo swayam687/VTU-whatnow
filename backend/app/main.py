@@ -128,9 +128,9 @@ def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
     usn = parts[0].strip().upper()
     token_sig = parts[1]
 
-    # Verify student exists and has claimed password
+    # Verify student exists and has claimed password and is not hidden/deleted
     student = db.query(Student).filter(Student.usn == usn).first()
-    if not student or not student.password_hash or not student.is_claimed:
+    if not student or not student.password_hash or not student.is_claimed or student.is_hidden:
         AUTH_SESSIONS.pop(token, None)
         return None
 
@@ -412,6 +412,7 @@ def get_auth_status(usn: str = Query(..., description="USN to check"), db: Sessi
         is_claimed=bool(student.is_claimed and student.password_hash),
         name=student.name,
         branch=student.branch,
+        is_hidden=bool(student.is_hidden),
     )
 
 
@@ -431,6 +432,12 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
         raise HTTPException(
             status_code=404,
             detail=f"USN '{clean_usn}' not found in results database. Please ask admin to scrape your marks first."
+        )
+
+    if student.is_hidden:
+        raise HTTPException(
+            status_code=403,
+            detail="USN deleted, request admin to add this USN data again and send your selfie to verify that you are the owner of the USN."
         )
 
     client_ip = request.client.host if request.client else "unknown"
@@ -505,9 +512,14 @@ def verify_student_session(
     if not usn:
         raise HTTPException(
             status_code=401,
-            detail="Session has expired or USN ownership was updated. Please log in again."
+            detail="Session has expired or USN has been hidden/deleted. Please log in again."
         )
     student = db.query(Student).filter(Student.usn == usn).first()
+    if not student or student.is_hidden:
+        raise HTTPException(
+            status_code=401,
+            detail="USN deleted, request admin to add this USN data again and send your selfie to verify that you are the owner of the USN."
+        )
     return StudentSessionVerifyResponse(
         valid=True,
         usn=student.usn,
@@ -846,11 +858,15 @@ def handle_admin_rescrape_action(
         student = db.query(Student).filter(Student.usn == item.usn).first()
         if student:
             student.is_hidden = True
+            # Invalidate all active sessions for this USN to immediately throw them out
+            tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u.strip().upper() == item.usn.strip().upper()]
+            for t in tokens_to_evict:
+                AUTH_SESSIONS.pop(t, None)
         item.status = "resolved"
         item.resolved_at = datetime.utcnow()
         item.admin_notes = req.admin_notes or "Profile hidden from public view per data deletion request."
         db.commit()
-        return {"ok": True, "message": f"Student {item.usn} profile has been hidden from public views."}
+        return {"ok": True, "message": f"Student {item.usn} profile has been hidden from public views and active sessions revoked."}
 
     elif req.action == "unhide_student":
         student = db.query(Student).filter(Student.usn == item.usn).first()
@@ -874,12 +890,17 @@ def toggle_student_visibility(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
     student.is_hidden = hidden
+    if hidden:
+        # Throw them out: Invalidate any active sessions immediately
+        tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u.strip().upper() == clean_usn]
+        for t in tokens_to_evict:
+            AUTH_SESSIONS.pop(t, None)
     db.commit()
     return {
         "ok": True,
         "usn": clean_usn,
         "is_hidden": student.is_hidden,
-        "message": f"Student {clean_usn} is now {'hidden from' if hidden else 'visible in'} public views."
+        "message": f"Student {clean_usn} is now {'hidden from' if hidden else 'restored/visible in'} public views."
     }
 
 
@@ -1010,6 +1031,7 @@ def review_dispute(dispute_id: int, req: DisputeReviewRequest, db: Session = Dep
         if student:
             student.password_hash = dispute.new_password_hash
             student.is_claimed = True
+            student.is_hidden = False  # Restores/unhides the USN data for the verified owner!
             # Invalidate all active memory sessions for this USN to immediately kick out old user
             tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u == student.usn]
             for t in tokens_to_evict:
