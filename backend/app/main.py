@@ -1508,6 +1508,7 @@ def get_student_privacy(
         raise HTTPException(status_code=404, detail="Student not found.")
     return {
         "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else True,
+        "hidden": bool(student.is_hidden) if student.is_hidden is not None else False,
     }
 
 
@@ -1530,11 +1531,14 @@ def update_student_privacy(
 
     if data.show_my_backlogs is not None:
         student.show_my_backlogs = data.show_my_backlogs
+    if data.hidden is not None:
+        student.is_hidden = data.hidden
 
     db.commit()
     db.refresh(student)
     return {
         "show_my_backlogs": student.show_my_backlogs if student.show_my_backlogs is not None else True,
+        "hidden": bool(student.is_hidden) if student.is_hidden is not None else False,
     }
 
 

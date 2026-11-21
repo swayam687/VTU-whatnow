@@ -187,6 +187,7 @@ export async function fetchStudent(usn: string, token?: string): Promise<Student
 
 export interface PrivacySettings {
   show_my_backlogs: boolean;
+  hidden?: boolean;
 }
 
 export async function fetchStudentPrivacy(usn: string, token?: string): Promise<PrivacySettings> {

@@ -1,6 +1,6 @@
 from datetime import datetime
 from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, synonym
 from .database import Base
 
 class Student(Base):
@@ -32,6 +32,7 @@ class Student(Base):
     show_my_backlogs = Column(Boolean, default=True)  # default on
     allow_comparison = Column(Boolean, default=True)
     is_hidden = Column(Boolean, default=False)  # Soft hide for data deletion requests / admin control
+    hidden = synonym("is_hidden")
 
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")
 

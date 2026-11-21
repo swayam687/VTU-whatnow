@@ -37,9 +37,11 @@ class StudentBase(BaseModel):
 
 class PrivacySettingsUpdate(BaseModel):
     show_my_backlogs: Optional[bool] = None
+    hidden: Optional[bool] = None
 
 class PrivacySettingsOut(BaseModel):
     show_my_backlogs: bool = True
+    hidden: bool = False
 
 class AvatarUpdateRequest(BaseModel):
     pixel_art: str

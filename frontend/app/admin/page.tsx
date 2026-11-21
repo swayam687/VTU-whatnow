@@ -154,6 +154,7 @@ export default function AdminPanel() {
   const [newLinkSem, setNewLinkSem] = useState("1");
   const [addingLink, setAddingLink] = useState(false);
   const [linkActionMsg, setLinkActionMsg] = useState("");
+  const [savingLinkId, setSavingLinkId] = useState<number | null>(null);
 
   // Scraper status & Captcha
   const [status, setStatus] = useState<ScrapeStatus>({
@@ -401,6 +402,68 @@ export default function AdminPanel() {
       const msg = err instanceof Error ? err.message : "Failed to toggle visibility";
       alert(msg);
     }
+  };
+
+  const handleSaveAsSemesterLink = async (r: RescrapeRequestRecord) => {
+    const rawUrl = (r.vtu_link || r.custom_url || "").trim();
+    if (!rawUrl || !adminKey) return;
+
+    setSavingLinkId(r.id);
+    sfx.playClick();
+
+    const sem = r.target_semester && r.target_semester !== "all" ? r.target_semester : "1";
+    let linkTitle = `SEM-${sem} RESULTS`;
+    if (r.request_type === "REVALUATION") {
+      linkTitle = `SEM-${sem} REVAL`;
+    } else if (r.request_type === "RE_EXAM") {
+      linkTitle = `SEM-${sem} MAKEUP`;
+    } else if (r.request_type === "MISSING_SEMESTER") {
+      linkTitle = `SEM-${sem} REGULAR`;
+    }
+
+    try {
+      const created = await createSemesterLink(
+        {
+          title: linkTitle,
+          url: rawUrl,
+          semester: sem,
+          is_default: false,
+        },
+        adminKey
+      );
+      await loadSemesterLinks();
+      setSelectedSemesterLinkId(created.id);
+      setUseCustomUrl(false);
+      setActionSuccessMsg(`Saved "${created.title}" as Semester Link! Activated in Scraper.`);
+      sfx.playSonar();
+      setTimeout(() => setActionSuccessMsg(""), 5000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to save semester link";
+      alert(msg);
+    } finally {
+      setSavingLinkId(null);
+    }
+  };
+
+  const handlePrefillSemesterForm = (r: RescrapeRequestRecord) => {
+    const rawUrl = (r.vtu_link || r.custom_url || "").trim();
+    if (!rawUrl) return;
+
+    const sem = r.target_semester && r.target_semester !== "all" ? r.target_semester : "1";
+    let linkTitle = `SEM-${sem} RESULTS`;
+    if (r.request_type === "REVALUATION") {
+      linkTitle = `SEM-${sem} REVAL`;
+    } else if (r.request_type === "RE_EXAM") {
+      linkTitle = `SEM-${sem} MAKEUP`;
+    } else if (r.request_type === "MISSING_SEMESTER") {
+      linkTitle = `SEM-${sem} REGULAR`;
+    }
+
+    setNewLinkTitle(linkTitle);
+    setNewLinkUrl(rawUrl);
+    setNewLinkSem(sem);
+    setActiveTab("semesters");
+    sfx.playClick();
   };
 
   // Load Semester Coverage Audit
@@ -2157,24 +2220,43 @@ export default function AdminPanel() {
 
                           {/* VTU Link / Custom URL if provided */}
                           {(r.vtu_link || r.custom_url) && (
-                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-between text-xs">
-                              <div className="min-w-0 flex-1 mr-2">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                                  VTU Result Link:
+                            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2 text-xs">
+                              <div>
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+                                  Student Provided VTU Result Link:
                                 </span>
-                                <span className="text-[11px] font-mono text-slate-700 truncate block">
+                                <span className="text-[11px] font-mono text-slate-800 break-all select-all block bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 font-medium">
                                   {r.vtu_link || r.custom_url}
                                 </span>
                               </div>
-                              <a
-                                href={r.vtu_link || r.custom_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-600 hover:text-blue-800 shrink-0 px-2 py-1 bg-white border border-slate-200 rounded-lg shadow-xs"
-                              >
-                                <span>Open Link</span>
-                                <IconExternalLink className="w-3 h-3" />
-                              </a>
+                              <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                                <button
+                                  type="button"
+                                  disabled={savingLinkId === r.id}
+                                  onClick={() => handleSaveAsSemesterLink(r)}
+                                  title="One-click save directly into database semester_links table and activate in scraper"
+                                  className="inline-flex items-center gap-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl shadow-xs transition-transform active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                >
+                                  <span>{savingLinkId === r.id ? "Saving Link..." : "💾 Save as Semester Link"}</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handlePrefillSemesterForm(r)}
+                                  title="Open in Add Semester Link form pre-filled with this link & context title"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+                                >
+                                  <span>Pre-fill in Semesters Form ↗</span>
+                                </button>
+                                <a
+                                  href={r.vtu_link || r.custom_url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl shadow-xs hover:bg-blue-50 transition-colors"
+                                >
+                                  <span>Open Link</span>
+                                  <IconExternalLink className="w-3 h-3" />
+                                </a>
+                              </div>
                             </div>
                           )}
 
