@@ -61,7 +61,7 @@ export default function Navbar({
             }`}
           >
             <img
-              src="/app-icon.png"
+              src="/logo.png"
               alt="VTU WhatNow Logo"
               className="w-full h-full object-cover relative z-10"
               onError={(e) => {
