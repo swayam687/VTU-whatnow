@@ -49,7 +49,7 @@ function useSequentialUSNScramble(targetUsn: string | null, isActive: boolean) {
 
     const cleanUsn = targetUsn.trim().toUpperCase();
     const len = cleanUsn.length;
-    const TOTAL_MS = 2000;
+    const TOTAL_MS = 1300; // 1.3 seconds (within 1.2 to 1.5s range)
 
     // Build the natural progression sequence for each character
     const charSequences: string[][] = [];
@@ -83,9 +83,9 @@ function useSequentialUSNScramble(targetUsn: string | null, isActive: boolean) {
 
       charSequences.push(seq);
 
-      // Stagger lock times from 450ms up to 1950ms so positions resolve smoothly
-      const minLock = 450;
-      const maxLock = 1950;
+      // Stagger lock times from 250ms up to 1250ms so positions resolve smoothly
+      const minLock = 250;
+      const maxLock = 1250;
       const lockT = len <= 1 ? TOTAL_MS : minLock + (i / (len - 1)) * (maxLock - minLock);
       lockTimes.push(lockT);
     }
@@ -101,8 +101,8 @@ function useSequentialUSNScramble(targetUsn: string | null, isActive: boolean) {
     const tick = (now: number) => {
       const elapsed = now - startTime;
 
-      // Throttle updates to ~35ms so the human eye can clearly read each sequential step
-      if (now - lastTick >= 35 || elapsed >= TOTAL_MS) {
+      // Throttle updates to ~28ms for fast and smooth stepping
+      if (now - lastTick >= 28 || elapsed >= TOTAL_MS) {
         lastTick = now;
 
         const nextChars: CharScramble[] = [];
@@ -324,11 +324,11 @@ export default function StudentDetailModal({
           }`}
         >
           <div className="flex items-center gap-3 min-w-0 flex-1">
-            {/* Identicon - Staged reveal after 2s sequential scramble */}
+            {/* Identicon - Clean avatar box without any overlapping fingerprint text */}
             <div
-              className={`transition-all duration-500 ease-out flex-shrink-0 ${
+              className={`transition-all duration-300 ease-out flex-shrink-0 ${
                 isScrambleComplete
-                  ? "opacity-100 scale-100 translate-x-0 w-[42px] h-[42px]"
+                  ? "opacity-100 scale-100 translate-x-0"
                   : "opacity-0 scale-75 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
               }`}
             >
@@ -338,8 +338,8 @@ export default function StudentDetailModal({
                   percentage={student?.percentage}
                   totalBacklogs={student?.total_backlogs}
                   customPixelArt={student?.avatar_pixel_art}
-                  size={42}
-                  showFingerprint
+                  size={44}
+                  showFingerprint={false}
                   isEditable={isMyVerifiedProfile}
                   onEditClick={onOpenPixelModal}
                 />
@@ -360,7 +360,7 @@ export default function StudentDetailModal({
                     {displayChars.map((item, idx) => (
                       <span
                         key={idx}
-                        className={`inline-block w-4 sm:w-5 text-center font-mono font-bold text-sm sm:text-base tabular-nums transition-colors duration-150 ${
+                        className={`inline-block w-4 sm:w-5 text-center font-mono font-bold text-sm sm:text-base tabular-nums transition-colors duration-100 ${
                           item.isLocked
                             ? "text-cyan-300 font-extrabold"
                             : "text-amber-400 font-medium animate-pulse"
@@ -369,21 +369,36 @@ export default function StudentDetailModal({
                         {item.char}
                       </span>
                     ))}
-                    <span className="text-[10px] font-mono text-cyan-400/80 ml-2 border-l border-cyan-500/30 pl-2 hidden sm:inline">
-                      2.0s
-                    </span>
                   </div>
                 </div>
               ) : (
-                /* After 2s: Smoothly reveal student Name, badges, and locked USN */
-                <div className="transition-all duration-500 ease-out opacity-100 translate-y-0">
+                /* After Scramble: Clearly visible Name, badges, and USN row with zero overlap */
+                <div className="transition-all duration-300 ease-out opacity-100 translate-y-0">
+                  {/* Row 1: Student Name + Cached status */}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="font-bold text-sm sm:text-base leading-tight truncate">
+                    <h2 className="font-extrabold text-base sm:text-lg leading-tight tracking-tight text-slate-900 dark:text-white truncate">
                       {student?.name || "Student Marksheet"}
                     </h2>
+                    {isCached && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
+                        <span>⚡️</span>
+                        <span>0ms Cached ({cachedAge || "saved"})</span>
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Row 2: USN badge, branch, and action buttons */}
+                  <div className="flex items-center gap-2 flex-wrap mt-1">
+                    <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 font-bold font-mono text-xs text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10 tracking-wider">
+                      {usn}
+                    </span>
+                    <span className="text-xs font-mono opacity-40">•</span>
+                    <span className="text-xs font-semibold opacity-75">{student?.branch || "ENG"}</span>
+
                     {isMyVerifiedProfile && (
-                      <>
+                      <div className="flex items-center gap-1.5 ml-auto sm:ml-2">
                         <button
+                          type="button"
                           onClick={onOpenPixelModal}
                           className="inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-md bg-amber-500/10 border border-amber-500/25 text-amber-400 hover:bg-amber-500/20 transition-colors cursor-pointer"
                           title="Edit your 10x10 custom pixel art avatar"
@@ -392,6 +407,7 @@ export default function StudentDetailModal({
                           <span>Edit Avatar</span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => {
                             sfx.playMechanicalClick();
                             setIsPrivacyModalOpen(true);
@@ -402,21 +418,8 @@ export default function StudentDetailModal({
                           <IconShield className="w-2.5 h-2.5" />
                           <span>Privacy Settings</span>
                         </button>
-                      </>
+                      </div>
                     )}
-                    {isCached && (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400">
-                        <span>⚡️</span>
-                        <span>0ms Cached ({cachedAge || "saved"})</span>
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-xs opacity-75 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
-                    <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 font-bold text-slate-800 dark:text-cyan-300 border border-slate-200 dark:border-white/10 tracking-wider">
-                      {usn}
-                    </span>
-                    <span className="opacity-40">•</span>
-                    <span>{student?.branch || "ENG"}</span>
                   </div>
                 </div>
               )}
