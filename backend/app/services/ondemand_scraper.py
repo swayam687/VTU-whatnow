@@ -528,7 +528,7 @@ class OnDemandScraperManager:
                     "ok": False,
                     "reason": "invalid_captcha",
                     "fail_count": session.fail_count,
-                    "message": f"VTU Alert: {alert_text or 'Incorrect captcha code'}. Please try again.",
+                    "message": "Invalid captcha code. Please try again.",
                     "new_captcha_base64": new_b64,
                 }
 

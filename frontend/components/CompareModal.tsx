@@ -43,12 +43,14 @@ export default function CompareModal({
   const [captchaLoading, setCaptchaLoading] = useState(false);
   const [captchaSubmitting, setCaptchaSubmitting] = useState(false);
   const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [wrongAttempts, setWrongAttempts] = useState(0);
   const [verificationSuccess, setVerificationSuccess] = useState<string | null>(null);
   const captchaInputRef = useRef<HTMLInputElement>(null);
 
   const loadCaptchaChallenge = async () => {
     setCaptchaLoading(true);
     setCaptchaError(null);
+    setWrongAttempts(0);
     try {
       const data = await solveCompareCaptcha();
       setCaptchaSessionId(data.session_id);
@@ -102,7 +104,7 @@ export default function CompareModal({
 
   const handleVerificationSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!captchaSessionId || !captchaInput.trim()) return;
+    if (!captchaSessionId || !captchaInput.trim() || wrongAttempts >= 3) return;
 
     setCaptchaSubmitting(true);
     setCaptchaError(null);
@@ -111,6 +113,7 @@ export default function CompareModal({
       if (res.ok) {
         sfx.playMechanicalClick();
         setVerificationSuccess("Verification complete! Comparison unlocked.");
+        setWrongAttempts(0);
         setTimeout(async () => {
           setIsVerificationRequired(false);
           setVerificationSuccess(null);
@@ -124,7 +127,13 @@ export default function CompareModal({
           setCaptchaBase64(res.new_captcha_base64);
         }
         setCaptchaInput("");
-        setCaptchaError(res.message || "Security checksum mismatch. Please try again.");
+        const nextAttempts = wrongAttempts + 1;
+        setWrongAttempts(nextAttempts);
+        if (nextAttempts >= 3) {
+          setCaptchaError("Maximum attempts reached (3/3). Please refresh the security challenge.");
+        } else {
+          setCaptchaError(`Invalid captcha code. Please try again. (${nextAttempts}/3 attempts)`);
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification failed";
@@ -236,14 +245,28 @@ export default function CompareModal({
                 isObsidian ? "bg-[#0f1115] border-white/10 text-white" : "bg-white border-zinc-200 text-zinc-900"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
-                  <IconShield className="w-5 h-5" />
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                    <IconShield className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-base leading-tight">Security Verification Required</h3>
+                    <p className="text-[11px] text-zinc-400 mt-0.5">Automated abuse prevention gate</p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="font-bold text-base leading-tight">Security Verification Required</h3>
-                  <p className="text-[11px] text-zinc-400 mt-0.5">Automated abuse prevention gate</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setIsVerificationRequired(false);
+                    onClose();
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                  title="Cancel & Close"
+                >
+                  <IconClose className="w-4 h-4" />
+                </button>
               </div>
 
               <p className="text-xs text-zinc-300 leading-relaxed">
@@ -261,6 +284,17 @@ export default function CompareModal({
                 <div className="py-8 text-center space-y-3">
                   <div className="w-10 h-10 mx-auto rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
                   <p className="text-xs font-mono text-zinc-400">Loading security verification challenge...</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      setIsVerificationRequired(false);
+                      onClose();
+                    }}
+                    className="mt-3 px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
                 </div>
               ) : (
                 <form onSubmit={handleVerificationSubmit} className="space-y-3.5">
@@ -317,13 +351,14 @@ export default function CompareModal({
                       type="text"
                       value={captchaInput}
                       onChange={(e) => setCaptchaInput(e.target.value)}
-                      placeholder="e.g. 5k9P2x"
+                      placeholder={wrongAttempts >= 3 ? "Click Refresh below to retry" : "e.g. 5k9P2x"}
                       maxLength={10}
                       autoCapitalize="none"
                       autoCorrect="off"
                       spellCheck={false}
+                      disabled={wrongAttempts >= 3}
                       required
-                      className="w-full px-4 py-2.5 text-base font-mono text-center tracking-widest rounded-xl border border-white/10 bg-white/5 text-white focus:border-cyan-400 outline-none"
+                      className="w-full px-4 py-2.5 text-base font-mono text-center tracking-widest rounded-xl border border-white/10 bg-white/5 text-white focus:border-cyan-400 outline-none disabled:opacity-50"
                     />
                   </div>
 
@@ -339,20 +374,34 @@ export default function CompareModal({
                     >
                       Cancel
                     </button>
-                    <button
-                      type="submit"
-                      disabled={captchaSubmitting || !captchaInput.trim()}
-                      className="flex-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white shadow-md shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
-                    >
-                      {captchaSubmitting ? (
-                        <>
-                          <div className="w-3.5 h-3.5 rounded-full border border-white/30 border-t-white animate-spin" />
-                          <span>Verifying...</span>
-                        </>
-                      ) : (
-                        <span>Verify & Unlock Comparison →</span>
-                      )}
-                    </button>
+                    {wrongAttempts >= 3 ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playMechanicalClick();
+                          loadCaptchaChallenge();
+                        }}
+                        className="flex-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 text-white shadow-md shadow-cyan-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        <IconRotateCcw className="w-3.5 h-3.5" />
+                        <span>Refresh Challenge</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="submit"
+                        disabled={captchaSubmitting || !captchaInput.trim()}
+                        className="flex-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white shadow-md shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                      >
+                        {captchaSubmitting ? (
+                          <>
+                            <div className="w-3.5 h-3.5 rounded-full border border-white/30 border-t-white animate-spin" />
+                            <span>Verifying...</span>
+                          </>
+                        ) : (
+                          <span>Submit Verification</span>
+                        )}
+                      </button>
+                    )}
                   </div>
                 </form>
               )}

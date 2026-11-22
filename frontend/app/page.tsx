@@ -1172,19 +1172,19 @@ export default function Dashboard() {
 
       {/* Floating Comparison Action Bar */}
       {compareUsns.length > 0 && (
-        <div className="fixed bottom-16 sm:bottom-6 left-1/2 transform -translate-x-1/2 z-40 w-full max-w-md px-4">
+        <div className="fixed bottom-16 sm:bottom-6 left-1/2 transform -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-md mx-auto pointer-events-auto">
           <div
-            className={`rounded-2xl p-3 shadow-xl flex items-center justify-between gap-3 border transition-all ${
+            className={`rounded-2xl p-3 shadow-xl flex items-center justify-between gap-2.5 border transition-all ${
               isObsidian
                 ? "bg-slate-950/95 border-cyan-500/50 text-white shadow-cyan-950/40"
                 : "bg-white/95 border-blue-500/50 text-slate-900 shadow-blue-500/10"
             }`}
           >
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping" />
-              <div className="text-xs">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <span className="w-2 h-2 rounded-full bg-blue-500 animate-ping shrink-0" />
+              <div className="text-xs min-w-0">
                 <span className="font-bold">{compareUsns.length} / 2</span> Selected
-                <p className="text-[10px] opacity-70 truncate max-w-[210px] sm:max-w-xs font-mono">
+                <p className="text-[10px] opacity-70 truncate font-mono">
                   {compareUsns
                     .map((u) => {
                       const found = (allCollegeStudents.length > 0 ? allCollegeStudents : students).find(
@@ -1197,20 +1197,20 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 shrink-0">
               <button
                 onClick={() => {
                   sfx.playMechanicalClick();
                   setCompareUsns([]);
                 }}
-                className="px-2.5 py-1 text-xs opacity-60 hover:opacity-100 transition-opacity"
+                className="px-2 py-1 text-xs opacity-60 hover:opacity-100 transition-opacity cursor-pointer"
               >
                 Clear
               </button>
               <button
                 disabled={compareUsns.length < 2}
                 onClick={handleOpenCompare}
-                className={`px-3.5 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all ${
+                className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
                   compareUsns.length === 2
                     ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
                     : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"

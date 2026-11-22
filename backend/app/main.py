@@ -1798,8 +1798,8 @@ async def submit_compare_captcha(
     if res.get("ok"):
         user_student = db.query(Student).filter(Student.usn == current_usn).first()
         if user_student:
-            # Grant +1 comparison credit
-            user_student.comparison_credits = (user_student.comparison_credits or 0) + 1
+            # Grant +2 comparison credits
+            user_student.comparison_credits = (user_student.comparison_credits or 0) + 2
 
             # Log to UserCaptchaLog to track and prevent abuse
             captcha_log = UserCaptchaLog(
@@ -1815,7 +1815,7 @@ async def submit_compare_captcha(
         return {
             "ok": True,
             "message": "Verification complete! You have unlocked your comparison.",
-            "comparison_credits": user_student.comparison_credits if user_student else 1,
+            "comparison_credits": user_student.comparison_credits if user_student else 2,
         }
     else:
         return res
