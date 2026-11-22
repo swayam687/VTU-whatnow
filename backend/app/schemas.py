@@ -227,6 +227,53 @@ class OnDemandSubmitResponse(BaseModel):
     new_captcha_base64: Optional[str] = None
     message: Optional[str] = None
 
+# ---------------- Crowdsourced Distributed Scraping Login Gate ----------------
+class ScrapeTargetCreate(BaseModel):
+    start_usn: str
+    end_usn: str
+    vtu_link: Optional[str] = None
+    semester: str = "1"
+    semester_link_id: Optional[int] = None
+
+class ScrapeTargetOut(BaseModel):
+    id: int
+    start_usn: str
+    end_usn: str
+    vtu_link: str
+    semester: str
+    status: str
+    current_usn_index: Optional[str] = None
+    created_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+class LoginGateChallengeResponse(BaseModel):
+    ok: bool
+    require_captcha: bool = False
+    session_id: Optional[str] = None
+    captcha_base64: Optional[str] = None
+    message: Optional[str] = None
+    auth_response: Optional[AuthResponse] = None
+
+class LoginGateSubmitRequest(BaseModel):
+    session_id: str
+    captcha: str
+    usn: str
+    password: str
+
+class LoginGateSubmitResponse(BaseModel):
+    ok: bool
+    require_captcha: bool = False
+    bypassed: bool = False
+    session_id: Optional[str] = None
+    new_captcha_base64: Optional[str] = None
+    fail_count: int = 0
+    reason: Optional[str] = None
+    message: Optional[str] = None
+    auth_response: Optional[AuthResponse] = None
+
 class LoginLogOut(BaseModel):
     id: int
     usn: str

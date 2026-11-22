@@ -7,7 +7,7 @@ import uuid
 import traceback
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 
 # Ensure persistent Playwright cache on Linux / Render hosts
 if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and sys.platform != "win32":
@@ -19,13 +19,14 @@ if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and sys.platform != "win32":
         os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "0"
 
 from playwright.async_api import Browser, BrowserContext, Page, Playwright, async_playwright
+from sqlalchemy.orm import Session
 
 from ..config import settings
 from ..database import SessionLocal
-from ..models import Student, LoginLog
+from ..models import Student, Mark, LoginLog, ScrapeTarget
 from ..auth import hash_password, create_session
 from ..scraper.parser import parse_vtu_html
-from ..scraper.worker import scraper_worker
+from ..scraper.worker import scraper_worker, generate_usn_range
 
 
 class OnDemandSession:
@@ -39,15 +40,22 @@ class OnDemandSession:
         context: BrowserContext,
         page: Page,
         target_url: str,
+        student_usn: str,
+        is_self_scrape: bool = True,
+        target_id: Optional[int] = None,
     ):
         self.session_id = session_id
-        self.usn = usn
+        self.usn = usn  # Target USN being scraped on VTU
         self.semester = semester
         self.playwright = playwright
         self.browser = browser
         self.context = context
         self.page = page
         self.target_url = target_url
+        self.student_usn = student_usn  # Student who is authenticating / solving
+        self.is_self_scrape = is_self_scrape
+        self.target_id = target_id
+        self.fail_count = 0  # Failed captcha attempts (anti-lockout gate)
         self.created_at = time.time()
         self.last_alert_msg = {"text": ""}
 
@@ -83,18 +91,56 @@ class OnDemandScraperManager:
             if session:
                 await session.close()
 
+    def get_next_scrape_target(self, db: Session) -> Optional[Tuple[ScrapeTarget, str]]:
+        """
+        Finds the next unscraped USN from the administrator's queued ScrapeTargets.
+        Sequential range progression: from start_usn to end_usn.
+        """
+        targets = db.query(ScrapeTarget).filter(
+            ScrapeTarget.status == "PENDING"
+        ).order_by(ScrapeTarget.id.asc()).all()
+
+        for target in targets:
+            usn_list = generate_usn_range(target.start_usn, target.end_usn)
+            start_idx = 0
+            if target.current_usn_index and target.current_usn_index in usn_list:
+                start_idx = usn_list.index(target.current_usn_index)
+
+            # Look for the first USN in the range not yet extracted in database
+            found_usn = None
+            for candidate in usn_list[start_idx:]:
+                has_marks = db.query(Mark.id).filter(Mark.usn == candidate).first()
+                if not has_marks:
+                    found_usn = candidate
+                    break
+
+            if found_usn:
+                target.current_usn_index = found_usn
+                db.commit()
+                return target, found_usn
+            else:
+                # All USNs in this range have already been scraped
+                target.status = "COMPLETED"
+                target.completed_at = datetime.utcnow()
+                db.commit()
+
+        return None
+
     async def start_session(
         self,
-        usn: str,
+        target_usn: str,
         semester: str = "1",
-        target_url: Optional[str] = None
+        target_url: Optional[str] = None,
+        student_usn: Optional[str] = None,
+        is_self_scrape: bool = True,
+        target_id: Optional[int] = None,
     ) -> dict:
         """
         Launches an isolated Playwright browser instance, navigates to the VTU portal,
-        fills the student's USN, takes a screenshot of the live captcha, and returns
-        the session ID and base64 captcha image.
+        fills the target USN, captures the captcha image Base64, and records the session.
         """
-        clean_usn = usn.strip().upper()
+        clean_target_usn = target_usn.strip().upper()
+        clean_student_usn = (student_usn or clean_target_usn).strip().upper()
         await self._cleanup_expired()
 
         if not target_url or not target_url.strip():
@@ -148,13 +194,16 @@ class OnDemandScraperManager:
 
             session = OnDemandSession(
                 session_id=session_id,
-                usn=clean_usn,
+                usn=clean_target_usn,
                 semester=semester,
                 playwright=p,
                 browser=browser,
                 context=context,
                 page=page,
                 target_url=target_url,
+                student_usn=clean_student_usn,
+                is_self_scrape=is_self_scrape,
+                target_id=target_id,
             )
 
             # Dialog listener for JS alerts
@@ -179,13 +228,13 @@ class OnDemandScraperManager:
                 await session.close()
                 return {
                     "ok": False,
-                    "usn": clean_usn,
-                    "message": "Could not find USN input box on VTU portal. VTU servers may be down or slow.",
+                    "usn": clean_target_usn,
+                    "message": "Could not locate USN input box on VTU portal. VTU servers may be down or slow.",
                 }
 
-            # Type USN
+            # Type target USN
             await usn_input.fill("")
-            await usn_input.type(clean_usn, delay=35)
+            await usn_input.type(clean_target_usn, delay=35)
 
             # Locate Captcha image element
             captcha_el = await page.wait_for_selector(
@@ -196,7 +245,7 @@ class OnDemandScraperManager:
                 await session.close()
                 return {
                     "ok": False,
-                    "usn": clean_usn,
+                    "usn": clean_target_usn,
                     "message": "Could not find Captcha image on VTU portal. Please try again in a few moments.",
                 }
 
@@ -211,8 +260,10 @@ class OnDemandScraperManager:
                 "ok": True,
                 "session_id": session_id,
                 "captcha_base64": captcha_b64,
-                "usn": clean_usn,
-                "message": "Captcha generated successfully from VTU portal.",
+                "target_usn": clean_target_usn,
+                "student_usn": clean_student_usn,
+                "is_self_scrape": is_self_scrape,
+                "message": "Security verification captcha generated from VTU portal.",
             }
 
         except Exception as e:
@@ -230,8 +281,8 @@ class OnDemandScraperManager:
                     pass
             return {
                 "ok": False,
-                "usn": clean_usn,
-                "message": f"Connection to VTU portal timed out or failed ({err_msg}). VTU might be under heavy load.",
+                "usn": clean_target_usn,
+                "message": f"Connection to VTU portal timed out ({err_msg}). VTU might be under heavy load.",
             }
 
     async def refresh_captcha(self, session_id: str) -> dict:
@@ -248,7 +299,6 @@ class OnDemandScraperManager:
                 'img[src*="captcha" i], img[src*="code" i], img[id*="captcha" i], #captchaimg, form img'
             )
             if not captcha_el:
-                # Reload page and re-enter USN
                 await page.goto(session.target_url, wait_until="domcontentloaded", timeout=25000)
                 usn_input = await page.wait_for_selector(
                     'input[name="lns"], input[name="usn"], input[name="USN"], #usn, #lns, input[placeholder*="USN" i], input[type="text"]',
@@ -279,8 +329,11 @@ class OnDemandScraperManager:
         client_ip: str = "unknown"
     ) -> dict:
         """
-        Submits the student's solved captcha to the active Playwright session,
-        extracts marks, saves student record into DB, registers password, and logs student in.
+        Submits the student's solved captcha to VTU.
+        - If self-scrape: saves marks for student and locks password.
+        - If crowdsourced gate: saves marks for target USN, marks target queue progress,
+          and logs the authenticated student into their dashboard.
+        - Anti-Lockout: tracks failed attempts; if fails >= 3, bypasses gate and logs student in.
         """
         async with self._lock:
             session = self._sessions.get(session_id)
@@ -289,7 +342,7 @@ class OnDemandScraperManager:
             return {
                 "ok": False,
                 "reason": "session_expired",
-                "message": "Verification session expired. Please request a new captcha.",
+                "message": "Verification session expired. Please try again.",
             }
 
         clean_captcha = captcha_code.strip()
@@ -344,41 +397,42 @@ class OnDemandScraperManager:
             except Exception:
                 pass
 
-            # 1. Check for VTU JavaScript alert dialog
+            # -------------------------------------------------------------
+            # Handle Captcha Failures & Fallback Anti-Lockout Gate
+            # -------------------------------------------------------------
             alert_text = session.last_alert_msg["text"].strip()
             alert_lower = alert_text.lower()
-            if "captcha" in alert_lower:
-                # Capture new captcha screenshot
-                new_b64 = None
-                try:
-                    c_el = await page.query_selector('img[src*="captcha" i], img[src*="code" i], #captchaimg, form img')
-                    if c_el:
-                        new_bytes = await c_el.screenshot()
-                        new_b64 = base64.b64encode(new_bytes).decode("utf-8")
-                except Exception:
-                    pass
-
-                return {
-                    "ok": False,
-                    "reason": "invalid_captcha",
-                    "message": f"VTU Alert: {alert_text or 'Invalid captcha code'}. Please try again with the new image.",
-                    "new_captcha_base64": new_b64,
-                }
-            elif "not available" in alert_lower or "not found" in alert_lower or "check the usn" in alert_lower:
-                async with self._lock:
-                    self._sessions.pop(session_id, None)
-                await session.close()
-                return {
-                    "ok": False,
-                    "reason": "not_found",
-                    "message": f"VTU Alert: {alert_text}",
-                }
-
-            # 2. Check page HTML content
             content = await active_page.content()
             text_lower = content.lower()
 
-            if "invalid captcha" in text_lower or "captcha code is not matching" in text_lower:
+            is_captcha_fail = (
+                "captcha" in alert_lower
+                or "invalid captcha" in text_lower
+                or "captcha code is not matching" in text_lower
+            )
+
+            if is_captcha_fail:
+                session.fail_count += 1
+
+                # CRITICAL FALLBACK (Anti-Lockout):
+                # If student fails 3 times on a crowdsourced verification gate,
+                # bypass gate and grant login with cached data so they are not blocked.
+                if session.fail_count >= 3 and not session.is_self_scrape:
+                    async with self._lock:
+                        self._sessions.pop(session_id, None)
+                    await session.close()
+
+                    # Authenticate student directly
+                    auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
+                    return {
+                        "ok": True,
+                        "bypassed": True,
+                        "fail_count": session.fail_count,
+                        "auth_response": auth_resp,
+                        "message": "VTU servers are currently unresponsive. Logging you in with cached data.",
+                    }
+
+                # Otherwise, fetch new captcha for next attempt
                 new_b64 = None
                 try:
                     c_el = await page.query_selector('img[src*="captcha" i], img[src*="code" i], #captchaimg, form img')
@@ -391,85 +445,129 @@ class OnDemandScraperManager:
                 return {
                     "ok": False,
                     "reason": "invalid_captcha",
-                    "message": "Captcha code was incorrect or expired. Please solve the updated captcha.",
+                    "fail_count": session.fail_count,
+                    "message": f"VTU Alert: {alert_text or 'Incorrect captcha code'}. Please try again.",
                     "new_captcha_base64": new_b64,
                 }
 
-            # 3. Parse VTU marksheet HTML
-            parsed = parse_vtu_html(content)
+            # If target results not available on VTU:
+            if "not available" in alert_lower or "not found" in alert_lower or "check the usn" in alert_lower or "not yet available" in text_lower:
+                session.fail_count += 1
+                async with self._lock:
+                    self._sessions.pop(session_id, None)
+                await session.close()
 
+                # If crowdsourced, student shouldn't be blocked if the other person's result isn't announced
+                if not session.is_self_scrape:
+                    auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
+                    return {
+                        "ok": True,
+                        "bypassed": True,
+                        "fail_count": session.fail_count,
+                        "auth_response": auth_resp,
+                        "message": "Verification completed. Campus records updated.",
+                    }
+                else:
+                    return {
+                        "ok": False,
+                        "reason": "not_found",
+                        "message": f"Results for USN {session.usn} have not been published by VTU yet.",
+                    }
+
+            # -------------------------------------------------------------
+            # Marksheet Extracted Successfully!
+            # -------------------------------------------------------------
+            parsed = parse_vtu_html(content)
             if parsed["marks"]:
                 if not parsed["student"].get("usn"):
                     parsed["student"]["usn"] = session.usn
 
-                # Persist extracted results into database using intelligent upsert
+                # Save extracted marksheet into database
                 scraper_worker._save_result(parsed, session.semester)
 
-                # Now lock student account with password and create session
-                db = SessionLocal()
-                try:
-                    student = db.query(Student).filter(Student.usn == session.usn).first()
-                    if not student:
-                        raise Exception("Failed to query created student record.")
+                # Advance ScrapeTarget index if this was a crowdsourced job
+                if session.target_id:
+                    db = SessionLocal()
+                    try:
+                        target = db.query(ScrapeTarget).filter(ScrapeTarget.id == session.target_id).first()
+                        if target:
+                            target.current_usn_index = session.usn
+                            db.commit()
+                    finally:
+                        db.close()
 
-                    student.password_hash = hash_password(password)
-                    student.is_claimed = True
-                    student.login_count = 1
-                    student.last_login_at = datetime.utcnow()
+                # Case A: Self-Scrape (student is new, register their account)
+                if session.is_self_scrape:
+                    db = SessionLocal()
+                    try:
+                        student = db.query(Student).filter(Student.usn == session.student_usn).first()
+                        if student:
+                            student.password_hash = hash_password(password)
+                            student.is_claimed = True
+                            student.login_count = 1
+                            student.last_login_at = datetime.utcnow()
+                            log_entry = LoginLog(
+                                usn=student.usn,
+                                name=student.name,
+                                branch=student.branch,
+                                login_at=datetime.utcnow(),
+                                ip_address=client_ip,
+                            )
+                            db.add(log_entry)
+                            db.commit()
+                            token = create_session(student.usn, student.password_hash)
+                            auth_resp = {
+                                "ok": True,
+                                "status": "registered",
+                                "token": token,
+                                "usn": student.usn,
+                                "name": student.name,
+                                "branch": student.branch,
+                                "login_count": 1,
+                            }
+                        else:
+                            auth_resp = None
+                    finally:
+                        db.close()
 
-                    log_entry = LoginLog(
-                        usn=student.usn,
-                        name=student.name,
-                        branch=student.branch,
-                        login_at=datetime.utcnow(),
-                        ip_address=client_ip,
-                    )
-                    db.add(log_entry)
-                    db.commit()
-
-                    token = create_session(student.usn, student.password_hash)
-
-                    res_data = {
-                        "ok": True,
-                        "status": "registered",
-                        "token": token,
-                        "usn": student.usn,
-                        "name": student.name,
-                        "branch": student.branch,
-                        "login_count": 1,
-                        "total_marks": student.total_marks,
-                        "max_marks": student.max_marks,
-                        "percentage": student.percentage,
-                        "message": f"Successfully extracted marksheet for {student.name}!",
-                    }
-                finally:
-                    db.close()
+                # Case B: Crowdsourced Login Gate (student already exists, log them in!)
+                else:
+                    auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
 
                 # Clean up Playwright session
                 async with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
 
-                return res_data
+                return {
+                    "ok": True,
+                    "bypassed": False,
+                    "auth_response": auth_resp,
+                    "message": "Security verification successful! Access granted.",
+                }
 
             else:
-                # Check if results not yet announced
+                # Could not parse table
+                session.fail_count += 1
                 async with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
 
-                if "not yet available" in text_lower or "check the usn" in text_lower or "not available" in text_lower:
+                if not session.is_self_scrape and session.fail_count >= 3:
+                    auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
                     return {
-                        "ok": False,
-                        "reason": "not_published",
-                        "message": f"Results for USN {session.usn} have not been published by VTU yet.",
+                        "ok": True,
+                        "bypassed": True,
+                        "auth_response": auth_resp,
+                        "message": "VTU servers are currently unresponsive. Logging you in with cached data.",
                     }
-                else:
-                    return {
-                        "ok": False,
-                        "reason": "parsing_failed",
-                        "message": f"VTU responded, but could not parse marks table. Please check if your USN is correct.",
-                    }
+
+                return {
+                    "ok": False,
+                    "reason": "parsing_failed",
+                    "fail_count": session.fail_count,
+                    "message": "Could not read VTU marks table. Please try again.",
+                }
 
         except Exception as e:
             traceback.print_exc()
@@ -481,6 +579,39 @@ class OnDemandScraperManager:
                 "reason": "error",
                 "message": f"Error during VTU extraction: {str(e)}",
             }
+
+    def _authenticate_student_directly(self, usn: str, client_ip: str) -> dict:
+        """Helper to create session token and record login for an authenticated student."""
+        db = SessionLocal()
+        try:
+            student = db.query(Student).filter(Student.usn == usn.strip().upper()).first()
+            if not student:
+                return {"ok": False, "message": "Student record not found."}
+
+            student.login_count = (student.login_count or 0) + 1
+            student.last_login_at = datetime.utcnow()
+            log_entry = LoginLog(
+                usn=student.usn,
+                name=student.name,
+                branch=student.branch,
+                login_at=datetime.utcnow(),
+                ip_address=client_ip,
+            )
+            db.add(log_entry)
+            db.commit()
+
+            token = create_session(student.usn, student.password_hash)
+            return {
+                "ok": True,
+                "status": "authenticated",
+                "token": token,
+                "usn": student.usn,
+                "name": student.name,
+                "branch": student.branch,
+                "login_count": student.login_count,
+            }
+        finally:
+            db.close()
 
 
 ondemand_scraper = OnDemandScraperManager()

@@ -153,6 +153,26 @@ class RescrapeRequest(Base):
     ip_address = Column(String, nullable=True, default="")
 
 
+class ScrapeTarget(Base):
+    """
+    Admin-targeted USN range for distributed crowdsourced scraping.
+    Students logging into the system will be assigned to solve captchas
+    for USNs in this range sequentially.
+    """
+    __tablename__ = "scrape_targets"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    start_usn = Column(String, nullable=False)
+    end_usn = Column(String, nullable=False)
+    vtu_link = Column(String, nullable=False)
+    semester = Column(String, default="1")
+    status = Column(String, default="PENDING")  # 'PENDING', 'COMPLETED'
+    current_usn_index = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    completed_at = Column(DateTime, nullable=True)
+
+
+
 
 
 

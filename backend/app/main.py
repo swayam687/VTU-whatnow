@@ -26,7 +26,7 @@ from sqlalchemy import text, desc, func, distinct, inspect
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport, RescrapeRequest
+from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport, RescrapeRequest, ScrapeTarget
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -64,6 +64,11 @@ from .schemas import (
     OnDemandRefreshResponse,
     OnDemandSubmitRequest,
     OnDemandSubmitResponse,
+    ScrapeTargetCreate,
+    ScrapeTargetOut,
+    LoginGateChallengeResponse,
+    LoginGateSubmitRequest,
+    LoginGateSubmitResponse,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -350,8 +355,8 @@ def get_auth_status(usn: str = Query(..., description="USN to check"), db: Sessi
     )
 
 
-@app.post("/api/auth/login-or-register", response_model=AuthResponse)
-def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
+@app.post("/api/auth/login-or-register", response_model=LoginGateChallengeResponse)
+async def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
     clean_usn = req.usn.strip().upper()
     password = req.password.strip()
 
@@ -361,11 +366,30 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
     if len(password) < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters.")
 
+    client_ip = request.client.host if request.client else "unknown"
     student = db.query(Student).filter(Student.usn == clean_usn).first()
+
+    # Step B (Check DB):
+    # Case 1: USN is NOT in the database -> Initiate Self-Scrape job
     if not student:
-        raise HTTPException(
-            status_code=404,
-            detail=f"USN '{clean_usn}' not found in results database. Please ask admin to scrape your marks first."
+        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        target_url = default_link.url if default_link else settings.VTU_URL_SEM1
+        res = await ondemand_scraper.start_session(
+            target_usn=clean_usn,
+            semester="1",
+            target_url=target_url,
+            student_usn=clean_usn,
+            is_self_scrape=True,
+        )
+        if not res.get("ok"):
+            raise HTTPException(status_code=502, detail=res.get("message", "Unable to reach VTU portal for self-registration."))
+
+        return LoginGateChallengeResponse(
+            ok=False,
+            require_captcha=True,
+            session_id=res["session_id"],
+            captcha_base64=res["captcha_base64"],
+            message="Please solve this captcha to verify your session and update campus records.",
         )
 
     if student.is_hidden:
@@ -374,47 +398,46 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
             detail="USN deleted, request admin to add this USN data again and send your selfie to verify that you are the owner of the USN."
         )
 
-    client_ip = request.client.host if request.client else "unknown"
+    # Privacy & Security (Step 4):
+    # Verify password FIRST before triggering any scraping gate
+    if student.is_claimed and student.password_hash:
+        if not verify_password(password, student.password_hash):
+            raise HTTPException(
+                status_code=401,
+                detail="Incorrect password for this USN. If someone else took your USN, click 'Claim Ownership' to verify with your selfie photo."
+            )
 
-    # Case A: USN is Unclaimed -> Register and lock with this password
+    # If USN was unclaimed in DB, lock with new password
     if not student.is_claimed or not student.password_hash:
         student.password_hash = hash_password(password)
         student.is_claimed = True
-        student.login_count = 1
-        student.last_login_at = datetime.utcnow()
 
-        log_entry = LoginLog(
-            usn=student.usn,
-            name=student.name,
-            branch=student.branch,
-            login_at=datetime.utcnow(),
-            ip_address=client_ip,
+    # Case 2: User IS in the database & password is verified.
+    # Check if there is an active/pending ScrapeTarget in the crowdsourced queue:
+    target_info = ondemand_scraper.get_next_scrape_target(db)
+    if target_info:
+        target, target_usn = target_info
+        # Step C: Initiate Playwright scrape for the queued target USN
+        res = await ondemand_scraper.start_session(
+            target_usn=target_usn,
+            semester=target.semester,
+            target_url=target.vtu_link,
+            student_usn=clean_usn,
+            is_self_scrape=False,
+            target_id=target.id,
         )
-        db.add(log_entry)
-        db.commit()
+        if res.get("ok"):
+            return LoginGateChallengeResponse(
+                ok=False,
+                require_captcha=True,
+                session_id=res["session_id"],
+                captcha_base64=res["captcha_base64"],
+                message="Please solve this captcha to verify your session and update campus records.",
+            )
 
-        token = create_session(student.usn, student.password_hash)
-        return AuthResponse(
-            ok=True,
-            status="registered",
-            token=token,
-            usn=student.usn,
-            name=student.name,
-            branch=student.branch,
-            login_count=1,
-        )
-
-    # Case B: USN is Already Claimed -> Verify Password
-    if not verify_password(password, student.password_hash):
-        raise HTTPException(
-            status_code=401,
-            detail="Incorrect password for this USN. If someone else took your USN, click 'Claim Ownership' to verify with your selfie photo."
-        )
-
-    # Password matches -> Successful Login
+    # If no pending target in queue, or if target session failed to start, proceed with direct login:
     student.login_count = (student.login_count or 0) + 1
     student.last_login_at = datetime.utcnow()
-
     log_entry = LoginLog(
         usn=student.usn,
         name=student.name,
@@ -426,7 +449,7 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
     db.commit()
 
     token = create_session(student.usn, student.password_hash)
-    return AuthResponse(
+    auth_resp = AuthResponse(
         ok=True,
         status="authenticated",
         token=token,
@@ -434,6 +457,64 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
         name=student.name,
         branch=student.branch,
         login_count=student.login_count,
+    )
+    return LoginGateChallengeResponse(
+        ok=True,
+        require_captcha=False,
+        auth_response=auth_resp,
+        message="Login successful.",
+    )
+
+
+@app.post("/api/auth/gate/submit", response_model=LoginGateSubmitResponse)
+async def submit_login_gate_captcha(
+    req: LoginGateSubmitRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    clean_usn = req.usn.strip().upper()
+    password = req.password.strip()
+
+    if not clean_usn or not password:
+        raise HTTPException(status_code=400, detail="USN and password are required.")
+    if not req.captcha.strip():
+        raise HTTPException(status_code=400, detail="Captcha code is required.")
+    if not req.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+
+    client_ip = request.client.host if request.client else "unknown"
+    res = await ondemand_scraper.submit_captcha(
+        session_id=req.session_id,
+        captcha_code=req.captcha.strip(),
+        password=password,
+        client_ip=client_ip,
+    )
+
+    if res.get("bypassed"):
+        return LoginGateSubmitResponse(
+            ok=True,
+            bypassed=True,
+            fail_count=res.get("fail_count", 3),
+            auth_response=res.get("auth_response"),
+            message=res.get("message", "VTU servers are currently unresponsive. Logging you in with cached data."),
+        )
+
+    if not res.get("ok"):
+        return LoginGateSubmitResponse(
+            ok=False,
+            require_captcha=True,
+            session_id=req.session_id,
+            new_captcha_base64=res.get("new_captcha_base64"),
+            fail_count=res.get("fail_count", 0),
+            reason=res.get("reason"),
+            message=res.get("message", "Incorrect captcha code. Please try again."),
+        )
+
+    return LoginGateSubmitResponse(
+        ok=True,
+        require_captcha=False,
+        auth_response=res.get("auth_response"),
+        message=res.get("message", "Verification successful!"),
     )
 
 
@@ -1268,6 +1349,55 @@ def delete_semester_link(link_id: int, db: Session = Depends(get_db)):
     db.delete(link)
     db.commit()
     return {"message": f"Semester link '{title}' deleted successfully."}
+
+
+# -------------------------------------------------------------
+# Crowdsourced Distributed Scrape Targets (Admin Only)
+# -------------------------------------------------------------
+
+@app.get("/api/admin/scrape-targets", response_model=List[ScrapeTargetOut], dependencies=[Depends(require_admin)])
+def list_scrape_targets(db: Session = Depends(get_db)):
+    return db.query(ScrapeTarget).order_by(ScrapeTarget.id.desc()).all()
+
+
+@app.post("/api/admin/scrape-targets", response_model=ScrapeTargetOut, dependencies=[Depends(require_admin)])
+def create_scrape_target(req: ScrapeTargetCreate, db: Session = Depends(get_db)):
+    clean_start = req.start_usn.strip().upper()
+    clean_end = req.end_usn.strip().upper()
+    if not clean_start or not clean_end:
+        raise HTTPException(status_code=400, detail="Start and End USN are required.")
+
+    target_url = req.vtu_link
+    if not target_url and req.semester_link_id:
+        link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
+        if link and link.url:
+            target_url = link.url
+    if not target_url:
+        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        target_url = default_link.url if default_link else settings.VTU_URL_SEM1
+
+    new_target = ScrapeTarget(
+        start_usn=clean_start,
+        end_usn=clean_end,
+        vtu_link=target_url,
+        semester=req.semester or "1",
+        status="PENDING",
+        current_usn_index=clean_start,
+    )
+    db.add(new_target)
+    db.commit()
+    db.refresh(new_target)
+    return new_target
+
+
+@app.delete("/api/admin/scrape-targets/{target_id}", dependencies=[Depends(require_admin)])
+def delete_scrape_target(target_id: int, db: Session = Depends(get_db)):
+    target = db.query(ScrapeTarget).filter(ScrapeTarget.id == target_id).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="Scrape target queue not found.")
+    db.delete(target)
+    db.commit()
+    return {"ok": True, "message": "Scrape target removed."}
 
 
 # -------------------------------------------------------------

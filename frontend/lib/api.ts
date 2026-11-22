@@ -559,7 +559,16 @@ export async function fetchAuthStatus(usn: string): Promise<AuthStatus> {
   return res.json();
 }
 
-export async function loginOrRegisterStudent(usn: string, password: string): Promise<AuthSession> {
+export interface LoginGateResponse {
+  ok: boolean;
+  require_captcha: boolean;
+  session_id?: string;
+  captcha_base64?: string;
+  message?: string;
+  auth_response?: AuthSession;
+}
+
+export async function loginOrRegisterStudent(usn: string, password: string): Promise<LoginGateResponse> {
   const res = await fetch(`${API_BASE}/api/auth/login-or-register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -1049,6 +1058,107 @@ export async function submitOnDemandCaptcha(
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || "Failed to submit captcha");
+  }
+  return res.json();
+}
+
+// -------------------------------------------------------------
+// Crowdsourced Distributed Scraping Login Gate
+// -------------------------------------------------------------
+
+export interface LoginGateSubmitResponse {
+  ok: boolean;
+  require_captcha: boolean;
+  bypassed?: boolean;
+  session_id?: string;
+  new_captcha_base64?: string;
+  fail_count?: number;
+  reason?: string;
+  message?: string;
+  auth_response?: AuthSession;
+}
+
+export async function submitLoginGateCaptcha(
+  sessionId: string,
+  captcha: string,
+  usn: string,
+  password: string
+): Promise<LoginGateSubmitResponse> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/auth/gate/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      captcha: captcha.trim(),
+      usn: usn.trim().toUpperCase(),
+      password: password.trim(),
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || "Failed to submit verification captcha.");
+  }
+  return data;
+}
+
+export interface ScrapeTarget {
+  id: number;
+  start_usn: string;
+  end_usn: string;
+  vtu_link: string;
+  semester: string;
+  status: "PENDING" | "COMPLETED" | string;
+  current_usn_index?: string;
+  created_at?: string;
+  completed_at?: string;
+}
+
+export async function fetchScrapeTargets(adminKey: string): Promise<ScrapeTarget[]> {
+  const res = await fetch(`${API_BASE}/api/admin/scrape-targets`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) throw new Error("Failed to load scrape targets queue");
+  return res.json();
+}
+
+export async function createScrapeTarget(
+  payload: {
+    start_usn: string;
+    end_usn: string;
+    vtu_link?: string;
+    semester?: string;
+    semester_link_id?: number;
+  },
+  adminKey: string
+): Promise<ScrapeTarget> {
+  const res = await fetch(`${API_BASE}/api/admin/scrape-targets`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to create scrape target queue");
+  }
+  return res.json();
+}
+
+export async function deleteScrapeTarget(
+  targetId: number,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/scrape-targets/${targetId}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to delete scrape target");
   }
   return res.json();
 }

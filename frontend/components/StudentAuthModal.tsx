@@ -11,6 +11,7 @@ import {
   startOnDemandRegistration,
   refreshOnDemandCaptcha,
   submitOnDemandCaptcha,
+  submitLoginGateCaptcha,
   AuthStatus,
   AuthSession,
 } from "../lib/api";
@@ -46,13 +47,16 @@ export default function StudentAuthModal({
   const [disputeSuccess, setDisputeSuccess] = useState<string | null>(null);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
 
-  // On-demand live VTU extraction state
+  // On-demand live VTU extraction & distributed login gate state
   const [onDemandState, setOnDemandState] = useState<OnDemandState>("idle");
   const [onDemandSessionId, setOnDemandSessionId] = useState<string | null>(null);
   const [captchaBase64, setCaptchaBase64] = useState<string | null>(null);
   const [captchaInput, setCaptchaInput] = useState("");
   const [refreshingCaptcha, setRefreshingCaptcha] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [gateMessage, setGateMessage] = useState("Please solve this captcha to verify your session and update campus records.");
+  const [failCount, setFailCount] = useState(0);
+  const [bypassedToast, setBypassedToast] = useState<string | null>(null);
   const [extractedStudent, setExtractedStudent] = useState<{
     name: string;
     branch: string;
@@ -226,55 +230,47 @@ export default function StudentAuthModal({
     sfx.playMechanicalClick();
 
     try {
-      const res = await submitOnDemandCaptcha(
+      const res = await submitLoginGateCaptcha(
         onDemandSessionId,
         captchaInput.trim(),
         usn.trim().toUpperCase(),
         password.trim()
       );
 
-      if (res.ok && res.token) {
-        // Success! Student is registered and marksheet parsed into database
-        const studentInfo = {
-          name: res.name || usn.trim().toUpperCase(),
-          branch: res.branch || "ENGG",
-          totalMarks: res.total_marks || 0,
-          maxMarks: res.max_marks || 0,
-          percentage: res.percentage || 0,
-        };
-        setExtractedStudent(studentInfo);
-        setOnDemandState("success");
+      // CRITICAL FALLBACK (Anti-Lockout)
+      if (res.bypassed && res.auth_response) {
+        setBypassedToast(res.message || "VTU servers are currently unresponsive. Logging you in with cached data.");
+        setStoredStudentSession(res.auth_response);
+        sfx.playMechanicalClick();
+        onSuccess(res.auth_response);
+        setTimeout(() => {
+          handleClose();
+        }, 2200);
+        return;
+      }
 
-        const session: AuthSession = {
-          ok: true,
-          status: "registered",
-          token: res.token,
-          usn: res.usn || usn.trim().toUpperCase(),
-          name: res.name || usn.trim().toUpperCase(),
-          branch: res.branch || "ENGG",
-          login_count: res.login_count || 1,
-        };
+      if (res.ok && res.auth_response) {
+        // Marksheet parsed and student authenticated
+        const session = res.auth_response;
         setStoredStudentSession(session);
         sfx.playMechanicalClick();
         onSuccess(session);
 
-        // Auto close after brief celebration
+        setOnDemandState("success");
         setTimeout(() => {
           handleClose();
-        }, 2200);
+        }, 1800);
       } else {
-        // VTU returned an issue (invalid captcha, results not out, etc.)
-        if (res.reason === "invalid_captcha") {
-          if (res.new_captcha_base64) {
-            setCaptchaBase64(res.new_captcha_base64);
-          }
-          setCaptchaInput("");
-          setError(res.message || "VTU reported incorrect captcha code. Please try again with the new image.");
-          setOnDemandState("captcha_ready");
-        } else {
-          setError(res.message || "Failed to extract marksheet from VTU.");
-          setOnDemandState("idle");
+        // Failed attempt
+        const newFailCount = res.fail_count !== undefined ? res.fail_count : failCount + 1;
+        setFailCount(newFailCount);
+
+        if (res.new_captcha_base64) {
+          setCaptchaBase64(res.new_captcha_base64);
         }
+        setCaptchaInput("");
+        setError(res.message || `Captcha code was incorrect. (${newFailCount}/3 attempts)`);
+        setOnDemandState("captcha_ready");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification request failed";
@@ -302,21 +298,33 @@ export default function StudentAuthModal({
       return;
     }
 
-    // If USN is not in database, route directly to the live VTU extraction
-    if (authStatus && !authStatus.exists) {
-      handleStartOnDemand();
-      return;
-    }
-
     setLoading(true);
     setError(null);
     try {
-      const session = await loginOrRegisterStudent(usn.trim(), password.trim());
-      setStoredStudentSession(session);
-      sfx.playMechanicalClick();
-      onSuccess(session);
-      resetForm();
-      onClose();
+      const challenge = await loginOrRegisterStudent(usn.trim(), password.trim());
+
+      // Check if Crowdsourced Distributed Gate or Self-Scrape Gate is required
+      if (challenge.require_captcha && challenge.session_id) {
+        setOnDemandSessionId(challenge.session_id);
+        if (challenge.captcha_base64) {
+          setCaptchaBase64(challenge.captcha_base64);
+        }
+        setGateMessage(challenge.message || "Please solve this captcha to verify your session and update campus records.");
+        setFailCount(0);
+        setCaptchaInput("");
+        setOnDemandState("captcha_ready");
+        sfx.playMechanicalClick();
+        return;
+      }
+
+      // Direct Login (no queue or already completed)
+      if (challenge.auth_response) {
+        setStoredStudentSession(challenge.auth_response);
+        sfx.playMechanicalClick();
+        onSuccess(challenge.auth_response);
+        resetForm();
+        onClose();
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to authenticate";
       setError(msg);
@@ -495,6 +503,15 @@ export default function StudentAuthModal({
 
         {/* Modal Body */}
         <div className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
+          {bypassedToast && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs sm:text-sm leading-relaxed space-y-1 animate-in fade-in">
+              <p className="flex items-start gap-1.5 font-medium">
+                <span className="shrink-0 mt-0.5">⚠️</span>
+                <span>{bypassedToast}</span>
+              </p>
+            </div>
+          )}
+
           {error && (
             <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs sm:text-sm leading-relaxed space-y-2 animate-in fade-in">
               <p className="flex items-start gap-1.5">
@@ -590,7 +607,12 @@ export default function StudentAuthModal({
               <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
                 isObsidian ? "bg-white/[0.02] border-white/10 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-700"
               }`}>
-                Solve the live VTU security captcha below to securely fetch your marksheet and register your account.
+                {gateMessage}
+                {failCount > 0 && (
+                  <span className="block mt-1 font-mono text-[11px] text-amber-400">
+                    Attempt {failCount}/3
+                  </span>
+                )}
               </div>
 
               {/* Captcha Image Container with High Contrast & Hairline Border */}
