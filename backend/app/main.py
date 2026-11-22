@@ -398,6 +398,7 @@ def get_auth_status(usn: str = Query(..., description="USN to check"), db: Sessi
     )
 
 
+@app.post("/api/auth/login", response_model=LoginGateChallengeResponse)
 @app.post("/api/auth/login-or-register", response_model=LoginGateChallengeResponse)
 async def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
     clean_usn = req.usn.strip().upper()

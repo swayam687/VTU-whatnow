@@ -89,7 +89,8 @@ export interface AuthSession {
 export function getStoredStudentToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    return localStorage.getItem("vtu_student_token") || sessionStorage.getItem("vtu_student_token") || null;
+    // Stored in sessionStorage only: user is logged out on tab exit
+    return sessionStorage.getItem("vtu_student_token") || null;
   } catch {
     return null;
   }
@@ -98,7 +99,7 @@ export function getStoredStudentToken(): string | null {
 export function getStoredStudentSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = localStorage.getItem("vtu_student_session") || sessionStorage.getItem("vtu_student_session");
+    const raw = sessionStorage.getItem("vtu_student_session");
     if (!raw) return null;
     return JSON.parse(raw) as AuthSession;
   } catch {
@@ -109,13 +110,19 @@ export function getStoredStudentSession(): AuthSession | null {
 export function setStoredStudentSession(session: AuthSession) {
   if (typeof window === "undefined") return;
   try {
-    localStorage.setItem("vtu_student_token", session.token);
-    localStorage.setItem("vtu_student_session", JSON.stringify(session));
-    localStorage.setItem("vtu_student_usn", session.usn);
-    localStorage.setItem("vtu_my_usn", session.usn);
+    // Store active token and session in sessionStorage (cleared on browser/tab exit)
     sessionStorage.setItem("vtu_student_token", session.token);
     sessionStorage.setItem("vtu_student_session", JSON.stringify(session));
     sessionStorage.setItem("vtu_student_usn", session.usn);
+
+    // Save full USN in localStorage so next time they open the app, it pre-fills automatically
+    localStorage.setItem("last_usn", session.usn);
+
+    // Remove any legacy persistent credentials from localStorage
+    localStorage.removeItem("vtu_student_token");
+    localStorage.removeItem("vtu_student_session");
+    localStorage.removeItem("vtu_student_usn");
+    localStorage.removeItem("vtu_my_usn");
   } catch {
     // ignore
   }
@@ -124,12 +131,14 @@ export function setStoredStudentSession(session: AuthSession) {
 export function clearStoredStudentSession() {
   if (typeof window === "undefined") return;
   try {
-    localStorage.removeItem("vtu_student_token");
-    localStorage.removeItem("vtu_student_session");
-    localStorage.removeItem("vtu_student_usn");
     sessionStorage.removeItem("vtu_student_token");
     sessionStorage.removeItem("vtu_student_session");
     sessionStorage.removeItem("vtu_student_usn");
+    localStorage.removeItem("vtu_student_token");
+    localStorage.removeItem("vtu_student_session");
+    localStorage.removeItem("vtu_student_usn");
+    localStorage.removeItem("vtu_my_usn");
+    // Note: last_usn is retained in localStorage for smart pre-filling on next visit
   } catch {
     // ignore
   }

@@ -146,8 +146,19 @@ export default function StudentAuthModal({
   isObsidian = true,
   initialUsn = "",
 }: StudentAuthModalProps) {
+  // Smart USN Pre-filling:
+  // On first visit: '1RM25'
+  // On returning visit: saved 'last_usn' from localStorage
+  const getInitialUsn = () => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("last_usn");
+      if (saved && saved.trim()) return saved.trim().toUpperCase();
+    }
+    return initialUsn && initialUsn.trim() ? initialUsn.trim().toUpperCase() : "1RM25";
+  };
+
   const [mode, setMode] = useState<"auth" | "dispute">("auth");
-  const [usn, setUsn] = useState(initialUsn.toUpperCase());
+  const [usn, setUsn] = useState(getInitialUsn);
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -158,6 +169,26 @@ export default function StudentAuthModal({
   const [error, setError] = useState<string | null>(null);
   const [disputeSuccess, setDisputeSuccess] = useState<string | null>(null);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
+  const usnInputRef = useRef<HTMLInputElement | null>(null);
+  const passwordInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Pre-fill USN and place cursor at end on open
+  useEffect(() => {
+    if (isOpen) {
+      const candidateUsn = getInitialUsn();
+      setUsn(candidateUsn);
+      setPassword("");
+      setError(null);
+      setAgreedToPrivacy(false);
+      setTimeout(() => {
+        if (usnInputRef.current) {
+          usnInputRef.current.focus();
+          const len = candidateUsn.length;
+          usnInputRef.current.setSelectionRange(len, len);
+        }
+      }, 60);
+    }
+  }, [isOpen, initialUsn]);
 
   // On-demand live VTU extraction & distributed login gate state
   const [onDemandState, setOnDemandState] = useState<OnDemandState>("idle");
@@ -381,6 +412,9 @@ export default function StudentAuthModal({
         // Marksheet parsed and student authenticated
         const session = res.auth_response;
         setStoredStudentSession(session);
+        if (typeof window !== "undefined") {
+          localStorage.setItem("last_usn", session.usn);
+        }
         sfx.playMechanicalClick();
         onSuccess(session);
 
@@ -444,14 +478,28 @@ export default function StudentAuthModal({
     const startTime = Date.now();
     const MAX_WAIT_MS = 30000; // Stay on loading screen and retry for up to 30 seconds
 
-    let challenge: { require_captcha?: boolean; session_id?: string; captcha_base64?: string; message?: string } | null = null;
+    let challenge: {
+      ok?: boolean;
+      status?: string;
+      token?: string;
+      usn?: string;
+      name?: string;
+      branch?: string;
+      login_count?: number;
+      require_captcha?: boolean;
+      session_id?: string;
+      captcha_base64?: string;
+      message?: string;
+    } | null = null;
     let lastError: string | null = null;
 
     while (Date.now() - startTime < MAX_WAIT_MS) {
       try {
         challenge = await loginOrRegisterStudent(cleanUsn, cleanPassword);
-        if (challenge && challenge.require_captcha && challenge.session_id) {
-          break; // Captcha challenge acquired
+        if (challenge) {
+          if ((challenge.require_captcha && challenge.session_id) || (challenge.ok && challenge.status)) {
+            break; // Challenge or direct login success acquired
+          }
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Establishing session with VTU servers...";
@@ -484,7 +532,28 @@ export default function StudentAuthModal({
       }
     }
 
-    // Check if Captcha arrived
+    // Case 1: Direct Authentication (no captcha needed when no crowdsource target active)
+    if (challenge && challenge.ok && challenge.status) {
+      const session: AuthSession = {
+        ok: true,
+        status: (challenge.status as "registered" | "authenticated") || "authenticated",
+        token: challenge.token || "",
+        usn: challenge.usn || cleanUsn,
+        name: challenge.name || cleanUsn,
+        branch: challenge.branch || "ENG",
+        login_count: challenge.login_count || 1,
+      };
+      setStoredStudentSession(session);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("last_usn", session.usn);
+      }
+      sfx.playMechanicalClick();
+      onSuccess(session);
+      handleClose();
+      return;
+    }
+
+    // Case 2: Live Captcha Challenge arrived
     if (challenge && challenge.require_captcha && challenge.session_id) {
       setOnDemandSessionId(challenge.session_id);
       if (challenge.captcha_base64) {
@@ -1044,7 +1113,7 @@ export default function StudentAuthModal({
 
           ) : mode === "auth" ? (
             /* ========================================================================= */
-            /* STANDARD AUTH / REGISTER FORM                                             */
+            /* STREAMLINED SINGLE-VIEW LOGIN / REGISTRATION FORM                         */
             /* ========================================================================= */
             <form onSubmit={handleStandardAuthSubmit} className="space-y-4">
               {/* USN Field */}
@@ -1052,267 +1121,106 @@ export default function StudentAuthModal({
                 <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
                   University Seat Number (USN)
                 </label>
+                <input
+                  ref={usnInputRef}
+                  type="text"
+                  value={usn}
+                  onChange={(e) => setUsn(e.target.value.toUpperCase())}
+                  placeholder="e.g. 1RM25CS001"
+                  maxLength={10}
+                  className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
+                    isObsidian
+                      ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                      : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
+                  }`}
+                  required
+                />
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                  Password
+                </label>
                 <div className="relative">
                   <input
-                    type="text"
-                    value={usn}
-                    onChange={(e) => {
-                      const val = e.target.value.toUpperCase();
-                      setUsn(val);
-                      if (val.length >= 7) handleCheckUsn(val);
-                    }}
-                    onBlur={() => handleCheckUsn(usn)}
-                    placeholder="e.g. 1DB22CS001"
-                    maxLength={10}
-                    className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
+                    ref={passwordInputRef}
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter password (min 4 chars)"
+                    minLength={4}
+                    className={`w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl border outline-none transition-all ${
                       isObsidian
-                        ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
-                        : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
+                        ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                        : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
                     }`}
                     required
                   />
-                  {checkingUsn && (
-                    <span className="absolute right-3 top-3 text-xs text-zinc-400 animate-spin">
-                      ⏳
-                    </span>
-                  )}
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-3 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                  </button>
                 </div>
-
-                {authStatus?.exists ? (
-                  authStatus.is_hidden ? (
-                    <div className="mt-3 p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 space-y-2">
-                      <div className="flex items-center gap-1.5 font-bold text-xs">
-                        <span>🚫</span>
-                        <span>USN Deleted / Hidden</span>
-                      </div>
-                      <p className="text-xs leading-relaxed opacity-95">
-                        USN deleted, request admin to add this USN data again and send your selfie to verify that you are the owner of the USN.
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sfx.playMechanicalClick();
-                          setMode("dispute");
-                          setError(null);
-                        }}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-xs transition-colors cursor-pointer"
-                      >
-                        <span>📸 Send Selfie Verification to Admin →</span>
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="mt-2 text-xs flex items-center justify-between">
-                      <span className={authStatus.is_claimed ? "text-amber-400" : "text-emerald-400"}>
-                        {authStatus.name} ({authStatus.branch}) •{" "}
-                        {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
-                      </span>
-                    </div>
-                  )
-                ) : authStatus && !authStatus.exists ? (
-                  /* USN NOT in DB: Inform student they can instantly register via live VTU captcha */
-                  <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 space-y-1.5 animate-in fade-in">
-                    <div className="flex items-center gap-1.5 font-semibold text-xs text-cyan-400">
-                      <span>✨</span>
-                      <span>New USN • Instant VTU Extraction</span>
-                    </div>
-                    <p className={`text-[11px] leading-relaxed ${isObsidian ? "text-zinc-300" : "text-zinc-600"}`}>
-                      This USN is not in the database yet. Set your password below and solve a live VTU captcha to automatically extract your marksheet!
-                    </p>
-                  </div>
-                ) : null}
               </div>
 
-              {/* Password Field (Rendered when USN is not hidden) */}
-              {(!authStatus || !authStatus.is_hidden) && (
-                <>
-                  <div>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className={`text-xs font-medium ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                        {authStatus?.is_claimed
-                          ? "Password"
-                          : authStatus && !authStatus.exists
-                          ? "Create New Password (to lock your account)"
-                          : "Create Password (to claim USN)"}
-                      </label>
-                      {authStatus?.is_claimed && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            sfx.playMechanicalClick();
-                            setMode("dispute");
-                            setError(null);
-                          }}
-                          className="text-[11px] text-emerald-400 hover:underline cursor-pointer"
-                        >
-                          Not you? Claim USN
-                        </button>
-                      )}
-                    </div>
-                    <div className="relative">
-                      <input
-                        type={showPassword ? "text" : "password"}
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder={
-                          authStatus?.is_claimed
-                            ? "Enter your account password"
-                            : "Create a password (min 4 chars)"
-                        }
-                        minLength={4}
-                        className={`w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl border outline-none transition-all ${
-                          isObsidian
-                            ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
-                            : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
-                        }`}
-                        required
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword(!showPassword)}
-                        className={`absolute right-3 top-3 text-zinc-400 hover:text-white transition-colors cursor-pointer`}
-                      >
-                        {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Privacy Policy Agreement Checkbox */}
-                  <div className="pt-1">
-                    <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs">
-                      <input
-                        type="checkbox"
-                        checked={agreedToPrivacy}
-                        onChange={(e) => setAgreedToPrivacy(e.target.checked)}
-                        className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 cursor-pointer accent-emerald-500 shrink-0"
-                      />
-                      <span className={isObsidian ? "text-zinc-300" : "text-zinc-700"}>
-                        I have read and agree to the{" "}
-                        <a
-                          href="/privacy"
-                          target="_blank"
-                          rel="noreferrer"
-                          onClick={(e) => e.stopPropagation()}
-                          className="text-cyan-400 hover:underline font-semibold"
-                        >
-                          Privacy Policy
-                        </a>
-                      </span>
-                    </label>
-                  </div>
-
-                  {/* Submit Button */}
-                  {authStatus && !authStatus.exists ? (
-                    <button
-                      type="button"
-                      onClick={handleStartOnDemand}
-                      disabled={loading || !agreedToPrivacy || !password.trim()}
-                      className="w-full py-3.5 px-4 rounded-xl text-sm font-semibold tracking-wide bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-lg shadow-cyan-500/20 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              {/* Privacy Policy Agreement Checkbox */}
+              <div className="pt-0.5">
+                <label className="flex items-start gap-2.5 cursor-pointer select-none text-xs">
+                  <input
+                    type="checkbox"
+                    checked={agreedToPrivacy}
+                    onChange={(e) => setAgreedToPrivacy(e.target.checked)}
+                    className="mt-0.5 w-4 h-4 rounded text-cyan-500 focus:ring-cyan-400 cursor-pointer accent-cyan-500 shrink-0"
+                  />
+                  <span className={isObsidian ? "text-zinc-300" : "text-zinc-700"}>
+                    I have read and agree to the{" "}
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-cyan-400 hover:underline font-semibold"
                     >
-                      <span>⚡</span>
-                      <span>Fetch VTU Marksheet & Register</span>
-                    </button>
-                  ) : (
-                    <button
-                      type="submit"
-                      disabled={loading || !agreedToPrivacy}
-                      className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    >
-                      {loading
-                        ? "Signing In..."
-                        : authStatus?.is_claimed
-                        ? "Unlock Results & Rankings"
-                        : "Claim USN & Create Password"}
-                    </button>
-                  )}
+                      Privacy Policy
+                    </a>
+                  </span>
+                </label>
+              </div>
 
-                  {/* Optional: Dispute Link or Admin Report Drawer */}
-                  <div className="pt-2 text-center space-y-2">
-                    {authStatus && !authStatus.exists ? (
-                      <div>
-                        <button
-                          type="button"
-                          onClick={() => setShowAdminReport(!showAdminReport)}
-                          className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                        >
-                          Having trouble with VTU? <span className="text-amber-400 underline">{showAdminReport ? "Hide" : "Request Admin to Add USN manually"}</span>
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sfx.playMechanicalClick();
-                          setMode("dispute");
-                          setError(null);
-                        }}
-                        className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
-                      >
-                        Did someone else take your USN? <span className="text-emerald-400 underline">Send Selfie Verification</span>
-                      </button>
-                    )}
-                  </div>
+              {/* Submit Button */}
+              <button
+                type="submit"
+                disabled={loading || !agreedToPrivacy || !usn.trim() || password.length < 4}
+                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-400 border-t-white dark:border-slate-600 dark:border-t-slate-950 animate-spin" />
+                    <span>Signing in...</span>
+                  </>
+                ) : (
+                  <span>Login</span>
+                )}
+              </button>
 
-                  {/* Collapsible Admin Report Form (Fallback for missing USN) */}
-                  {showAdminReport && authStatus && !authStatus.exists && (
-                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3 text-left animate-in fade-in">
-                      <div>
-                        <span className="text-xs font-bold text-amber-400 block">📢 Request Admin Scrape</span>
-                        <p className={`text-[11px] mt-0.5 ${isObsidian ? "text-zinc-400" : "text-zinc-600"}`}>
-                          If the live scraper cannot connect, request the administrator to batch import your semester marks.
-                        </p>
-                      </div>
-
-                      {missingReportSuccess ? (
-                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
-                          {missingReportSuccess}
-                        </div>
-                      ) : (
-                        <div className="space-y-2 pt-1">
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value={missingStudentName}
-                              onChange={(e) => setMissingStudentName(e.target.value)}
-                              placeholder="Your Name (Optional)"
-                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none ${
-                                isObsidian
-                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
-                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
-                              }`}
-                            />
-                            <select
-                              value={missingStudentBranch}
-                              onChange={(e) => setMissingStudentBranch(e.target.value)}
-                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none ${
-                                isObsidian
-                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
-                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
-                              }`}
-                            >
-                              <option value="CSE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CSE</option>
-                              <option value="DS" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>DS</option>
-                              <option value="AIML" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>AIML</option>
-                              <option value="ISE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ISE</option>
-                              <option value="ECE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ECE</option>
-                              <option value="MECH" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>MECH</option>
-                              <option value="CIVIL" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CIVIL</option>
-                            </select>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={handleReportMissingUsn}
-                            disabled={reportingMissing}
-                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            {reportingMissing ? "Sending Report..." : "Submit Report to Admin"}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
+              {/* Dispute Link */}
+              <div className="pt-1 text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setMode("dispute");
+                    setError(null);
+                  }}
+                  className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"} cursor-pointer`}
+                >
+                  Did someone else take your USN? <span className="text-cyan-400 underline">Send Selfie Verification</span>
+                </button>
+              </div>
             </form>
           ) : (
             /* ========================================================================= */
