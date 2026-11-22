@@ -220,19 +220,25 @@ class OnDemandScraperManager:
             if target.current_usn_index and target.current_usn_index in usn_list:
                 start_idx = usn_list.index(target.current_usn_index)
 
-            # Look for the first USN in the range not yet extracted for THIS TARGET SEMESTER in database
+            # Look for the next USN in range (respecting force_update / revaluation mode)
             target_sem = str(target.semester or "1").strip()
+            is_force = bool(getattr(target, "force_update", False))
             found_usn = None
             for candidate in usn_list[start_idx:]:
                 if candidate in in_flight_usns:
                     continue
-                has_marks = db.query(Mark.id).filter(
-                    Mark.usn == candidate,
-                    Mark.semester == target_sem
-                ).first()
-                if not has_marks:
+                if is_force:
+                    # Force Update / Revaluation mode: Sequential extraction through range without skipping
                     found_usn = candidate
                     break
+                else:
+                    has_marks = db.query(Mark.id).filter(
+                        Mark.usn == candidate,
+                        Mark.semester == target_sem
+                    ).first()
+                    if not has_marks:
+                        found_usn = candidate
+                        break
 
             if found_usn:
                 with self._lock:
@@ -241,16 +247,23 @@ class OnDemandScraperManager:
                 db.commit()
                 return target, found_usn
             else:
-                # Check if all USNs in this range have marks
-                all_have_marks = True
-                for candidate in usn_list:
-                    if not db.query(Mark.id).filter(Mark.usn == candidate, Mark.semester == target_sem).first():
-                        all_have_marks = False
-                        break
-                if all_have_marks:
-                    target.status = "COMPLETED"
-                    target.completed_at = datetime.utcnow()
-                    db.commit()
+                if is_force:
+                    # In force mode, if all USNs from start_idx were processed, mark completed
+                    if start_idx >= len(usn_list) - 1:
+                        target.status = "COMPLETED"
+                        target.completed_at = datetime.utcnow()
+                        db.commit()
+                else:
+                    # Check if all USNs in this range have marks
+                    all_have_marks = True
+                    for candidate in usn_list:
+                        if not db.query(Mark.id).filter(Mark.usn == candidate, Mark.semester == target_sem).first():
+                            all_have_marks = False
+                            break
+                    if all_have_marks:
+                        target.status = "COMPLETED"
+                        target.completed_at = datetime.utcnow()
+                        db.commit()
 
         return None
 

@@ -226,6 +226,7 @@ class ScrapeTargetCreate(BaseModel):
     vtu_link: Optional[str] = None
     semester: str = "1"
     semester_link_id: Optional[int] = None
+    force_update: Optional[bool] = False
 
 class ScrapeTargetOut(BaseModel):
     id: int
@@ -235,6 +236,7 @@ class ScrapeTargetOut(BaseModel):
     semester: str
     status: str
     current_usn_index: Optional[str] = None
+    force_update: bool = False
     created_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None
 

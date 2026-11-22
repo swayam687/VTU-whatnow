@@ -973,7 +973,7 @@ export async function fetchAdminRescrapeRequests(
 
 export async function actionAdminRescrapeRequest(
   requestId: number,
-  action: "resolve" | "reject" | "scrape_now" | "hide_student" | "unhide_student",
+  action: "resolve" | "reject" | "scrape_now" | "hide_student" | "unhide_student" | "queue_crowdsource",
   adminNotes: string | undefined,
   adminKey: string
 ): Promise<{ ok: boolean; message: string }> {
@@ -1178,6 +1178,7 @@ export interface ScrapeTarget {
   semester: string;
   status: "PENDING" | "COMPLETED" | string;
   current_usn_index?: string;
+  force_update?: boolean;
   created_at?: string;
   completed_at?: string;
 }
@@ -1198,6 +1199,7 @@ export async function createScrapeTarget(
     vtu_link?: string;
     semester?: string;
     semester_link_id?: number;
+    force_update?: boolean;
   },
   adminKey: string
 ): Promise<ScrapeTarget> {

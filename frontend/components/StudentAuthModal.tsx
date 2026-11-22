@@ -319,8 +319,10 @@ export default function StudentAuthModal({
     onClose();
   };
 
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   // Check USN status on blur or when user finishes typing 7+ chars
-  const handleCheckUsn = async (candidateUsn: string) => {
+  const handleCheckUsn = async (candidateUsn: string, isRetry = false) => {
     const clean = candidateUsn.trim().toUpperCase();
     if (clean.length < 5) return;
     setCheckingUsn(true);
@@ -332,7 +334,16 @@ export default function StudentAuthModal({
         setError(null);
       }
     } catch {
-      // Network or backend unavailable
+      // Network or backend unavailable (e.g. Render spinning up)
+      // Auto-retry once after 2.5 seconds if modal is still open and still on this USN
+      if (!isRetry) {
+        if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = setTimeout(() => {
+          if (clean.length >= 7) {
+            handleCheckUsn(clean, true);
+          }
+        }, 2500);
+      }
     } finally {
       setCheckingUsn(false);
     }
@@ -801,7 +812,7 @@ export default function StudentAuthModal({
             <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs sm:text-sm leading-relaxed space-y-2 animate-in fade-in">
               <p className="flex items-start gap-1.5">
                 <span className="shrink-0 mt-0.5">⚠️</span>
-                <span>{error}</span>
+                <span>{cleanErrorMessage(error)}</span>
               </p>
               {error.toLowerCase().includes("selfie") && mode === "auth" && (
                 <button
@@ -1222,7 +1233,7 @@ export default function StudentAuthModal({
                       </button>
                     </div>
                   ) : (
-                    <div className="mt-2 text-xs flex items-center justify-between">
+                    <div className="mt-2 text-xs flex items-center justify-between animate-in fade-in">
                       <span className={authStatus.is_claimed ? "text-amber-400 font-medium" : "text-emerald-400 font-medium"}>
                         {authStatus.name} ({authStatus.branch}) •{" "}
                         {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
@@ -1230,10 +1241,26 @@ export default function StudentAuthModal({
                     </div>
                   )
                 ) : authStatus && !authStatus.exists ? (
-                  <div className="mt-2 text-xs flex items-center justify-between">
+                  <div className="mt-2 text-xs flex items-center justify-between animate-in fade-in">
                     <span className="text-cyan-400 font-medium">
                       ⚡ New USN • Automatic VTU Marksheet Registration
                     </span>
+                  </div>
+                ) : checkingUsn ? (
+                  <div className="mt-2 text-xs flex items-center gap-1.5 text-zinc-400 animate-in fade-in">
+                    <span className="inline-block animate-spin">⏳</span>
+                    <span>Checking USN records...</span>
+                  </div>
+                ) : usn.trim().length >= 7 ? (
+                  <div className="mt-2 text-xs flex items-center justify-between text-zinc-400 animate-in fade-in">
+                    <span className="text-[11px]">Backend connecting...</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCheckUsn(usn)}
+                      className="text-cyan-400 hover:underline font-medium text-[11px] cursor-pointer"
+                    >
+                      Check Name ↻
+                    </button>
                   </div>
                 ) : null}
               </div>

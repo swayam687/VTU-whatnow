@@ -169,6 +169,7 @@ class ScrapeTarget(Base):
     semester = Column(String, default="1")
     status = Column(String, default="PENDING")  # 'PENDING', 'COMPLETED'
     current_usn_index = Column(String, nullable=True)
+    force_update = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
 

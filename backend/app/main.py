@@ -136,6 +136,19 @@ def init_db():
                     except Exception as col_err:
                         print(f"⚠️ Could not add column 'vtu_link': {col_err}")
 
+            if "scrape_targets" in existing_tables:
+                st_cols = {c["name"] for c in insp.get_columns("scrape_targets")}
+                if "force_update" not in st_cols:
+                    try:
+                        with engine.begin() as conn:
+                            if engine.dialect.name == "postgresql":
+                                conn.execute(text("ALTER TABLE scrape_targets ADD COLUMN force_update BOOLEAN DEFAULT FALSE;"))
+                            else:
+                                conn.execute(text("ALTER TABLE scrape_targets ADD COLUMN force_update BOOLEAN DEFAULT 0;"))
+                        print("✅ Added column 'force_update' to scrape_targets table.")
+                    except Exception as col_err:
+                        print(f"⚠️ Could not add column 'force_update': {col_err}")
+
             # 3. For PostgreSQL (e.g. Supabase on Render), guarantee idempotency with IF NOT EXISTS
             if engine.dialect.name == "postgresql":
                 for col_name, col_def in [
@@ -159,6 +172,7 @@ def init_db():
                 try:
                     with engine.begin() as conn:
                         conn.execute(text("ALTER TABLE rescrape_requests ADD COLUMN IF NOT EXISTS vtu_link VARCHAR DEFAULT '';"))
+                        conn.execute(text("ALTER TABLE scrape_targets ADD COLUMN IF NOT EXISTS force_update BOOLEAN DEFAULT FALSE;"))
                 except Exception:
                     pass
         except Exception as insp_err:
@@ -1046,6 +1060,32 @@ def handle_admin_rescrape_action(
             "message": f"Launched scraper for {item.usn} (Sem {target_sem})! Monitor progress in the Scraper tab."
         }
 
+    elif req.action == "queue_crowdsource":
+        target_url = (item.vtu_link or item.custom_url or "").strip()
+        if not target_url:
+            default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+            target_url = default_link.url if default_link else settings.VTU_URL_SEM1
+
+        target_sem = item.target_semester if item.target_semester in ("1", "2") else "1"
+
+        new_target = ScrapeTarget(
+            start_usn=item.usn.strip().upper(),
+            end_usn=item.usn.strip().upper(),
+            vtu_link=target_url,
+            semester=target_sem,
+            status="PENDING",
+            current_usn_index=item.usn.strip().upper(),
+            force_update=True,
+        )
+        db.add(new_target)
+        item.status = "in_progress"
+        item.admin_notes = req.admin_notes or f"Queued for crowdsourced verification (force_update=True) on {target_url}"
+        db.commit()
+        return {
+            "ok": True,
+            "message": f"USN {item.usn} queued in Crowdsourced Gate with Force Update enabled! Next logging-in student will solve this captcha."
+        }
+
     elif req.action == "hide_student":
         student = db.query(Student).filter(Student.usn == item.usn).first()
         if student:
@@ -1451,6 +1491,7 @@ def create_scrape_target(req: ScrapeTargetCreate, db: Session = Depends(get_db))
         semester=target_sem,
         status="PENDING",
         current_usn_index=clean_start,
+        force_update=bool(req.force_update),
     )
     db.add(new_target)
     db.commit()

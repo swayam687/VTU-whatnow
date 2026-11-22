@@ -99,7 +99,7 @@ export default function RescrapeRequestModal({
           branch: student?.branch || studentSession?.branch || "",
           request_type: requestType,
           target_semester: requestType === "DATA_DELETION" ? "all" : targetSemester,
-          vtu_link: (requestType === "REVALUATION" || requestType === "RE_EXAM") ? (vtuLink.trim() || undefined) : undefined,
+          vtu_link: requestType !== "DATA_DELETION" ? (vtuLink.trim() || undefined) : undefined,
         },
         studentSession?.token
       );
@@ -343,8 +343,8 @@ export default function RescrapeRequestModal({
                 </div>
               </div>
 
-              {/* Optional VTU Result Link Input for Revaluation or Re-exam */}
-              {(requestType === "REVALUATION" || requestType === "RE_EXAM") && (
+              {/* Optional VTU Result Link Input for all update requests */}
+              {requestType !== "DATA_DELETION" && (
                 <div
                   className={`p-3.5 rounded-2xl border space-y-1.5 transition-all ${
                     isObsidian
@@ -362,7 +362,7 @@ export default function RescrapeRequestModal({
                     type="url"
                     value={vtuLink}
                     onChange={(e) => setVtuLink(e.target.value)}
-                    placeholder="https://results.vtu.ac.in/..."
+                    placeholder="https://results.vtu.ac.in/.../index.php"
                     className={`w-full px-3 py-2 text-xs rounded-xl border outline-none font-mono transition-all ${
                       isObsidian
                         ? "bg-slate-950/60 border-slate-700 text-white focus:border-cyan-400"
@@ -370,7 +370,7 @@ export default function RescrapeRequestModal({
                     }`}
                   />
                   <p className="text-[11px] opacity-65 leading-relaxed">
-                    Go to the VTU results website, select your specific Revaluation or Makeup exam link, and paste the URL here. This helps admins process your update faster.
+                    If you have a specific revaluation, makeup, or results portal link, paste it here. Admins can route it directly to the Crowdsourced Scraping Gate.
                   </p>
                 </div>
               )}
