@@ -1,8 +1,16 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
-import { Student, Mark, fetchStudent, logStudentComparison } from "../lib/api";
-import { IconClose, IconCompare } from "./Icons";
+import React, { useState, useMemo, useEffect, useRef } from "react";
+import {
+  Student,
+  Mark,
+  fetchStudent,
+  logStudentComparison,
+  compareStudents,
+  solveCompareCaptcha,
+  submitCompareCaptcha,
+} from "../lib/api";
+import { IconClose, IconCompare, IconShield, IconRotateCcw } from "./Icons";
 import Identicon from "./Identicon";
 import { sfx } from "../lib/sfx";
 
@@ -27,6 +35,55 @@ export default function CompareModal({
   const [s1, setS1] = useState<Student>(initialS1);
   const [s2, setS2] = useState<Student>(initialS2);
 
+  // Security Verification (Comparison Gate) States
+  const [isVerificationRequired, setIsVerificationRequired] = useState(false);
+  const [captchaSessionId, setCaptchaSessionId] = useState<string | null>(null);
+  const [captchaBase64, setCaptchaBase64] = useState<string | null>(null);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [captchaLoading, setCaptchaLoading] = useState(false);
+  const [captchaSubmitting, setCaptchaSubmitting] = useState(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const [verificationSuccess, setVerificationSuccess] = useState<string | null>(null);
+  const captchaInputRef = useRef<HTMLInputElement>(null);
+
+  const loadCaptchaChallenge = async () => {
+    setCaptchaLoading(true);
+    setCaptchaError(null);
+    try {
+      const data = await solveCompareCaptcha();
+      setCaptchaSessionId(data.session_id);
+      setCaptchaBase64(data.captcha_base64);
+      setTimeout(() => captchaInputRef.current?.focus(), 150);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load verification challenge";
+      setCaptchaError(msg);
+    } finally {
+      setCaptchaLoading(false);
+    }
+  };
+
+  const executeComparisonGate = async (usnA: string, usnB: string) => {
+    try {
+      const res = await compareStudents(usnA, usnB);
+      if (res.student1) setS1(res.student1);
+      if (res.student2) setS2(res.student2);
+      setIsVerificationRequired(false);
+    } catch (err: unknown) {
+      const errObj = err as { name?: string; message?: string };
+      if (errObj.name === "CAPTCHA_REQUIRED" || errObj.message === "CAPTCHA_REQUIRED") {
+        setIsVerificationRequired(true);
+        loadCaptchaChallenge();
+      }
+    }
+  };
+
+  // Check comparison gate on initial open
+  useEffect(() => {
+    if (initialS1?.usn && initialS2?.usn) {
+      executeComparisonGate(initialS1.usn, initialS2.usn);
+    }
+  }, []);
+
   // Guarantee compare event is recorded on mount if user is logged in
   useEffect(() => {
     if (viewer?.usn && initialS1?.usn && initialS2?.usn) {
@@ -42,6 +99,40 @@ export default function CompareModal({
       });
     }
   }, []);
+
+  const handleVerificationSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!captchaSessionId || !captchaInput.trim()) return;
+
+    setCaptchaSubmitting(true);
+    setCaptchaError(null);
+    try {
+      const res = await submitCompareCaptcha(captchaSessionId, captchaInput.trim());
+      if (res.ok) {
+        sfx.playMechanicalClick();
+        setVerificationSuccess("Verification complete! Comparison unlocked.");
+        setTimeout(async () => {
+          setIsVerificationRequired(false);
+          setVerificationSuccess(null);
+          setCaptchaInput("");
+          setCaptchaBase64(null);
+          setCaptchaSessionId(null);
+          await executeComparisonGate(s1.usn, s2.usn);
+        }, 700);
+      } else {
+        if (res.new_captcha_base64) {
+          setCaptchaBase64(res.new_captcha_base64);
+        }
+        setCaptchaInput("");
+        setCaptchaError(res.message || "Security checksum mismatch. Please try again.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification failed";
+      setCaptchaError(msg);
+    } finally {
+      setCaptchaSubmitting(false);
+    }
+  };
 
   // Guarantee that initialS1 and initialS2 are always included in the dropdown options
   const selectableStudents = useMemo(() => {
@@ -131,12 +222,143 @@ export default function CompareModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto">
       <div
-        className={`rounded-t-3xl sm:rounded-3xl border shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 ${
+        className={`relative rounded-t-3xl sm:rounded-3xl border shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 ${
           isObsidian
             ? "bg-[#0b0d11] border-slate-800 text-white"
             : "bg-white border-slate-200 text-slate-900"
         }`}
       >
+        {/* Security Verification Required (Comparison Gate) */}
+        {isVerificationRequired && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
+            <div
+              className={`w-full max-w-md rounded-2xl border shadow-2xl p-5 sm:p-6 space-y-4 ${
+                isObsidian ? "bg-[#0f1115] border-white/10 text-white" : "bg-white border-zinc-200 text-zinc-900"
+              }`}
+            >
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold">
+                  <IconShield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base leading-tight">Security Verification Required</h3>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">Automated abuse prevention gate</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                To prevent automated abuse and keep comparisons running smoothly, please solve this captcha to continue.
+              </p>
+
+              {verificationSuccess ? (
+                <div className="p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-center space-y-2 animate-in zoom-in-95">
+                  <div className="w-10 h-10 mx-auto rounded-full bg-emerald-500/20 flex items-center justify-center text-xl font-bold">
+                    ✓
+                  </div>
+                  <p className="text-xs font-semibold">{verificationSuccess}</p>
+                </div>
+              ) : captchaLoading ? (
+                <div className="py-8 text-center space-y-3">
+                  <div className="w-10 h-10 mx-auto rounded-full border-2 border-cyan-500/30 border-t-cyan-400 animate-spin" />
+                  <p className="text-xs font-mono text-zinc-400">Loading security verification challenge...</p>
+                </div>
+              ) : (
+                <form onSubmit={handleVerificationSubmit} className="space-y-3.5">
+                  {captchaError && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs flex items-center justify-between">
+                      <span>{captchaError}</span>
+                      <button
+                        type="button"
+                        onClick={loadCaptchaChallenge}
+                        className="text-xs font-bold underline hover:text-rose-300 ml-2"
+                      >
+                        Retry
+                      </button>
+                    </div>
+                  )}
+
+                  {captchaBase64 && (
+                    <div className="flex flex-col items-center gap-2 p-3 rounded-xl bg-slate-900 border border-white/10">
+                      <div className="flex items-center justify-between w-full">
+                        <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider">
+                          Official Security Checksum
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            sfx.playMechanicalClick();
+                            loadCaptchaChallenge();
+                          }}
+                          className="text-[11px] font-semibold text-cyan-400 hover:text-cyan-300 flex items-center gap-1 cursor-pointer"
+                        >
+                          <IconRotateCcw className="w-3 h-3" />
+                          <span>Refresh</span>
+                        </button>
+                      </div>
+                      <img
+                        src={`data:image/png;base64,${captchaBase64}`}
+                        alt="Security Captcha"
+                        className="h-14 sm:h-16 rounded-lg border border-white/10 shadow-xs"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-medium text-zinc-300">
+                        Enter Captcha Code
+                      </label>
+                      <span className="text-[10px] font-mono text-cyan-400 font-medium">
+                        Case-Sensitive (a-z & A-Z)
+                      </span>
+                    </div>
+                    <input
+                      ref={captchaInputRef}
+                      type="text"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      placeholder="e.g. 5k9P2x"
+                      maxLength={10}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      required
+                      className="w-full px-4 py-2.5 text-base font-mono text-center tracking-widest rounded-xl border border-white/10 bg-white/5 text-white focus:border-cyan-400 outline-none"
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setIsVerificationRequired(false);
+                        onClose();
+                      }}
+                      className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition-colors cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={captchaSubmitting || !captchaInput.trim()}
+                      className="flex-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50 text-white shadow-md shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      {captchaSubmitting ? (
+                        <>
+                          <div className="w-3.5 h-3.5 rounded-full border border-white/30 border-t-white animate-spin" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <span>Verify & Unlock Comparison →</span>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        )}
         {/* Header */}
         <div
           className={`px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between ${

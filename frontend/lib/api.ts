@@ -42,6 +42,7 @@ export interface Student {
   has_pending_subjects?: string | null;
   is_my_profile?: boolean;
   is_hidden?: boolean;
+  comparison_credits?: number;
   marks?: Mark[];
 }
 
@@ -1162,3 +1163,101 @@ export async function deleteScrapeTarget(
   }
   return res.json();
 }
+
+// -------------------------------------------------------------
+// Comparison Gate & Captcha API Methods
+// -------------------------------------------------------------
+
+export async function compareStudents(
+  usn_a: string,
+  usn_b: string
+): Promise<{ ok: boolean; student1: Student; student2: Student; credits_remaining?: number }> {
+  const headers: Record<string, string> = {};
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+
+  const res = await fetch(`${API_BASE}/api/compare/${encodeURIComponent(usn_a)}/${encodeURIComponent(usn_b)}`, {
+    headers,
+    cache: "no-store",
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 403 && (data.detail === "CAPTCHA_REQUIRED" || data.detail?.code === "CAPTCHA_REQUIRED")) {
+      const err = new Error("CAPTCHA_REQUIRED");
+      err.name = "CAPTCHA_REQUIRED";
+      throw err;
+    }
+    throw new Error(data.detail || "Failed to perform comparison");
+  }
+
+  return res.json();
+}
+
+export async function solveCompareCaptcha(): Promise<{
+  ok: boolean;
+  session_id: string;
+  captcha_base64: string;
+  message: string;
+}> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+
+  const res = await fetch(`${API_BASE}/api/compare/solve-captcha`, {
+    method: "POST",
+    headers,
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to initialize verification captcha");
+  }
+
+  return res.json();
+}
+
+export async function submitCompareCaptcha(
+  sessionId: string,
+  captchaCode: string
+): Promise<{ ok: boolean; message: string; comparison_credits?: number; reason?: string; new_captcha_base64?: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+
+  const res = await fetch(`${API_BASE}/api/compare/submit-captcha`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ session_id: sessionId, captcha: captchaCode }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || "Verification failed");
+  }
+
+  return data;
+}
+
+export async function updateStudentCredits(
+  usn: string,
+  payload: { amount?: number; set?: number },
+  adminKey: string
+): Promise<{ ok: boolean; usn: string; comparison_credits: number; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/students/${encodeURIComponent(usn)}/credits`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to update student comparison credits");
+  }
+
+  return res.json();
+}
+

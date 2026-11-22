@@ -25,6 +25,7 @@ class Student(Base):
     login_count = Column(Integer, default=0)
     last_login_at = Column(DateTime, nullable=True)
     avatar_pixel_art = Column(String, nullable=True, default="")  # 10x10 custom pixel art matrix
+    comparison_credits = Column(Integer, default=2, nullable=False)
 
     # Student Privacy Controls
     show_my_name = Column(Boolean, default=True)
@@ -170,6 +171,23 @@ class ScrapeTarget(Base):
     current_usn_index = Column(String, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     completed_at = Column(DateTime, nullable=True)
+
+
+class UserCaptchaLog(Base):
+    """
+    Tracks captchas solved by students during crowdsourced scraping (login gate or comparison gate).
+    Prevents abuse and verifies target progression.
+    """
+    __tablename__ = "user_captcha_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_usn = Column(String, index=True, nullable=False)
+    target_usn = Column(String, nullable=False)
+    vtu_link = Column(String, nullable=True, default="")
+    action = Column(String, default="comparison")  # 'comparison', 'login_gate'
+    solved_at = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String, nullable=True, default="")
+
 
 
 

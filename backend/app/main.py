@@ -34,7 +34,7 @@ from sqlalchemy import text, desc, func, distinct, inspect
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport, RescrapeRequest, ScrapeTarget
+from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport, RescrapeRequest, ScrapeTarget, UserCaptchaLog
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -77,6 +77,9 @@ from .schemas import (
     LoginGateChallengeResponse,
     LoginGateSubmitRequest,
     LoginGateSubmitResponse,
+    CompareCaptchaChallengeResponse,
+    CompareCaptchaSubmitRequest,
+    AdminCreditUpdateRequest,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -148,6 +151,7 @@ def init_db():
                     ("show_my_backlogs", "BOOLEAN DEFAULT TRUE"),
                     ("allow_comparison", "BOOLEAN DEFAULT TRUE"),
                     ("is_hidden", "BOOLEAN DEFAULT FALSE"),
+                    ("comparison_credits", "INTEGER DEFAULT 2"),
                 ]:
                     try:
                         with engine.begin() as conn:
@@ -276,6 +280,36 @@ def init_db():
                     """))
         except Exception as e:
             print(f"⚠️ rescrape_requests init notice: {e}")
+
+        # user_captcha_logs
+        try:
+            with engine.begin() as conn:
+                if engine.dialect.name == "postgresql":
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS user_captcha_logs (
+                            id SERIAL PRIMARY KEY,
+                            user_usn VARCHAR NOT NULL,
+                            target_usn VARCHAR NOT NULL,
+                            vtu_link VARCHAR DEFAULT '',
+                            action VARCHAR DEFAULT 'comparison',
+                            solved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address VARCHAR DEFAULT ''
+                        );
+                    """))
+                else:
+                    conn.execute(text("""
+                        CREATE TABLE IF NOT EXISTS user_captcha_logs (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_usn TEXT NOT NULL,
+                            target_usn TEXT NOT NULL,
+                            vtu_link TEXT DEFAULT '',
+                            action TEXT DEFAULT 'comparison',
+                            solved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            ip_address TEXT DEFAULT ''
+                        );
+                    """))
+        except Exception as e:
+            print(f"⚠️ user_captcha_logs init notice: {e}")
 
         print("✅ Database schema initialized and verified.")
     except Exception as e:
@@ -1606,6 +1640,212 @@ def get_students(
         response.headers["X-Is-Authenticated"] = "true"
     students = query.limit(limit).all()
     return [sanitize_student_record(s, current_usn) for s in students]
+
+
+# -------------------------------------------------------------
+# Freemium Comparison Gate & Crowdsourced Captcha Endpoints
+# -------------------------------------------------------------
+
+@app.get("/api/compare/{usn_a}/{usn_b}")
+def compare_students(
+    usn_a: str,
+    usn_b: str,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db)
+    if not current_usn:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to compare student profiles."
+        )
+
+    user_student = db.query(Student).filter(Student.usn == current_usn).first()
+    if not user_student or user_student.is_hidden:
+        raise HTTPException(status_code=401, detail="Session expired or invalid.")
+
+    # Step 1: Check comparison credits
+    if (user_student.comparison_credits or 0) <= 0:
+        # Step 3: Out of credits -> Return 403 CAPTCHA_REQUIRED
+        raise HTTPException(
+            status_code=403,
+            detail="CAPTCHA_REQUIRED"
+        )
+
+    # Step 2: Deduct 1 credit
+    user_student.comparison_credits = max(0, user_student.comparison_credits - 1)
+    db.commit()
+
+    clean_a = usn_a.strip().upper()
+    clean_b = usn_b.strip().upper()
+    st1 = db.query(Student).filter(Student.usn == clean_a).first()
+    st2 = db.query(Student).filter(Student.usn == clean_b).first()
+
+    if not st1 or not st2:
+        raise HTTPException(status_code=404, detail="One or both students not found.")
+
+    return {
+        "ok": True,
+        "student1": sanitize_student_record(st1, current_usn),
+        "student2": sanitize_student_record(st2, current_usn),
+        "credits_remaining": user_student.comparison_credits,
+    }
+
+
+@app.post("/api/compare/solve-captcha", response_model=CompareCaptchaChallengeResponse)
+async def solve_compare_captcha(
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db)
+    if not current_usn:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    target_info = ondemand_scraper.get_next_scrape_target(db)
+    if not target_info:
+        unscraped = db.query(Student).filter(
+            ~Student.marks.any(),
+            Student.is_hidden == False
+        ).first()
+
+        target_url = settings.VTU_URL_SEM1
+        if unscraped:
+            auto_target = ScrapeTarget(
+                start_usn=unscraped.usn,
+                end_usn=unscraped.usn,
+                vtu_link=target_url,
+                semester="1",
+                status="PENDING",
+                current_usn_index=unscraped.usn,
+            )
+            db.add(auto_target)
+            db.commit()
+            db.refresh(auto_target)
+            target_info = (auto_target, unscraped.usn)
+        else:
+            college_prefix = current_usn[:5] if len(current_usn) >= 5 else "1RM25"
+            existing_count = db.query(ScrapeTarget).count()
+            base_idx = (existing_count + 1) * 10 + 1
+            next_usn = f"{college_prefix}CS{base_idx:03d}"
+            auto_target = ScrapeTarget(
+                start_usn=next_usn,
+                end_usn=f"{college_prefix}CS{base_idx + 10:03d}",
+                vtu_link=target_url,
+                semester="1",
+                status="PENDING",
+                current_usn_index=next_usn,
+            )
+            db.add(auto_target)
+            db.commit()
+            db.refresh(auto_target)
+            target_info = (auto_target, next_usn)
+
+    target, target_usn = target_info
+    portal_url = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+    res = await ondemand_scraper.start_session(
+        target_usn=target_usn,
+        semester=target.semester or "1",
+        target_url=portal_url,
+        student_usn=current_usn,
+        is_self_scrape=False,
+        target_id=target.id,
+    )
+
+    if not res or not res.get("ok"):
+        err_msg = res.get("message", "Timeout") if res else "VTU examination servers unresponsive"
+        raise HTTPException(
+            status_code=503,
+            detail=f"VTU examination servers are currently slow or unreachable ({err_msg}). Please try again in 5 seconds."
+        )
+
+    return CompareCaptchaChallengeResponse(
+        ok=True,
+        session_id=res["session_id"],
+        captcha_base64=res["captcha_base64"],
+        message="To prevent automated abuse and keep comparisons running smoothly, please solve this captcha to continue."
+    )
+
+
+@app.post("/api/compare/submit-captcha")
+async def submit_compare_captcha(
+    req: CompareCaptchaSubmitRequest,
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db)
+    if not current_usn:
+        raise HTTPException(status_code=401, detail="Authentication required.")
+
+    if not req.captcha.strip():
+        raise HTTPException(status_code=400, detail="Please enter the captcha code.")
+
+    client_ip = request.headers.get("x-forwarded-for")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+
+    res = await ondemand_scraper.submit_captcha(
+        session_id=req.session_id,
+        captcha_code=req.captcha.strip(),
+        password="",
+        client_ip=client_ip
+    )
+
+    if res.get("ok"):
+        user_student = db.query(Student).filter(Student.usn == current_usn).first()
+        if user_student:
+            # Grant +1 comparison credit
+            user_student.comparison_credits = (user_student.comparison_credits or 0) + 1
+
+            # Log to UserCaptchaLog to track and prevent abuse
+            captcha_log = UserCaptchaLog(
+                user_usn=current_usn,
+                target_usn=res.get("target_usn") or "TARGET_USN",
+                vtu_link=res.get("portal_url") or "",
+                action="comparison",
+                ip_address=client_ip,
+            )
+            db.add(captcha_log)
+            db.commit()
+
+        return {
+            "ok": True,
+            "message": "Verification complete! You have unlocked your comparison.",
+            "comparison_credits": user_student.comparison_credits if user_student else 1,
+        }
+    else:
+        return res
+
+
+@app.patch("/api/admin/students/{usn}/credits", dependencies=[Depends(require_admin)])
+def update_student_comparison_credits(
+    usn: str,
+    req: AdminCreditUpdateRequest,
+    db: Session = Depends(get_db)
+):
+    clean_usn = usn.strip().upper()
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail=f"Student {clean_usn} not found.")
+
+    if req.set is not None:
+        student.comparison_credits = max(0, req.set)
+    elif req.amount is not None:
+        student.comparison_credits = max(0, (student.comparison_credits or 0) + req.amount)
+    else:
+        raise HTTPException(status_code=400, detail="Must provide 'amount' or 'set' in request body.")
+
+    db.commit()
+    db.refresh(student)
+    return {
+        "ok": True,
+        "usn": student.usn,
+        "comparison_credits": student.comparison_credits,
+        "message": f"Updated comparison credits for {student.usn} to {student.comparison_credits}"
+    }
 
 
 # -------------------------------------------------------------

@@ -617,6 +617,8 @@ class OnDemandScraperManager:
                     auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
 
                 # Clean up Playwright session
+                target_scraped_usn = session.usn
+                portal_scraped_url = session.target_url
                 with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
@@ -624,6 +626,8 @@ class OnDemandScraperManager:
                 return {
                     "ok": True,
                     "bypassed": False,
+                    "target_usn": target_scraped_usn,
+                    "portal_url": portal_scraped_url,
                     "auth_response": auth_resp,
                     "message": "Security verification successful! Access granted.",
                 }

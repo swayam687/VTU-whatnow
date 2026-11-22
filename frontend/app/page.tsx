@@ -236,6 +236,10 @@ export default function Dashboard() {
 
   const handleCompareWithMe = async (targetStudent: Student) => {
     sfx.playMechanicalClick();
+    if (!studentSession?.usn && !myUsn) {
+      setIsAuthModalOpen(true);
+      return;
+    }
     const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
     let myProfile = pool.find((s) => s.usn.toUpperCase() === myUsn.toUpperCase());
     if (!myProfile && myUsn) {
@@ -414,6 +418,11 @@ export default function Dashboard() {
   // Launch compare modal
   const handleOpenCompare = async () => {
     if (compareUsns.length < 2) return;
+    if (!studentSession?.usn && !myUsn) {
+      sfx.playMechanicalClick();
+      setIsAuthModalOpen(true);
+      return;
+    }
     sfx.playSonarChime();
     try {
       const [s1, s2] = await Promise.all([

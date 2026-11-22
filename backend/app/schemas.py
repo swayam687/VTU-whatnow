@@ -47,6 +47,7 @@ class StudentBase(BaseModel):
     has_pending_subjects: Optional[str] = None
     is_my_profile: bool = False
     is_hidden: bool = False
+    comparison_credits: int = 2
 
 class PrivacySettingsUpdate(BaseModel):
     show_my_backlogs: Optional[bool] = None
@@ -414,6 +415,24 @@ class SemesterAuditResponse(BaseModel):
     missing_sem1: int
     no_marks: int
     students: List[StudentSemesterAudit]
+
+
+class CompareCaptchaChallengeResponse(BaseModel):
+    ok: bool = True
+    session_id: str
+    captcha_base64: str
+    message: str = "To prevent automated abuse and keep comparisons running smoothly, please solve this captcha to continue."
+
+
+class CompareCaptchaSubmitRequest(BaseModel):
+    session_id: str
+    captcha: str
+
+
+class AdminCreditUpdateRequest(BaseModel):
+    amount: Optional[int] = None
+    set: Optional[int] = None
+
 
 
 

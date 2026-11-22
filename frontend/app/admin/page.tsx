@@ -42,6 +42,7 @@ import {
   createScrapeTarget,
   deleteScrapeTarget,
   ScrapeTarget,
+  updateStudentCredits,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -468,6 +469,25 @@ export default function AdminPanel() {
       sfx.playSonar();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to toggle visibility";
+      alert(msg);
+    }
+  };
+
+  const handleUpdateCredits = async (usn: string, amount?: number, setVal?: number) => {
+    if (!adminKey) return;
+    sfx.playClick();
+    try {
+      const res = await updateStudentCredits(usn, { amount, set: setVal }, adminKey);
+      setAllStudents((prev) =>
+        prev.map((st) =>
+          st.usn === usn ? { ...st, comparison_credits: res.comparison_credits } : st
+        )
+      );
+      setActionSuccessMsg(`⚖️ Comparison credits for ${usn} updated to ${res.comparison_credits}`);
+      sfx.playSonar();
+      setTimeout(() => setActionSuccessMsg(""), 3500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update credits";
       alert(msg);
     }
   };
@@ -2113,6 +2133,43 @@ export default function AdminPanel() {
                       >
                         {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
                       </span>
+
+                      {/* Comparison Credits Control */}
+                      <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700/80">
+                        <span className="text-[10px] font-mono font-semibold text-slate-500 uppercase tracking-tight">
+                          Credits:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCredits(s.usn, -1)}
+                          disabled={(s.comparison_credits ?? 2) <= 0}
+                          title="Decrease credits by 1"
+                          className="w-5 h-5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-30 cursor-pointer transition-colors"
+                        >
+                          -
+                        </button>
+                        <input
+                          type="number"
+                          min={0}
+                          max={999}
+                          value={s.comparison_credits ?? 2}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val >= 0) {
+                              handleUpdateCredits(s.usn, undefined, val);
+                            }
+                          }}
+                          className="w-8 text-center text-xs font-mono font-bold bg-transparent border-0 outline-none text-slate-900 dark:text-white"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateCredits(s.usn, 1)}
+                          title="Increase credits by 1"
+                          className="w-5 h-5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer transition-colors"
+                        >
+                          +
+                        </button>
+                      </div>
 
                       <button
                         type="button"
