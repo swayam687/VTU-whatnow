@@ -210,6 +210,11 @@ export default function StudentAuthModal({
       setPassword("");
       setError(null);
       setAgreedToPrivacy(false);
+      if (candidateUsn.length >= 7) {
+        handleCheckUsn(candidateUsn);
+      } else {
+        setAuthStatus(null);
+      }
       setTimeout(() => {
         if (usnInputRef.current) {
           usnInputRef.current.focus();
@@ -1158,34 +1163,114 @@ export default function StudentAuthModal({
                 <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
                   University Seat Number (USN)
                 </label>
-                <input
-                  ref={usnInputRef}
-                  type="text"
-                  value={usn}
-                  onChange={(e) => setUsn(e.target.value.toUpperCase())}
-                  placeholder="e.g. 1RM25CS001"
-                  maxLength={10}
-                  className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
-                    isObsidian
-                      ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
-                      : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
-                  }`}
-                  required
-                />
+                <div className="relative">
+                  <input
+                    ref={usnInputRef}
+                    type="text"
+                    value={usn}
+                    onChange={(e) => {
+                      const val = e.target.value.toUpperCase();
+                      setUsn(val);
+                      if (val.length >= 7) {
+                        handleCheckUsn(val);
+                      } else {
+                        setAuthStatus(null);
+                      }
+                    }}
+                    onBlur={() => {
+                      if (usn.trim().length >= 5) {
+                        handleCheckUsn(usn);
+                      }
+                    }}
+                    placeholder="e.g. 1RM25CS001"
+                    maxLength={10}
+                    className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
+                      isObsidian
+                        ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                        : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
+                    }`}
+                    required
+                  />
+                  {checkingUsn && (
+                    <span className="absolute right-3 top-3 text-xs text-zinc-400 animate-spin">
+                      ⏳
+                    </span>
+                  )}
+                </div>
+
+                {/* Auth / Student Status Indicator */}
+                {authStatus?.exists ? (
+                  authStatus.is_hidden ? (
+                    <div className="mt-2.5 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 space-y-1.5 text-xs">
+                      <div className="flex items-center gap-1.5 font-bold">
+                        <span>🚫</span>
+                        <span>USN Deleted / Hidden</span>
+                      </div>
+                      <p className="text-[11px] leading-relaxed opacity-95">
+                        USN deleted. Please request admin to add this USN data again or submit a selfie verification.
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playMechanicalClick();
+                          setMode("dispute");
+                          setError(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-semibold text-[11px] transition-colors cursor-pointer"
+                      >
+                        <span>📸 Send Selfie Verification →</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="mt-2 text-xs flex items-center justify-between">
+                      <span className={authStatus.is_claimed ? "text-amber-400 font-medium" : "text-emerald-400 font-medium"}>
+                        {authStatus.name} ({authStatus.branch}) •{" "}
+                        {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
+                      </span>
+                    </div>
+                  )
+                ) : authStatus && !authStatus.exists ? (
+                  <div className="mt-2 text-xs flex items-center justify-between">
+                    <span className="text-cyan-400 font-medium">
+                      ⚡ New USN • Automatic VTU Marksheet Registration
+                    </span>
+                  </div>
+                ) : null}
               </div>
 
               {/* Password Field */}
               <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                  Password
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className={`block text-xs font-medium ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                    Password
+                  </label>
+                  {authStatus?.is_claimed && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        sfx.playMechanicalClick();
+                        setMode("dispute");
+                        setError(null);
+                      }}
+                      className="text-[11px] text-cyan-400 hover:underline cursor-pointer"
+                    >
+                      Not you? Claim USN
+                    </button>
+                  )}
+                </div>
                 <div className="relative">
                   <input
                     ref={passwordInputRef}
                     type={showPassword ? "text" : "password"}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password (min 4 chars)"
+                    placeholder={
+                      authStatus?.is_claimed
+                        ? "Enter your account password"
+                        : authStatus && !authStatus.exists
+                        ? "Create new password"
+                        : "Create a password (min 4 chars)"
+                    }
                     minLength={4}
                     className={`w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl border outline-none transition-all ${
                       isObsidian
@@ -1240,7 +1325,13 @@ export default function StudentAuthModal({
                     <span>Signing in...</span>
                   </>
                 ) : (
-                  <span>Login</span>
+                  <span>
+                    {authStatus?.is_claimed
+                      ? "Unlock Results & Rankings"
+                      : authStatus && !authStatus.is_claimed
+                      ? "Claim USN & Create Password"
+                      : "Login"}
+                  </span>
                 )}
               </button>
 
