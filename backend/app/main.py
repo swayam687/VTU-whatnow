@@ -118,6 +118,7 @@ def init_db():
                     ("show_my_backlogs", "ALTER TABLE students ADD COLUMN show_my_backlogs BOOLEAN DEFAULT TRUE;"),
                     ("allow_comparison", "ALTER TABLE students ADD COLUMN allow_comparison BOOLEAN DEFAULT TRUE;"),
                     ("is_hidden", "ALTER TABLE students ADD COLUMN is_hidden BOOLEAN DEFAULT FALSE;"),
+                    ("comparison_credits", "ALTER TABLE students ADD COLUMN comparison_credits INTEGER DEFAULT 2;"),
                 ]
                 for col_name, sql_stmt in columns_to_ensure:
                     if col_name not in existing_cols:
