@@ -508,17 +508,21 @@ export default function StudentAuthModal({
         const msg = err instanceof Error ? err.message : "Establishing session with VTU servers...";
         lastError = msg;
 
-        // When password is wrong or credentials invalid: STOP IMMEDIATELY! Do not show any captcha!
-        const isAuthCredentialError =
+        // When password is wrong, credentials invalid, or server error occurs: STOP IMMEDIATELY!
+        const isFatalError =
           msg.toLowerCase().includes("incorrect password") ||
           msg.toLowerCase().includes("password") ||
           msg.toLowerCase().includes("claim ownership") ||
           msg.toLowerCase().includes("deleted") ||
           msg.toLowerCase().includes("hidden") ||
           msg.includes("401") ||
-          msg.includes("403");
+          msg.includes("403") ||
+          msg.includes("429") ||
+          msg.includes("500") ||
+          msg.includes("502") ||
+          msg.includes("503");
 
-        if (isAuthCredentialError) {
+        if (isFatalError) {
           setError(msg);
           setOnDemandState("idle");
           setLoading(false);

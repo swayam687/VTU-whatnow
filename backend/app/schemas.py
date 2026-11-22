@@ -241,6 +241,15 @@ class ScrapeTargetOut(BaseModel):
     class Config:
         from_attributes = True
 
+class AuthResponse(BaseModel):
+    ok: bool = True
+    status: str = "authenticated"
+    token: str = ""
+    usn: str
+    name: str = ""
+    branch: str = ""
+    login_count: int = 1
+
 class LoginGateChallengeResponse(BaseModel):
     ok: bool
     require_captcha: bool = False

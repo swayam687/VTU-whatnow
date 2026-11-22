@@ -48,6 +48,7 @@ from .schemas import (
     SemesterLinkOut,
     AuthStatusResponse,
     AuthLoginRequest,
+    AuthResponse,
     DisputeCreateRequest,
     DisputeOut,
     DisputeReviewRequest,

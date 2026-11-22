@@ -32,7 +32,7 @@ services:
       ADMIN_PASSWORD: admin
 
       # Safe Playwright concurrency limit for Render 512MB free tier
-      MAX_CONCURRENT_SCRAPERS: "10"
+      MAX_CONCURRENT_SCRAPERS: "3"
 
   # ---------- Frontend ----------
   - type: web

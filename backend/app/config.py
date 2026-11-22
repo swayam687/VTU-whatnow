@@ -19,8 +19,8 @@ class Settings(BaseSettings):
     ADMIN_PASSWORD: str = "admin"
 
     # Playwright Concurrency Throttle (active simultaneous browser contexts)
-    # Set to 10 for safe operation under Render free tier (512MB RAM cap)
-    MAX_CONCURRENT_SCRAPERS: int = 10
+    # Set to 3 for guaranteed safety under Render free tier (512MB RAM cap)
+    MAX_CONCURRENT_SCRAPERS: int = 3
 
     class Config:
         env_file = ".env"

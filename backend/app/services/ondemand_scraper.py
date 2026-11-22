@@ -147,10 +147,17 @@ class OnDemandScraperManager:
                 "--disable-dev-shm-usage",
                 "--disable-gpu",
                 "--no-zygote",
+                "--disable-extensions",
+                "--disable-default-apps",
+                "--mute-audio",
+                "--no-default-browser-check",
+                "--js-flags=--max-old-space-size=128",
                 "--disable-blink-features=AutomationControlled",
                 "--ignore-certificate-errors",
                 "--ignore-certificate-errors-spki-list",
             ]
+            if sys.platform != "win32":
+                launch_args.append("--single-process")
             try:
                 self._browser = await self._playwright.chromium.launch(
                     headless=True,
