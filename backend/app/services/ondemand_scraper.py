@@ -5,9 +5,45 @@ import sys
 import time
 import uuid
 import traceback
+import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Tuple
+
+class ProactorLoopThread:
+    """
+    Dedicated worker thread running asyncio.ProactorEventLoop on Windows.
+    This permanently eliminates the Windows SelectorEventLoop limitation
+    in Uvicorn (--reload) where asyncio.create_subprocess_exec raises NotImplementedError.
+    """
+    def __init__(self):
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._thread: Optional[threading.Thread] = None
+        self._ready = threading.Event()
+
+    def ensure_started(self):
+        if self._loop and self._loop.is_running():
+            return
+
+        def _worker():
+            if sys.platform == "win32":
+                asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+                self._loop = asyncio.ProactorEventLoop()
+            else:
+                self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            self._ready.set()
+            self._loop.run_forever()
+
+        self._thread = threading.Thread(target=_worker, daemon=True, name="PlaywrightProactorThread")
+        self._thread.start()
+        self._ready.wait()
+
+    async def run(self, coro):
+        self.ensure_started()
+        assert self._loop is not None
+        fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+        return await asyncio.wrap_future(fut)
 
 # Ensure persistent Playwright cache on Linux / Render hosts
 if "PLAYWRIGHT_BROWSERS_PATH" not in os.environ and sys.platform != "win32":
@@ -77,19 +113,23 @@ class OnDemandSession:
 class OnDemandScraperManager:
     def __init__(self):
         self._sessions: Dict[str, OnDemandSession] = {}
-        self._lock = asyncio.Lock()
+        self._lock = threading.Lock()
+        self._worker_loop = ProactorLoopThread()
 
     async def _cleanup_expired(self):
         """Purge sessions older than 6 minutes to avoid browser resource leaks."""
         now = time.time()
-        expired_ids = [
-            sid for sid, s in self._sessions.items()
-            if now - s.created_at > 360
-        ]
-        for sid in expired_ids:
-            session = self._sessions.pop(sid, None)
-            if session:
+        with self._lock:
+            expired_ids = [
+                sid for sid, s in self._sessions.items()
+                if now - s.created_at > 360
+            ]
+            expired_sessions = [self._sessions.pop(sid) for sid in expired_ids if sid in self._sessions]
+        for session in expired_sessions:
+            try:
                 await session.close()
+            except Exception:
+                pass
 
     def get_next_scrape_target(self, db: Session) -> Optional[Tuple[ScrapeTarget, str]]:
         """
@@ -127,6 +167,26 @@ class OnDemandScraperManager:
         return None
 
     async def start_session(
+        self,
+        target_usn: str,
+        semester: str = "1",
+        target_url: Optional[str] = None,
+        student_usn: Optional[str] = None,
+        is_self_scrape: bool = True,
+        target_id: Optional[int] = None,
+    ) -> dict:
+        return await self._worker_loop.run(
+            self._start_session_internal(
+                target_usn=target_usn,
+                semester=semester,
+                target_url=target_url,
+                student_usn=student_usn,
+                is_self_scrape=is_self_scrape,
+                target_id=target_id,
+            )
+        )
+
+    async def _start_session_internal(
         self,
         target_usn: str,
         semester: str = "1",
@@ -258,7 +318,7 @@ class OnDemandScraperManager:
             captcha_bytes = await captcha_el.screenshot()
             captcha_b64 = base64.b64encode(captcha_bytes).decode("utf-8")
 
-            async with self._lock:
+            with self._lock:
                 self._sessions[session_id] = session
 
             return {
@@ -291,8 +351,13 @@ class OnDemandScraperManager:
             }
 
     async def refresh_captcha(self, session_id: str) -> dict:
+        return await self._worker_loop.run(
+            self._refresh_captcha_internal(session_id)
+        )
+
+    async def _refresh_captcha_internal(self, session_id: str) -> dict:
         """Captures a fresh screenshot of the captcha if the user finds it blurry or difficult."""
-        async with self._lock:
+        with self._lock:
             session = self._sessions.get(session_id)
 
         if not session:
@@ -333,6 +398,22 @@ class OnDemandScraperManager:
         password: str,
         client_ip: str = "unknown"
     ) -> dict:
+        return await self._worker_loop.run(
+            self._submit_captcha_internal(
+                session_id=session_id,
+                captcha_code=captcha_code,
+                password=password,
+                client_ip=client_ip,
+            )
+        )
+
+    async def _submit_captcha_internal(
+        self,
+        session_id: str,
+        captcha_code: str,
+        password: str,
+        client_ip: str = "unknown"
+    ) -> dict:
         """
         Submits the student's solved captcha to VTU.
         - If self-scrape: saves marks for student and locks password.
@@ -340,7 +421,7 @@ class OnDemandScraperManager:
           and logs the authenticated student into their dashboard.
         - Anti-Lockout: tracks failed attempts; if fails >= 3, bypasses gate and logs student in.
         """
-        async with self._lock:
+        with self._lock:
             session = self._sessions.get(session_id)
 
         if not session:
@@ -423,7 +504,7 @@ class OnDemandScraperManager:
                 # If student fails 3 times on a crowdsourced verification gate,
                 # bypass gate and grant login with cached data so they are not blocked.
                 if session.fail_count >= 3 and not session.is_self_scrape:
-                    async with self._lock:
+                    with self._lock:
                         self._sessions.pop(session_id, None)
                     await session.close()
 
@@ -458,7 +539,7 @@ class OnDemandScraperManager:
             # If target results not available on VTU:
             if "not available" in alert_lower or "not found" in alert_lower or "check the usn" in alert_lower or "not yet available" in text_lower:
                 session.fail_count += 1
-                async with self._lock:
+                with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
 
@@ -540,7 +621,7 @@ class OnDemandScraperManager:
                     auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
 
                 # Clean up Playwright session
-                async with self._lock:
+                with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
 
@@ -554,7 +635,7 @@ class OnDemandScraperManager:
             else:
                 # Could not parse table
                 session.fail_count += 1
-                async with self._lock:
+                with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
 
@@ -576,7 +657,7 @@ class OnDemandScraperManager:
 
         except Exception as e:
             traceback.print_exc()
-            async with self._lock:
+            with self._lock:
                 self._sessions.pop(session_id, None)
             await session.close()
             return {
