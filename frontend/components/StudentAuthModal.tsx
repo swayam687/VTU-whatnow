@@ -377,18 +377,6 @@ export default function StudentAuthModal({
         password.trim()
       );
 
-      // CRITICAL FALLBACK (Anti-Lockout)
-      if (res.bypassed && res.auth_response) {
-        setBypassedToast(res.message || "VTU servers are currently unresponsive. Logging you in with cached data.");
-        setStoredStudentSession(res.auth_response);
-        sfx.playMechanicalClick();
-        onSuccess(res.auth_response);
-        setTimeout(() => {
-          handleClose();
-        }, 2200);
-        return;
-      }
-
       if (res.ok && res.auth_response) {
         // Marksheet parsed and student authenticated
         const session = res.auth_response;
@@ -396,14 +384,20 @@ export default function StudentAuthModal({
         sfx.playMechanicalClick();
         onSuccess(session);
 
-        setOnDemandState("success");
-        setTimeout(() => {
-          handleClose();
-        }, 1800);
+        // Directly close modal and enter portal without flashing the login form!
+        handleClose();
       } else {
         // Failed attempt
         const newFailCount = res.fail_count !== undefined ? res.fail_count : failCount + 1;
         setFailCount(newFailCount);
+
+        if (newFailCount >= 3 || res.reason === "max_attempts_exceeded") {
+          // 3 wrong attempts finished: prompt user to refresh and login again
+          setError("⚠️ You have completed 3 wrong attempts. Please refresh the captcha or return to login and try again.");
+          setOnDemandState("captcha_ready");
+          setCaptchaInput("");
+          return;
+        }
 
         if (res.new_captcha_base64) {
           setCaptchaBase64(res.new_captcha_base64);
@@ -460,7 +454,27 @@ export default function StudentAuthModal({
           break; // Captcha challenge acquired
         }
       } catch (err: unknown) {
-        lastError = err instanceof Error ? err.message : "Establishing session with VTU servers...";
+        const msg = err instanceof Error ? err.message : "Establishing session with VTU servers...";
+        lastError = msg;
+
+        // When password is wrong or credentials invalid: STOP IMMEDIATELY! Do not show any captcha!
+        const isAuthCredentialError =
+          msg.toLowerCase().includes("incorrect password") ||
+          msg.toLowerCase().includes("password") ||
+          msg.toLowerCase().includes("claim ownership") ||
+          msg.toLowerCase().includes("deleted") ||
+          msg.toLowerCase().includes("hidden") ||
+          msg.includes("401") ||
+          msg.includes("403");
+
+        if (isAuthCredentialError) {
+          setError(msg);
+          setOnDemandState("idle");
+          setLoading(false);
+          sfx.playMechanicalClick();
+          return;
+        }
+
         const elapsed = Date.now() - startTime;
         if (elapsed < MAX_WAIT_MS - 2500) {
           await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -812,37 +826,85 @@ export default function StudentAuthModal({
                 </div>
               </div>
 
-              {/* Captcha Input Field */}
-              <div>
-                <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                  Enter Captcha Code <span className="text-[11px] font-normal text-zinc-400">(exact characters)</span>
-                </label>
-                <input
-                  ref={captchaInputRef}
-                  type="text"
-                  value={captchaInput}
-                  onChange={(e) => setCaptchaInput(e.target.value)}
-                  placeholder="e.g. 5K9P2X"
-                  maxLength={10}
-                  className={`w-full px-4 py-3 text-lg font-mono text-center tracking-widest uppercase rounded-xl border outline-none transition-all ${
-                    isObsidian
-                      ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
-                      : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
-                  }`}
-                  required
-                />
-              </div>
+              {failCount >= 3 ? (
+                <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-center space-y-3 animate-in fade-in">
+                  <div className="flex items-center justify-center gap-2 text-amber-400 font-bold text-sm">
+                    <span>⚠️</span>
+                    <span>3 Wrong Attempts Completed</span>
+                  </div>
+                  <p className="text-xs text-zinc-300 leading-relaxed px-2">
+                    You have reached the maximum of 3 incorrect captcha attempts. Please refresh the captcha to generate a new image or return to the login screen.
+                  </p>
+                  <div className="flex flex-col sm:flex-row items-center justify-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFailCount(0);
+                        setError(null);
+                        handleRefreshCaptcha();
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-md shadow-cyan-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>🔄</span>
+                      <span>Refresh Captcha & Try Again</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOnDemandState("idle");
+                        setFailCount(0);
+                        setError(null);
+                      }}
+                      className="w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <span>←</span>
+                      <span>Return to Login</span>
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {/* Captcha Input Field */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className={`block text-xs font-medium ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                        Enter Captcha Code
+                      </label>
+                      <span className="text-[11px] font-mono text-cyan-400 font-medium">
+                        Case-Sensitive (a-z & A-Z)
+                      </span>
+                    </div>
+                    <input
+                      ref={captchaInputRef}
+                      type="text"
+                      value={captchaInput}
+                      onChange={(e) => setCaptchaInput(e.target.value)}
+                      placeholder="e.g. 5k9P2x"
+                      maxLength={10}
+                      autoCapitalize="none"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      className={`w-full px-4 py-3 text-lg font-mono text-center tracking-widest rounded-xl border outline-none transition-all ${
+                        isObsidian
+                          ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                          : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
+                      }`}
+                      required
+                    />
+                  </div>
 
-              {/* Submit Buttons */}
-              <button
-                type="submit"
-                disabled={!captchaInput.trim()}
-                className="w-full py-3.5 px-4 rounded-xl text-sm font-semibold tracking-wide bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-              >
-                Verify Captcha & Continue →
-              </button>
+                  {/* Submit Buttons */}
+                  <button
+                    type="submit"
+                    disabled={!captchaInput.trim()}
+                    className="w-full py-3.5 px-4 rounded-xl text-sm font-semibold tracking-wide bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                  >
+                    Verify Captcha & Continue →
+                  </button>
+                </>
+              )}
 
-              <div className="text-center">
+              <div className="text-center pt-1">
                 <button
                   type="button"
                   onClick={() => {
@@ -914,9 +976,9 @@ export default function StudentAuthModal({
               </div>
             </div>
 
-          ) : onDemandState === "success" && extractedStudent ? (
+          ) : onDemandState === "success" ? (
             /* ========================================================================= */
-            /* STAGE 4: REGISTRATION SUCCESS CELEBRATION                                 */
+            /* STAGE 4: REGISTRATION / AUTHENTICATION SUCCESS                            */
             /* ========================================================================= */
             <div className="py-5 space-y-4 text-center animate-in zoom-in-95 duration-200">
               <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-3xl text-emerald-400">
@@ -924,32 +986,33 @@ export default function StudentAuthModal({
               </div>
 
               <div className="space-y-1">
-                <h3 className="font-bold text-lg text-emerald-400">Marksheet Saved Successfully!</h3>
+                <h3 className="font-bold text-lg text-emerald-400">Authentication Verified!</h3>
                 <p className={`text-xs ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                  Welcome, <strong className="text-white">{extractedStudent.name}</strong> ({extractedStudent.branch})
+                  Entering your student portal...
                 </p>
               </div>
 
-              {/* Marks snapshot */}
-              <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
-                isObsidian ? "bg-white/[0.02] border-white/10 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-800"
-              }`}>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">University Seat Number:</span>
-                  <span className="font-mono font-bold">{usn.trim().toUpperCase()}</span>
+              {extractedStudent && (
+                <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                  isObsidian ? "bg-white/[0.02] border-white/10 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-800"
+                }`}>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">University Seat Number:</span>
+                    <span className="font-mono font-bold">{usn.trim().toUpperCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Total Marks Scored:</span>
+                    <span className="font-semibold">{extractedStudent.totalMarks} / {extractedStudent.maxMarks}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-zinc-400">Overall Percentage:</span>
+                    <span className="font-semibold text-emerald-400">{extractedStudent.percentage}%</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Total Marks Scored:</span>
-                  <span className="font-semibold">{extractedStudent.totalMarks} / {extractedStudent.maxMarks}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Overall Percentage:</span>
-                  <span className="font-semibold text-emerald-400">{extractedStudent.percentage}%</span>
-                </div>
-              </div>
+              )}
 
               <p className="text-xs text-zinc-400 animate-pulse">
-                Locking profile with your chosen password & logging in...
+                Redirecting to dashboard...
               </p>
             </div>
 

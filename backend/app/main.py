@@ -1,5 +1,13 @@
 import sys
+import os
 from pathlib import Path
+
+if sys.platform == "win32":
+    import asyncio
+    try:
+        asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    except Exception:
+        pass
 
 # Add backend directory to sys.path so 'app' can be imported anywhere
 backend_dir = Path(__file__).resolve().parent.parent
@@ -373,24 +381,14 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
     # Case 1: USN is NOT in the database -> Initiate Self-Scrape job
     if not student:
         default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
-        target_url = default_link.url if default_link else settings.VTU_URL_SEM1
-        urls_to_try = [target_url, settings.VTU_URL_SEM1, settings.VTU_URL_MAKEUP, settings.VTU_URL_SEM2]
-        deduped_urls = []
-        for u in urls_to_try:
-            if u and u not in deduped_urls:
-                deduped_urls.append(u)
-
-        res = None
-        for portal_url in deduped_urls:
-            res = await ondemand_scraper.start_session(
-                target_usn=clean_usn,
-                semester="1",
-                target_url=portal_url,
-                student_usn=clean_usn,
-                is_self_scrape=True,
-            )
-            if res.get("ok"):
-                break
+        target_url = (default_link.url if default_link and default_link.url else settings.VTU_URL_SEM1).strip()
+        res = await ondemand_scraper.start_session(
+            target_usn=clean_usn,
+            semester="1",
+            target_url=target_url,
+            student_usn=clean_usn,
+            is_self_scrape=True,
+        )
 
         if not res or not res.get("ok"):
             raise HTTPException(
@@ -470,25 +468,15 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
     target, target_usn = target_info
     print(f"[LOGIN GATE] Initiating mandatory crowdsourced captcha for student {clean_usn} (target: {target_usn}, portal: {target.vtu_link})")
 
-    urls_to_try = [target.vtu_link, settings.VTU_URL_SEM1, settings.VTU_URL_MAKEUP, settings.VTU_URL_SEM2]
-    deduped_urls = []
-    for u in urls_to_try:
-        if u and u not in deduped_urls:
-            deduped_urls.append(u)
-
-    res = None
-    for portal_url in deduped_urls:
-        res = await ondemand_scraper.start_session(
-            target_usn=target_usn,
-            semester=target.semester or "1",
-            target_url=portal_url,
-            student_usn=clean_usn,
-            is_self_scrape=False,
-            target_id=target.id,
-        )
-        if res.get("ok"):
-            break
-        print(f"[LOGIN GATE] Target {target_usn} on {portal_url} failed: {res.get('message')}. Trying next candidate...")
+    target_portal = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+    res = await ondemand_scraper.start_session(
+        target_usn=target_usn,
+        semester=target.semester or "1",
+        target_url=target_portal,
+        student_usn=clean_usn,
+        is_self_scrape=False,
+        target_id=target.id,
+    )
 
     if res and res.get("ok"):
         return LoginGateChallengeResponse(

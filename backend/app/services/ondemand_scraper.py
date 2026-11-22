@@ -500,22 +500,18 @@ class OnDemandScraperManager:
             if is_captcha_fail:
                 session.fail_count += 1
 
-                # CRITICAL FALLBACK (Anti-Lockout):
-                # If student fails 3 times on a crowdsourced verification gate,
-                # bypass gate and grant login with cached data so they are not blocked.
-                if session.fail_count >= 3 and not session.is_self_scrape:
+                # If student reaches 3 failed attempts, close session and prompt to refresh/login again
+                if session.fail_count >= 3:
                     with self._lock:
                         self._sessions.pop(session_id, None)
                     await session.close()
 
-                    # Authenticate student directly
-                    auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
                     return {
-                        "ok": True,
-                        "bypassed": True,
+                        "ok": False,
+                        "bypassed": False,
+                        "reason": "max_attempts_exceeded",
                         "fail_count": session.fail_count,
-                        "auth_response": auth_resp,
-                        "message": "VTU servers are currently unresponsive. Logging you in with cached data.",
+                        "message": "Maximum of 3 attempts reached. Please refresh the captcha or return to login and try again.",
                     }
 
                 # Otherwise, fetch new captcha for next attempt
@@ -639,20 +635,12 @@ class OnDemandScraperManager:
                     self._sessions.pop(session_id, None)
                 await session.close()
 
-                if not session.is_self_scrape and session.fail_count >= 3:
-                    auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
-                    return {
-                        "ok": True,
-                        "bypassed": True,
-                        "auth_response": auth_resp,
-                        "message": "VTU servers are currently unresponsive. Logging you in with cached data.",
-                    }
-
                 return {
                     "ok": False,
+                    "bypassed": False,
                     "reason": "parsing_failed",
                     "fail_count": session.fail_count,
-                    "message": "Could not read VTU marks table. Please try again.",
+                    "message": "Maximum attempts reached. Please refresh captcha or return to login and try again." if session.fail_count >= 3 else "Could not read VTU marks table. Please try again.",
                 }
 
         except Exception as e:
