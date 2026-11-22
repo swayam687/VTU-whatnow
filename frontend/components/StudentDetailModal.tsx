@@ -839,23 +839,10 @@ export default function StudentDetailModal({
 
               {/* Marks Breakdown Table */}
               <div>
-                <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+                <div className="mb-2">
                   <h3 className="font-bold text-xs uppercase tracking-wider opacity-70">
                     Subject Marks Breakdown ({student.marks?.length || 0})
                   </h3>
-                  {isMyVerifiedProfile && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        sfx.playMechanicalClick();
-                        setIsRescrapeModalOpen(true);
-                      }}
-                      className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-200 inline-flex items-center gap-1 transition-colors cursor-pointer"
-                    >
-                      <IconRotateCcw className="w-3 h-3 text-cyan-500" />
-                      <span>Missing your Sem 2 or Reval Results? Request Scrape</span>
-                    </button>
-                  )}
                 </div>
 
                 <div
