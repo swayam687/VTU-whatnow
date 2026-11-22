@@ -56,6 +56,8 @@ import {
   IconSettings,
   IconLock,
   IconRotateCcw,
+  IconEye,
+  IconEyeOff,
 } from "../../components/Icons";
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";
@@ -822,9 +824,13 @@ export default function AdminPanel() {
   // -------------------------------------------------------------
   if (checkingAuth) {
     return (
-      <div className="max-w-md mx-auto my-28 p-8 text-center text-slate-400 font-medium text-xs sm:text-sm">
-        <div className="w-8 h-8 border-2 border-slate-300 border-t-slate-800 rounded-full animate-spin mx-auto mb-3" />
-        Verifying administrator credentials...
+      <div className="min-h-[70vh] flex flex-col items-center justify-center px-4">
+        <div className="p-8 rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-[#0c0e12] shadow-sm text-center max-w-sm w-full space-y-3">
+          <div className="w-8 h-8 border-2 border-slate-300 dark:border-slate-700 border-t-slate-900 dark:border-t-cyan-400 rounded-full animate-spin mx-auto" />
+          <p className="text-xs font-mono font-medium text-slate-500 dark:text-slate-400">
+            Verifying administrator credentials...
+          </p>
+        </div>
       </div>
     );
   }
@@ -834,35 +840,35 @@ export default function AdminPanel() {
   // -------------------------------------------------------------
   if (!isAuthenticated) {
     return (
-      <div className="w-full max-w-md mx-auto my-8 sm:my-20 px-4 sm:px-0">
-        <div className="bg-white border border-slate-200/90 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xs space-y-6">
+      <div className="min-h-[80vh] flex items-center justify-center px-4 py-8">
+        <div className="w-full max-w-md bg-white dark:bg-[#0c0e12] border border-slate-200/90 dark:border-slate-800 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-sm space-y-6">
           <div className="text-center space-y-2">
-            <div className="w-11 h-11 bg-slate-50 border border-slate-200/80 text-slate-900 rounded-xl flex items-center justify-center mx-auto shadow-2xs">
+            <div className="w-12 h-12 bg-slate-50 dark:bg-slate-900/80 border border-slate-200/80 dark:border-slate-800 text-slate-900 dark:text-cyan-400 rounded-2xl flex items-center justify-center mx-auto">
               <IconLock className="w-5 h-5" />
             </div>
-            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">Admin Control Room</h2>
-            <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-              Authenticate to manage scraping queues, examine portal endpoints, and review student ownership claims.
+            <h2 className="text-xl font-extrabold text-slate-900 dark:text-white tracking-tight">Admin Control Room</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed max-w-xs mx-auto">
+              Authenticate to manage scraper queues, portal endpoints, and student verification audits.
             </p>
           </div>
 
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 mb-1.5">
-                Admin Password
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 mb-1.5 font-mono">
+                Admin Secret Key
               </label>
               <input
                 type="password"
                 value={passwordInput}
                 onChange={(e) => setPasswordInput(e.target.value)}
-                placeholder="Enter admin password"
-                className="w-full px-3.5 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:border-slate-900 transition-all font-mono placeholder:font-sans placeholder:text-slate-400"
+                placeholder="Enter password"
+                className="w-full px-3.5 py-2.5 text-base sm:text-sm rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 transition-all font-mono placeholder:font-sans placeholder:text-slate-400 dark:placeholder:text-slate-600"
                 autoFocus
               />
             </div>
 
             {authError && (
-              <div className="p-3 bg-rose-50/70 border border-rose-200/80 text-rose-700 text-xs font-medium rounded-xl leading-relaxed flex items-center gap-2">
+              <div className="p-3 bg-rose-50/80 dark:bg-rose-950/30 border border-rose-200/80 dark:border-rose-900/50 text-rose-700 dark:text-rose-400 text-xs font-medium rounded-xl flex items-center gap-2">
                 <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
                 <span>{authError}</span>
               </div>
@@ -871,13 +877,13 @@ export default function AdminPanel() {
             <button
               type="submit"
               disabled={isVerifying || !passwordInput.trim()}
-              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white font-medium text-xs sm:text-sm rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+              className="w-full py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 active:scale-[0.98] text-white dark:text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer"
             >
-              {isVerifying ? "Verifying Access..." : "Sign In to Admin Portal"}
+              {isVerifying ? "Verifying Access..." : "Sign In to Control Room"}
             </button>
 
             <div className="text-center pt-2">
-              <Link href="/" className="text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors">
+              <Link href="/" className="text-xs font-medium text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors">
                 ← Return to Results Directory
               </Link>
             </div>
@@ -893,12 +899,12 @@ export default function AdminPanel() {
   return (
     <div className="w-full max-w-4xl mx-auto px-3 sm:px-6 py-3 sm:py-6 space-y-4 sm:space-y-6 pb-24 sm:pb-16 min-h-screen">
       {/* Top Header */}
-      <div className="border-b border-slate-200/80 pb-3 sm:pb-4 space-y-2.5">
+      <div className="border-b border-slate-200/80 dark:border-slate-800 pb-3 sm:pb-4 space-y-3">
         <div className="flex items-center justify-between gap-2">
           <Link
             href="/"
             onClick={() => sfx.playClick()}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-semibold text-slate-700 shadow-2xs transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0c0e12] hover:bg-slate-50 dark:hover:bg-slate-900 text-xs font-semibold text-slate-700 dark:text-slate-300 shadow-2xs transition-colors"
           >
             ← Results Dashboard
           </Link>
@@ -906,7 +912,7 @@ export default function AdminPanel() {
           <button
             type="button"
             onClick={handleLogout}
-            className="text-xs font-medium text-slate-500 hover:text-rose-600 px-3 py-1.5 rounded-xl border border-slate-200 hover:border-rose-200 bg-white hover:bg-rose-50/50 transition-colors shadow-2xs cursor-pointer"
+            className="text-xs font-medium text-slate-500 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:border-rose-200 dark:hover:border-rose-900/40 bg-white dark:bg-[#0c0e12] hover:bg-rose-50/50 dark:hover:bg-rose-950/20 transition-colors shadow-2xs cursor-pointer"
           >
             Sign Out
           </button>
@@ -914,40 +920,40 @@ export default function AdminPanel() {
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
           <div>
-            <h1 className="text-lg sm:text-2xl font-bold text-slate-900 tracking-tight">
+            <h1 className="text-lg sm:text-2xl font-extrabold text-slate-900 dark:text-white tracking-tight">
               Admin Control Room
             </h1>
-            <p className="text-slate-500 text-[11px] sm:text-xs">
+            <p className="text-slate-500 dark:text-slate-400 text-[11px] sm:text-xs">
               Scraper queues, semester links, USN claims verification, and student login audits.
             </p>
           </div>
 
           {/* Status Badges */}
           <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-white border border-slate-200 px-2.5 py-1 rounded-full shadow-2xs">
+            <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c0e12] border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-full shadow-2xs">
               <span
                 className={`w-2 h-2 rounded-full ${
                   status.is_running
-                    ? "bg-emerald-500"
+                    ? "bg-emerald-500 animate-pulse"
                     : status.status === "error"
                     ? "bg-rose-500"
-                    : "bg-slate-400"
+                    : "bg-slate-400 dark:bg-slate-600"
                 }`}
               />
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-700">
-                {status.is_running ? "Scraping" : status.status === "error" ? "Error" : "Idle"}
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
+                {status.is_running ? "Scraping Active" : status.status === "error" ? "Error" : "Scraper Idle"}
               </span>
             </div>
 
             <div
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-2xs ${
                 browserStatus?.status === "ready"
-                  ? "bg-emerald-50/70 border-emerald-200/80 text-emerald-800"
-                  : "bg-amber-50/70 border-amber-200/80 text-amber-800"
+                  ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300"
+                  : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/80 dark:border-amber-900/50 text-amber-800 dark:text-amber-300"
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"}`} />
-              <span>{browserStatus?.status === "ready" ? "Browser Ready" : "Browser Check"}</span>
+              <span className="font-mono">{browserStatus?.status === "ready" ? "Browser Ready" : "Browser Check"}</span>
             </div>
           </div>
         </div>
@@ -955,34 +961,34 @@ export default function AdminPanel() {
 
       {/* Global Alerts */}
       {actionError && (
-        <div className="p-3 bg-rose-50/80 border border-rose-200/80 text-rose-700 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
+        <div className="p-3 bg-rose-50/80 dark:bg-rose-950/40 border border-rose-200/80 dark:border-rose-900/60 text-rose-700 dark:text-rose-300 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
           <span>{actionError}</span>
-          <button onClick={() => setActionError("")} className="text-rose-500 hover:text-rose-800 text-xs font-bold p-1">
+          <button onClick={() => setActionError("")} className="text-rose-500 hover:text-rose-800 dark:hover:text-rose-200 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
       {deleteSuccessMsg && (
-        <div className="p-3 bg-emerald-50/80 border border-emerald-200/80 text-emerald-700 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
+        <div className="p-3 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
           <span>{deleteSuccessMsg}</span>
-          <button onClick={() => setDeleteSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 text-xs font-bold p-1">
+          <button onClick={() => setDeleteSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 dark:hover:text-emerald-200 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
       {actionSuccessMsg && (
-        <div className="p-3 bg-emerald-50/80 border border-emerald-200/80 text-emerald-700 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
+        <div className="p-3 bg-emerald-50/80 dark:bg-emerald-950/40 border border-emerald-200/80 dark:border-emerald-900/60 text-emerald-700 dark:text-emerald-300 text-xs rounded-xl font-medium flex items-center justify-between shadow-2xs">
           <span>{actionSuccessMsg}</span>
-          <button onClick={() => setActionSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 text-xs font-bold p-1">
+          <button onClick={() => setActionSuccessMsg("")} className="text-emerald-500 hover:text-emerald-800 dark:hover:text-emerald-200 text-xs font-bold p-1">
             <IconClose className="w-3.5 h-3.5" />
           </button>
         </div>
       )}
 
       {/* Mobile-First Tab Navigation (Polished horizontally scrollable track) */}
-      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar touch-pan-x bg-slate-100/80 p-1 sm:p-1.5 rounded-2xl border border-slate-200/80">
+      <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar touch-pan-x bg-slate-100/80 dark:bg-[#0c0e12] p-1 sm:p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-800">
         <button
           type="button"
           onClick={() => {
@@ -991,8 +997,8 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "scraper"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconBolt className="w-3.5 h-3.5" />
@@ -1007,13 +1013,13 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "semesters"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconLayers className="w-3.5 h-3.5" />
           <span>Semesters</span>
-          <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono">
+          <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-mono">
             {semesterLinks.length}
           </span>
         </button>
@@ -1026,13 +1032,13 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "records"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconUsers className="w-3.5 h-3.5" />
           <span>Students</span>
-          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono">
+          <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-mono">
             {allStudents.length}
           </span>
         </button>
@@ -1046,8 +1052,8 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "disputes"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconShield className="w-3.5 h-3.5" />
@@ -1069,8 +1075,8 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "missing_usn"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconBell className="w-3.5 h-3.5" />
@@ -1093,14 +1099,14 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "audit"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconRotateCcw className="w-3.5 h-3.5" />
           <span>Audit</span>
           {semesterAudit && semesterAudit.missing_sem2 > 0 && (
-            <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 font-mono font-semibold">
+            <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-300 dark:border-amber-800/50 font-mono font-semibold">
               -{semesterAudit.missing_sem2} S2
             </span>
           )}
@@ -1115,14 +1121,14 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "logs"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconFileText className="w-3.5 h-3.5" />
           <span>Logs</span>
           {loginLogsData && (
-            <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 text-slate-700 font-mono">
+            <span className="hidden sm:inline text-[9px] px-1.5 py-0.5 rounded-md bg-slate-200/80 dark:bg-slate-700/80 text-slate-700 dark:text-slate-300 font-mono">
               {loginLogsData.total_logins}
             </span>
           )}
@@ -1136,8 +1142,8 @@ export default function AdminPanel() {
           }}
           className={`h-8 sm:h-9 px-3 text-[11px] sm:text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
             activeTab === "system"
-              ? "bg-white text-slate-900 shadow-2xs font-semibold"
-              : "text-slate-600 hover:text-slate-900 hover:bg-white/50"
+              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
           }`}
         >
           <IconSettings className="w-3.5 h-3.5" />
@@ -1151,23 +1157,23 @@ export default function AdminPanel() {
       {activeTab === "scraper" && (
         <div className="space-y-6">
           {/* Main Control Card */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 sm:p-7 shadow-xs space-y-5">
+          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-5">
             {/* Mode Selector */}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 font-mono">
                 Scraping Target Mode
               </label>
-              <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1.5 rounded-2xl">
+              <div className="grid grid-cols-2 gap-2 bg-slate-100 dark:bg-slate-900/80 p-1.5 rounded-xl border border-slate-200/80 dark:border-slate-800/80">
                 <button
                   type="button"
                   onClick={() => {
                     sfx.playClick();
                     setMode("single");
                   }}
-                  className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${
                     mode === "single"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
                   Single Student USN
@@ -1178,13 +1184,13 @@ export default function AdminPanel() {
                     sfx.playClick();
                     setMode("range");
                   }}
-                  className={`py-2 text-xs font-bold rounded-xl transition-all ${
+                  className={`py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${
                     mode === "range"
-                      ? "bg-white text-slate-900 shadow-xs"
-                      : "text-slate-600 hover:text-slate-900"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold"
+                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
-                  Batch Range Scraper (e.g. 001–060)
+                  Batch Range Scraper
                 </button>
               </div>
             </div>
@@ -1192,7 +1198,7 @@ export default function AdminPanel() {
             {/* Target Examination / Semester Links Selector */}
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 font-mono">
                   Target Examination Portal Link
                 </label>
                 <button
@@ -1201,7 +1207,7 @@ export default function AdminPanel() {
                     sfx.playClick();
                     setActiveTab("semesters");
                   }}
-                  className="text-[11px] font-bold text-blue-600 hover:underline"
+                  className="text-[11px] font-bold text-blue-600 dark:text-cyan-400 hover:underline cursor-pointer"
                 >
                   + Add / Edit Portal Links
                 </button>
@@ -1221,19 +1227,19 @@ export default function AdminPanel() {
                         setSelectedSemesterLinkId(link.id);
                       }}
                       disabled={status.is_running}
-                      className={`p-3 rounded-2xl border text-left transition-all relative ${
+                      className={`p-3 rounded-xl border text-left transition-all relative active:scale-[0.99] cursor-pointer ${
                         isSelected
-                          ? "border-slate-900 bg-slate-900 text-white shadow-xs"
-                          : "border-slate-200 text-slate-700 hover:bg-slate-50 bg-white"
+                          ? "border-slate-900 dark:border-cyan-500 bg-slate-900 dark:bg-cyan-950/30 text-white dark:text-cyan-100 shadow-xs ring-1 ring-slate-900 dark:ring-cyan-500/50"
+                          : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 bg-white dark:bg-slate-950"
                       } disabled:opacity-50`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs sm:text-sm font-bold truncate">{link.title}</span>
                         <span
-                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded-full uppercase shrink-0 font-bold ${
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded-md uppercase shrink-0 font-bold ${
                             isSelected
-                              ? "bg-slate-800 text-slate-200"
-                              : "bg-slate-100 text-slate-600"
+                              ? "bg-slate-800 dark:bg-cyan-900/60 text-slate-200 dark:text-cyan-300"
+                              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
                           }`}
                         >
                           Sem {link.semester}
@@ -1241,7 +1247,7 @@ export default function AdminPanel() {
                       </div>
                       <div
                         className={`text-[10px] truncate mt-1 font-mono ${
-                          isSelected ? "text-slate-300" : "text-slate-400"
+                          isSelected ? "text-slate-300 dark:text-cyan-300/70" : "text-slate-400 dark:text-slate-500"
                         }`}
                       >
                         {link.url}
@@ -1258,16 +1264,16 @@ export default function AdminPanel() {
                     setUseCustomUrl(true);
                   }}
                   disabled={status.is_running}
-                  className={`p-3 rounded-2xl border text-left transition-all ${
+                  className={`p-3 rounded-xl border text-left transition-all active:scale-[0.99] cursor-pointer ${
                     useCustomUrl
-                      ? "border-slate-900 bg-slate-900 text-white shadow-xs"
-                      : "border-slate-200 text-slate-700 hover:bg-slate-50 bg-white"
+                      ? "border-slate-900 dark:border-cyan-500 bg-slate-900 dark:bg-cyan-950/30 text-white dark:text-cyan-100 shadow-xs ring-1 ring-slate-900 dark:ring-cyan-500/50"
+                      : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 bg-white dark:bg-slate-950"
                   } disabled:opacity-50`}
                 >
                   <div className="text-xs sm:text-sm font-bold">Custom Portal URL</div>
                   <div
-                    className={`text-[10px] mt-1 ${
-                      useCustomUrl ? "text-slate-300" : "text-slate-400"
+                    className={`text-[10px] mt-1 font-mono ${
+                      useCustomUrl ? "text-slate-300 dark:text-cyan-300/70" : "text-slate-400 dark:text-slate-500"
                     }`}
                   >
                     Enter any VTU index.php result endpoint manually
@@ -1282,10 +1288,10 @@ export default function AdminPanel() {
                     value={customUrl}
                     onChange={(e) => setCustomUrl(e.target.value)}
                     placeholder="https://results.vtu.ac.in/.../index.php"
-                    className="w-full p-3 rounded-xl border border-slate-200 text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
+                    className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 font-mono"
                   />
-                  <p className="text-[10px] text-slate-400 mt-1">
-                    Make sure the URL points to <code>index.php</code> (the student USN entry page).
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1">
+                    Endpoint must point to <code>index.php</code> (VTU USN input page).
                   </p>
                 </div>
               )}
@@ -1293,7 +1299,7 @@ export default function AdminPanel() {
 
             {/* Quick Branch Autofill */}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-2 font-mono">
                 Quick Branch Autofill (2025 Batch)
               </label>
               <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5">
@@ -1303,7 +1309,7 @@ export default function AdminPanel() {
                     type="button"
                     onClick={() => handleQuickBranch(b.code)}
                     disabled={status.is_running}
-                    className="px-2.5 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-[11px] sm:text-xs font-bold text-slate-700 disabled:opacity-50 transition-colors text-center"
+                    className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 hover:bg-slate-100 dark:hover:bg-slate-800 text-[11px] font-bold text-slate-700 dark:text-slate-300 disabled:opacity-50 transition-colors text-center font-mono active:scale-[0.98] cursor-pointer"
                   >
                     {b.name} ({b.code})
                   </button>
@@ -1312,10 +1318,10 @@ export default function AdminPanel() {
             </div>
 
             {/* USN Input Form */}
-            <form onSubmit={handleStart} className="space-y-4 pt-1 border-t border-slate-100">
+            <form onSubmit={handleStart} className="space-y-4 pt-2 border-t border-slate-100 dark:border-slate-800/80">
               {mode === "single" ? (
                 <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 font-mono">
                     Student USN
                   </label>
                   <input
@@ -1324,13 +1330,13 @@ export default function AdminPanel() {
                     onChange={(e) => setSingleUsn(e.target.value.toUpperCase())}
                     placeholder="e.g. 1RM25CD052"
                     disabled={status.is_running}
-                    className="w-full p-3 font-mono text-base uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                    className="w-full p-3 font-mono text-base uppercase font-bold rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 disabled:bg-slate-50 dark:disabled:bg-slate-900"
                   />
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 font-mono">
                       Start USN
                     </label>
                     <input
@@ -1339,11 +1345,11 @@ export default function AdminPanel() {
                       onChange={(e) => setStartUsn(e.target.value.toUpperCase())}
                       placeholder="1RM25CS001"
                       disabled={status.is_running}
-                      className="w-full p-3 font-mono text-base sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                      className="w-full p-3 font-mono text-base sm:text-sm uppercase font-bold rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 disabled:bg-slate-50 dark:disabled:bg-slate-900"
                     />
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1.5 font-mono">
                       End USN
                     </label>
                     <input
@@ -1352,28 +1358,28 @@ export default function AdminPanel() {
                       onChange={(e) => setEndUsn(e.target.value.toUpperCase())}
                       placeholder="1RM25CS060"
                       disabled={status.is_running}
-                      className="w-full p-3 font-mono text-base sm:text-sm uppercase font-bold rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 disabled:bg-slate-50"
+                      className="w-full p-3 font-mono text-base sm:text-sm uppercase font-bold rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 disabled:bg-slate-50 dark:disabled:bg-slate-900"
                     />
                   </div>
                 </div>
               )}
 
               {/* Start / Stop Button */}
-              <div className="pt-2">
+              <div className="pt-1">
                 {status.is_running ? (
                   <button
                     type="button"
                     onClick={handleStop}
-                    className="w-full py-3.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
+                    className="w-full py-3 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
                   >
-                    Stop Current Scraping Task
+                    Stop Active Scraping Task
                   </button>
                 ) : (
                   <button
                     type="submit"
-                    className="w-full py-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs sm:text-sm shadow-sm transition-all"
+                    className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 active:scale-[0.98] text-white dark:text-slate-950 font-bold text-xs sm:text-sm shadow-sm transition-all cursor-pointer"
                   >
-                    {mode === "single" ? `Fetch Results for ${singleUsn}` : "Start Scraping Range"}
+                    {mode === "single" ? `Fetch Marks for ${singleUsn}` : "Start Scraping Range"}
                   </button>
                 )}
               </div>
@@ -1381,32 +1387,32 @@ export default function AdminPanel() {
           </div>
 
           {/* Scraper Progress Bar */}
-          <div className="bg-white rounded-3xl border border-slate-200/90 p-5 shadow-xs space-y-3">
+          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between text-xs sm:text-sm">
               <div>
-                <span className="font-bold text-slate-800">Status:</span>
-                <span className="ml-2 font-medium text-slate-600">{status.message}</span>
+                <span className="font-bold text-slate-800 dark:text-slate-200">Status:</span>
+                <span className="ml-2 font-medium text-slate-600 dark:text-slate-400">{status.message}</span>
               </div>
               {status.total_count > 0 && (
-                <span className="font-bold text-slate-900 font-mono">
+                <span className="font-bold text-slate-900 dark:text-cyan-400 font-mono tabular-nums">
                   {status.processed_count} / {status.total_count} ({progressPercent}%)
                 </span>
               )}
             </div>
 
-            <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+            <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
                 className={`h-full transition-all duration-500 ease-out ${
-                  status.status === "error" ? "bg-rose-500" : "bg-slate-900"
+                  status.status === "error" ? "bg-rose-500" : "bg-slate-900 dark:bg-cyan-400"
                 }`}
                 style={{ width: `${status.total_count > 0 ? progressPercent : 0}%` }}
               />
             </div>
 
             {status.current_usn && (
-              <div className="text-[11px] text-slate-500 flex justify-between">
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 flex justify-between font-mono">
                 <span>
-                  Querying: <strong className="font-mono text-slate-800">{status.current_usn}</strong>
+                  Querying: <strong className="text-slate-900 dark:text-white">{status.current_usn}</strong>
                 </span>
                 <span>
                   Range: {status.start_usn} → {status.end_usn}
@@ -1417,43 +1423,45 @@ export default function AdminPanel() {
 
           {/* Interactive Captcha Solving Card */}
           {status.captcha_base64 && (
-            <div className="bg-white border border-amber-300/80 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4 animate-in fade-in duration-150">
+            <div className="bg-white dark:bg-[#0c0e12] border border-amber-300/80 dark:border-amber-600/40 rounded-2xl sm:rounded-3xl p-4 sm:p-6 shadow-xs space-y-4 animate-in fade-in duration-150">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
-                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-800">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-300 font-mono">
                       Captcha Required
                     </span>
                   </div>
-                  <h3 className="font-bold text-slate-900 text-sm sm:text-base mt-0.5">
-                    Solve Verification for <span className="font-mono text-slate-900">{status.current_usn}</span>
+                  <h3 className="font-bold text-slate-900 dark:text-white text-sm sm:text-base mt-0.5">
+                    Solve Verification for <span className="font-mono text-cyan-600 dark:text-cyan-400">{status.current_usn}</span>
                   </h3>
                 </div>
 
                 {/* Captcha Controls */}
-                <div className="flex items-center gap-1.5 bg-slate-50 p-1 rounded-xl border border-slate-200 self-start sm:self-auto">
-                  <span className="text-[10px] font-medium text-slate-400 px-1">Zoom:</span>
+                <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-slate-900/80 p-1 rounded-xl border border-slate-200 dark:border-slate-800 self-start sm:self-auto">
+                  <span className="text-[10px] font-medium text-slate-500 dark:text-slate-400 px-1 font-mono">Zoom:</span>
                   {([1, 2, 3] as const).map((z) => (
                     <button
                       key={z}
                       type="button"
                       onClick={() => setCaptchaZoom(z)}
-                      className={`px-2 py-0.5 text-[11px] font-semibold rounded-lg transition-colors ${
-                        captchaZoom === z ? "bg-slate-900 text-white shadow-2xs" : "text-slate-600 hover:bg-slate-200/60"
+                      className={`px-2 py-0.5 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer active:scale-95 ${
+                        captchaZoom === z
+                          ? "bg-slate-900 dark:bg-cyan-500 text-white dark:text-slate-950 shadow-2xs"
+                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
                       }`}
                     >
                       {z}x
                     </button>
                   ))}
-                  <div className="w-px h-3.5 bg-slate-200 mx-0.5" />
+                  <div className="w-px h-3.5 bg-slate-200 dark:bg-slate-700 mx-0.5" />
                   <button
                     type="button"
                     onClick={() => setCaptchaInvert((v) => !v)}
-                    className={`px-2 py-0.5 text-[10px] font-medium rounded-lg border transition-colors ${
+                    className={`px-2 py-0.5 text-[10px] font-medium rounded-lg border transition-colors cursor-pointer active:scale-95 ${
                       captchaInvert
-                        ? "bg-slate-900 text-white border-slate-900"
-                        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white font-bold"
+                        : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
                     }`}
                   >
                     {captchaInvert ? "Normal" : "High Contrast"}
@@ -1462,12 +1470,13 @@ export default function AdminPanel() {
               </div>
 
               {/* Captcha Image & Form */}
-              <div className="bg-slate-50/60 p-3 sm:p-4 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-4">
+              <div className="bg-slate-50/60 dark:bg-slate-900/50 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-4">
                 <div
-                  className={`bg-white p-2.5 rounded-lg border border-slate-200 flex items-center justify-center transition-all ${
+                  className={`bg-white p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all ${
                     captchaInvert ? "filter invert" : ""
                   }`}
                 >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={`data:image/png;base64,${status.captcha_base64}`}
                     alt="VTU Captcha"
@@ -1485,14 +1494,14 @@ export default function AdminPanel() {
                       type="text"
                       value={captchaInput}
                       onChange={(e) => setCaptchaInput(e.target.value)}
-                      placeholder="Type captcha (exact small & caps)..."
+                      placeholder="Type captcha characters..."
                       autoFocus
-                      className="flex-1 p-3 border-2 border-amber-300 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white"
+                      className="flex-1 p-3 border-2 border-amber-300 dark:border-amber-500/80 rounded-xl text-center font-mono font-bold text-lg tracking-widest focus:outline-none focus:ring-2 focus:ring-amber-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                     />
                     <button
                       type="submit"
                       disabled={submittingCaptcha || !captchaInput.trim()}
-                      className="px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs sm:text-sm transition-all shadow-xs disabled:opacity-50 whitespace-nowrap"
+                      className="px-5 py-3 bg-slate-900 hover:bg-slate-800 dark:bg-cyan-500 dark:hover:bg-cyan-400 text-white dark:text-slate-950 font-bold rounded-xl text-xs sm:text-sm transition-all shadow-xs disabled:opacity-50 whitespace-nowrap cursor-pointer active:scale-95"
                     >
                       {submittingCaptcha ? "Submitting..." : "Submit Captcha"}
                     </button>
@@ -1500,8 +1509,8 @@ export default function AdminPanel() {
 
                   {/* Character Breakdown */}
                   {captchaInput && (
-                    <div className="p-2.5 rounded-xl bg-amber-100/50 border border-amber-200">
-                      <p className="text-[10px] font-bold text-amber-900 uppercase tracking-wider mb-1.5 text-center">
+                    <div className="p-2.5 rounded-xl bg-amber-100/50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50">
+                      <p className="text-[10px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider mb-1.5 text-center font-mono">
                         Verify Case Sensitivity:
                       </p>
                       <div className="flex flex-wrap gap-1.5 justify-center">
@@ -1513,10 +1522,10 @@ export default function AdminPanel() {
                               key={idx}
                               className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold flex items-center gap-1 border ${
                                 isLower
-                                  ? "bg-blue-100 border-blue-300 text-blue-900"
+                                  ? "bg-blue-100 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-300"
                                   : isUpper
-                                  ? "bg-purple-100 border-purple-300 text-purple-900"
-                                  : "bg-slate-100 border-slate-300 text-slate-800"
+                                  ? "bg-purple-100 dark:bg-purple-950/60 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-300"
+                                  : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-300"
                               }`}
                             >
                               <span className="text-sm font-black underline underline-offset-2">{ch}</span>
@@ -1532,17 +1541,17 @@ export default function AdminPanel() {
                 </form>
               </div>
 
-              <p className="text-[11px] text-amber-800 text-center font-medium">
-                Tip: Press <kbd className="px-1.5 py-0.5 bg-amber-200/70 rounded font-mono font-bold">Enter</kbd> to submit immediately.
+              <p className="text-[11px] text-amber-800 dark:text-amber-300/80 text-center font-mono">
+                Tip: Press <kbd className="px-1.5 py-0.5 bg-amber-200/70 dark:bg-amber-900/60 rounded font-mono font-bold">Enter</kbd> to submit immediately.
               </p>
             </div>
           )}
 
           {/* Terminal Scraper Output */}
-          <div className="bg-slate-900 rounded-3xl p-5 text-slate-200 shadow-sm">
+          <div className="bg-slate-950 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-slate-200 shadow-sm border border-slate-800/90">
             <div className="flex items-center justify-between pb-2.5 border-b border-slate-800 mb-3">
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" />
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 <span className="text-xs font-bold uppercase tracking-wider text-slate-400 font-mono">
                   Live Scraping Activity Log
                 </span>
@@ -1558,8 +1567,8 @@ export default function AdminPanel() {
                 <p className="text-slate-600 italic">No activity logs recorded yet. Start a scraper job above.</p>
               ) : (
                 status.logs.map((log, idx) => (
-                  <div key={idx} className="leading-relaxed">
-                    <span className="text-slate-600 mr-2">›</span>
+                  <div key={idx} className="leading-relaxed flex items-start gap-2">
+                    <span className="text-slate-600 select-none">›</span>
                     <span
                       className={
                         log.includes("✅")

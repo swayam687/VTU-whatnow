@@ -958,3 +958,97 @@ export async function toggleAdminStudentVisibility(
   }
   return res.json();
 }
+
+// -------------------------------------------------------------
+// On-Demand Student Registration & Live VTU Captcha Extraction
+// -------------------------------------------------------------
+
+export interface OnDemandStartResponse {
+  ok: boolean;
+  session_id?: string;
+  captcha_base64?: string;
+  usn: string;
+  message?: string;
+}
+
+export interface OnDemandRefreshResponse {
+  ok: boolean;
+  captcha_base64?: string;
+  message?: string;
+}
+
+export interface OnDemandSubmitResponse {
+  ok: boolean;
+  status?: "registered" | "authenticated";
+  token?: string;
+  usn?: string;
+  name?: string;
+  branch?: string;
+  login_count?: number;
+  total_marks?: number;
+  max_marks?: number;
+  percentage?: number;
+  reason?: "invalid_captcha" | "not_found" | "not_published" | "session_expired" | "parsing_failed" | "error" | string;
+  new_captcha_base64?: string;
+  message?: string;
+}
+
+export async function startOnDemandRegistration(
+  usn: string,
+  semester: string = "1",
+  semesterLinkId?: number
+): Promise<OnDemandStartResponse> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/auth/on-demand/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      usn: usn.trim().toUpperCase(),
+      semester,
+      semester_link_id: semesterLinkId,
+    }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to connect to VTU portal");
+  }
+  return res.json();
+}
+
+export async function refreshOnDemandCaptcha(sessionId: string): Promise<OnDemandRefreshResponse> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/auth/on-demand/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to refresh captcha");
+  }
+  return res.json();
+}
+
+export async function submitOnDemandCaptcha(
+  sessionId: string,
+  captcha: string,
+  usn: string,
+  password: string
+): Promise<OnDemandSubmitResponse> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/auth/on-demand/submit`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      session_id: sessionId,
+      captcha: captcha.trim(),
+      usn: usn.trim().toUpperCase(),
+      password: password.trim(),
+    }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to submit captcha");
+  }
+  return res.json();
+}

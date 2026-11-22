@@ -58,89 +58,27 @@ from .schemas import (
     PrivacySettingsUpdate,
     PrivacySettingsOut,
     AdminMarksUpsertRequest,
+    OnDemandStartRequest,
+    OnDemandStartResponse,
+    OnDemandRefreshRequest,
+    OnDemandRefreshResponse,
+    OnDemandSubmitRequest,
+    OnDemandSubmitResponse,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
+from .services.ondemand_scraper import ondemand_scraper
+from .auth import (
+    hash_password,
+    verify_password,
+    compute_pw_sig,
+    create_session,
+    verify_session_token,
+    get_current_student_usn,
+    AUTH_SESSIONS,
+)
 
 from contextlib import asynccontextmanager
-
-# -------------------------------------------------------------
-# Cryptographic Password Hashing & Session Management
-# Standard library PBKDF2-HMAC-SHA256 (0 dependencies, 100% free)
-# -------------------------------------------------------------
-
-def hash_password(password: str, salt: Optional[str] = None) -> str:
-    if not salt:
-        salt = secrets.token_hex(16)
-    key = hashlib.pbkdf2_hmac(
-        "sha256",
-        password.encode("utf-8"),
-        salt.encode("utf-8"),
-        100000
-    )
-    return f"{salt}${key.hex()}"
-
-def verify_password(password: str, stored_hash: Optional[str]) -> bool:
-    if not stored_hash or "$" not in stored_hash:
-        return False
-    try:
-        salt, key_hex = stored_hash.split("$", 1)
-        computed = hashlib.pbkdf2_hmac(
-            "sha256",
-            password.encode("utf-8"),
-            salt.encode("utf-8"),
-            100000
-        )
-        return computed.hex() == key_hex
-    except Exception:
-        return False
-
-# In-memory session store (token -> usn)
-AUTH_SESSIONS: dict[str, str] = {}
-
-def compute_pw_sig(usn: str, password_hash: str) -> str:
-    """Computes a token signature tied directly to the current password_hash."""
-    salt = settings.ADMIN_PASSWORD
-    return hashlib.sha256(f"{usn.upper()}:{password_hash}:{salt}".encode("utf-8")).hexdigest()[:16]
-
-def create_session(usn: str, password_hash: str) -> str:
-    clean_usn = usn.strip().upper()
-    pw_sig = compute_pw_sig(clean_usn, password_hash)
-    token = f"{clean_usn}:{pw_sig}:{secrets.token_hex(16)}"
-    AUTH_SESSIONS[token] = clean_usn
-    return token
-
-def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
-    """
-    Validates token format and verifies that its signature matches the student's CURRENT
-    password_hash in the database. If a genuine owner transfers ownership via dispute approval,
-    the old password_hash changes, instantly invalidating any previously issued tokens.
-    """
-    if not token or ":" not in token:
-        return None
-    parts = token.split(":")
-    if len(parts) < 3:
-        return None
-    usn = parts[0].strip().upper()
-    token_sig = parts[1]
-
-    # Verify student exists and has claimed password and is not hidden/deleted
-    student = db.query(Student).filter(Student.usn == usn).first()
-    if not student or not student.password_hash or not student.is_claimed or student.is_hidden:
-        AUTH_SESSIONS.pop(token, None)
-        return None
-
-    expected_sig = compute_pw_sig(usn, student.password_hash)
-    if token_sig != expected_sig:
-        # Password was changed or ownership transferred! Old user session is REVOKED.
-        AUTH_SESSIONS.pop(token, None)
-        return None
-
-    AUTH_SESSIONS[token] = usn
-    return usn
-
-def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"), db: Session = Depends(get_db)) -> Optional[str]:
-    return verify_session_token(x_student_token, db)
 
 def init_db():
     try:
@@ -496,6 +434,121 @@ def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Dep
         name=student.name,
         branch=student.branch,
         login_count=student.login_count,
+    )
+
+
+# -------------------------------------------------------------
+# On-Demand Student Registration & Live VTU Captcha Extraction
+# -------------------------------------------------------------
+
+@app.post("/api/auth/on-demand/start", response_model=OnDemandStartResponse)
+async def start_on_demand_registration(req: OnDemandStartRequest, db: Session = Depends(get_db)):
+    clean_usn = req.usn.strip().upper()
+    if not clean_usn or len(clean_usn) < 5:
+        raise HTTPException(status_code=400, detail="Invalid USN format.")
+
+    # Check if student exists in DB
+    existing = db.query(Student).filter(Student.usn == clean_usn).first()
+    if existing and existing.is_hidden:
+        raise HTTPException(
+            status_code=403,
+            detail="USN deleted, request admin to add this USN data again and send your selfie to verify that you are the owner of the USN."
+        )
+
+    if existing and existing.is_claimed and existing.password_hash:
+        raise HTTPException(
+            status_code=400,
+            detail="This USN is already registered. Please sign in directly using your password, or submit a claim if someone else claimed it."
+        )
+
+    # Determine target VTU portal link
+    target_url = None
+    if req.custom_url and req.custom_url.strip():
+        target_url = req.custom_url.strip()
+    elif req.semester_link_id:
+        link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
+        if link and link.url:
+            target_url = link.url
+
+    if not target_url:
+        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        if default_link and default_link.url:
+            target_url = default_link.url
+        else:
+            first_link = db.query(SemesterLink).order_by(SemesterLink.id.asc()).first()
+            if first_link and first_link.url:
+                target_url = first_link.url
+            else:
+                target_url = settings.VTU_URL_SEM1
+
+    semester = req.semester or "1"
+    res = await ondemand_scraper.start_session(clean_usn, semester=semester, target_url=target_url)
+    if not res.get("ok"):
+        raise HTTPException(status_code=502, detail=res.get("message", "Failed to connect to VTU portal."))
+
+    return OnDemandStartResponse(
+        ok=True,
+        session_id=res["session_id"],
+        captcha_base64=res["captcha_base64"],
+        usn=clean_usn,
+        message=res.get("message")
+    )
+
+
+@app.post("/api/auth/on-demand/refresh", response_model=OnDemandRefreshResponse)
+async def refresh_on_demand_captcha(req: OnDemandRefreshRequest):
+    if not req.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+    res = await ondemand_scraper.refresh_captcha(req.session_id)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Failed to refresh captcha."))
+    return OnDemandRefreshResponse(
+        ok=True,
+        captcha_base64=res.get("captcha_base64"),
+        message="New captcha loaded."
+    )
+
+
+@app.post("/api/auth/on-demand/submit", response_model=OnDemandSubmitResponse)
+async def submit_on_demand_captcha(
+    req: OnDemandSubmitRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    clean_usn = req.usn.strip().upper()
+    password = req.password.strip()
+
+    if not clean_usn or not password:
+        raise HTTPException(status_code=400, detail="USN and password are required.")
+    if len(password) < 4:
+        raise HTTPException(status_code=400, detail="Password must be at least 4 characters.")
+    if not req.captcha or not req.captcha.strip():
+        raise HTTPException(status_code=400, detail="Captcha code is required.")
+    if not req.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+
+    client_ip = request.client.host if request.client else "unknown"
+    res = await ondemand_scraper.submit_captcha(
+        session_id=req.session_id,
+        captcha_code=req.captcha.strip(),
+        password=password,
+        client_ip=client_ip
+    )
+
+    return OnDemandSubmitResponse(
+        ok=bool(res.get("ok")),
+        status=res.get("status"),
+        token=res.get("token"),
+        usn=res.get("usn"),
+        name=res.get("name"),
+        branch=res.get("branch"),
+        login_count=res.get("login_count"),
+        total_marks=res.get("total_marks"),
+        max_marks=res.get("max_marks"),
+        percentage=res.get("percentage"),
+        reason=res.get("reason"),
+        new_captcha_base64=res.get("new_captcha_base64"),
+        message=res.get("message"),
     )
 
 

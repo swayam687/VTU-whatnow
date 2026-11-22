@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { sfx } from "../lib/sfx";
 import {
   fetchAuthStatus,
@@ -8,10 +8,13 @@ import {
   submitUsnDispute,
   reportMissingUsn,
   setStoredStudentSession,
+  startOnDemandRegistration,
+  refreshOnDemandCaptcha,
+  submitOnDemandCaptcha,
   AuthStatus,
   AuthSession,
 } from "../lib/api";
-import { IconClose } from "./Icons";
+import { IconClose, IconEye, IconEyeOff } from "./Icons";
 
 interface StudentAuthModalProps {
   isOpen: boolean;
@@ -20,6 +23,8 @@ interface StudentAuthModalProps {
   isObsidian?: boolean;
   initialUsn?: string;
 }
+
+type OnDemandState = "idle" | "connecting" | "captcha_ready" | "extracting" | "success";
 
 export default function StudentAuthModal({
   isOpen,
@@ -32,6 +37,8 @@ export default function StudentAuthModal({
   const [usn, setUsn] = useState(initialUsn.toUpperCase());
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [authStatus, setAuthStatus] = useState<AuthStatus | null>(null);
   const [checkingUsn, setCheckingUsn] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -39,17 +46,57 @@ export default function StudentAuthModal({
   const [disputeSuccess, setDisputeSuccess] = useState<string | null>(null);
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
 
-  // Selfie capture state
-  const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
-  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  // On-demand live VTU extraction state
+  const [onDemandState, setOnDemandState] = useState<OnDemandState>("idle");
+  const [onDemandSessionId, setOnDemandSessionId] = useState<string | null>(null);
+  const [captchaBase64, setCaptchaBase64] = useState<string | null>(null);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [refreshingCaptcha, setRefreshingCaptcha] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [extractedStudent, setExtractedStudent] = useState<{
+    name: string;
+    branch: string;
+    totalMarks: number;
+    maxMarks: number;
+    percentage: number;
+  } | null>(null);
 
-  // Missing USN report & notice state
+  // Manual admin report toggle
+  const [showAdminReport, setShowAdminReport] = useState(false);
   const [reportingMissing, setReportingMissing] = useState(false);
   const [missingReportSuccess, setMissingReportSuccess] = useState<string | null>(null);
   const [missingStudentName, setMissingStudentName] = useState("");
   const [missingStudentBranch, setMissingStudentBranch] = useState("CSE");
-  const [showPrivacyNotice, setShowPrivacyNotice] = useState(false);
+
+  // Selfie capture state for disputes
+  const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
+  const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const captchaInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Ticker timer for slow VTU connection wait
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    if (onDemandState === "connecting" || onDemandState === "extracting") {
+      timer = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      setElapsedSeconds(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [onDemandState]);
+
+  // Autofocus captcha input when ready
+  useEffect(() => {
+    if (onDemandState === "captcha_ready" && captchaInputRef.current) {
+      setTimeout(() => {
+        captchaInputRef.current?.focus();
+      }, 100);
+    }
+  }, [onDemandState]);
 
   if (!isOpen) return null;
 
@@ -59,9 +106,18 @@ export default function StudentAuthModal({
     setMissingReportSuccess(null);
     setPassword("");
     setNewPassword("");
+    setShowPassword(false);
+    setShowNewPassword(false);
     setSelfieBase64(null);
     setSelfiePreview(null);
     setAgreedToPrivacy(false);
+    setOnDemandState("idle");
+    setOnDemandSessionId(null);
+    setCaptchaBase64(null);
+    setCaptchaInput("");
+    setElapsedSeconds(0);
+    setExtractedStudent(null);
+    setShowAdminReport(false);
     setMode("auth");
   };
 
@@ -69,6 +125,204 @@ export default function StudentAuthModal({
     sfx.playMechanicalClick();
     resetForm();
     onClose();
+  };
+
+  // Check USN status on blur or when user finishes typing 7+ chars
+  const handleCheckUsn = async (candidateUsn: string) => {
+    const clean = candidateUsn.trim().toUpperCase();
+    if (clean.length < 5) return;
+    setCheckingUsn(true);
+    setError(null);
+    try {
+      const status = await fetchAuthStatus(clean);
+      setAuthStatus(status);
+      if (!status.exists) {
+        setError(null);
+      }
+    } catch {
+      // Network or backend unavailable
+    } finally {
+      setCheckingUsn(false);
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Live On-Demand Captcha Flow
+  // -------------------------------------------------------------
+
+  const handleStartOnDemand = async () => {
+    const cleanUsn = usn.trim().toUpperCase();
+    if (!cleanUsn || cleanUsn.length < 5) {
+      setError("Please enter a valid USN.");
+      return;
+    }
+    if (!password.trim() || password.length < 4) {
+      setError("Please choose a password with at least 4 characters.");
+      return;
+    }
+    if (!agreedToPrivacy) {
+      setError("Please read and agree to the Privacy Policy to proceed.");
+      return;
+    }
+
+    setError(null);
+    setOnDemandState("connecting");
+    setElapsedSeconds(0);
+    sfx.playMechanicalClick();
+
+    try {
+      const res = await startOnDemandRegistration(cleanUsn);
+      if (res.ok && res.session_id && res.captcha_base64) {
+        setOnDemandSessionId(res.session_id);
+        setCaptchaBase64(res.captcha_base64);
+        setOnDemandState("captcha_ready");
+        setCaptchaInput("");
+        sfx.playMechanicalClick();
+      } else {
+        throw new Error(res.message || "Failed to load VTU captcha.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Connection to VTU servers failed";
+      setError(msg);
+      setOnDemandState("idle");
+    }
+  };
+
+  const handleRefreshCaptcha = async () => {
+    if (!onDemandSessionId || refreshingCaptcha) return;
+    setRefreshingCaptcha(true);
+    sfx.playMechanicalClick();
+    try {
+      const res = await refreshOnDemandCaptcha(onDemandSessionId);
+      if (res.ok && res.captcha_base64) {
+        setCaptchaBase64(res.captcha_base64);
+        setCaptchaInput("");
+      } else {
+        setError(res.message || "Could not reload captcha. Please try again.");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to reload captcha";
+      setError(msg);
+    } finally {
+      setRefreshingCaptcha(false);
+    }
+  };
+
+  const handleSubmitCaptcha = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!onDemandSessionId) {
+      setError("Session expired. Please request a new captcha.");
+      setOnDemandState("idle");
+      return;
+    }
+    if (!captchaInput.trim()) {
+      setError("Please enter the captcha characters.");
+      return;
+    }
+
+    setError(null);
+    setOnDemandState("extracting");
+    setElapsedSeconds(0);
+    sfx.playMechanicalClick();
+
+    try {
+      const res = await submitOnDemandCaptcha(
+        onDemandSessionId,
+        captchaInput.trim(),
+        usn.trim().toUpperCase(),
+        password.trim()
+      );
+
+      if (res.ok && res.token) {
+        // Success! Student is registered and marksheet parsed into database
+        const studentInfo = {
+          name: res.name || usn.trim().toUpperCase(),
+          branch: res.branch || "ENGG",
+          totalMarks: res.total_marks || 0,
+          maxMarks: res.max_marks || 0,
+          percentage: res.percentage || 0,
+        };
+        setExtractedStudent(studentInfo);
+        setOnDemandState("success");
+
+        const session: AuthSession = {
+          ok: true,
+          status: "registered",
+          token: res.token,
+          usn: res.usn || usn.trim().toUpperCase(),
+          name: res.name || usn.trim().toUpperCase(),
+          branch: res.branch || "ENGG",
+          login_count: res.login_count || 1,
+        };
+        setStoredStudentSession(session);
+        sfx.playMechanicalClick();
+        onSuccess(session);
+
+        // Auto close after brief celebration
+        setTimeout(() => {
+          handleClose();
+        }, 2200);
+      } else {
+        // VTU returned an issue (invalid captcha, results not out, etc.)
+        if (res.reason === "invalid_captcha") {
+          if (res.new_captcha_base64) {
+            setCaptchaBase64(res.new_captcha_base64);
+          }
+          setCaptchaInput("");
+          setError(res.message || "VTU reported incorrect captcha code. Please try again with the new image.");
+          setOnDemandState("captcha_ready");
+        } else {
+          setError(res.message || "Failed to extract marksheet from VTU.");
+          setOnDemandState("idle");
+        }
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification request failed";
+      setError(msg);
+      setOnDemandState("idle");
+    }
+  };
+
+  // -------------------------------------------------------------
+  // Standard Auth & Dispute Handlers
+  // -------------------------------------------------------------
+
+  const handleStandardAuthSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!usn.trim()) {
+      setError("Please enter your USN.");
+      return;
+    }
+    if (!password.trim() || password.length < 4) {
+      setError("Password must be at least 4 characters.");
+      return;
+    }
+    if (!agreedToPrivacy) {
+      setError("Please check and agree to the Privacy Policy to sign in.");
+      return;
+    }
+
+    // If USN is not in database, route directly to the live VTU extraction
+    if (authStatus && !authStatus.exists) {
+      handleStartOnDemand();
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const session = await loginOrRegisterStudent(usn.trim(), password.trim());
+      setStoredStudentSession(session);
+      sfx.playMechanicalClick();
+      onSuccess(session);
+      resetForm();
+      onClose();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to authenticate";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleReportMissingUsn = async (e: React.FormEvent) => {
@@ -96,26 +350,7 @@ export default function StudentAuthModal({
     }
   };
 
-  // Check USN status on blur or when user finishes typing 10 chars
-  const handleCheckUsn = async (candidateUsn: string) => {
-    const clean = candidateUsn.trim().toUpperCase();
-    if (clean.length < 5) return;
-    setCheckingUsn(true);
-    setError(null);
-    try {
-      const status = await fetchAuthStatus(clean);
-      setAuthStatus(status);
-      if (!status.exists) {
-        setError(null);
-      }
-    } catch {
-      // Offline or network error
-    } finally {
-      setCheckingUsn(false);
-    }
-  };
-
-  // Client-side image compression to <50KB Base64 JPEG
+  // Client-side image compression to <50KB Base64 JPEG for disputes
   const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -156,40 +391,6 @@ export default function StudentAuthModal({
     reader.readAsDataURL(file);
   };
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!usn.trim()) {
-      setError("Please enter your USN.");
-      return;
-    }
-    if (!password.trim() || password.length < 4) {
-      setError("Password must be at least 4 characters.");
-      return;
-    }
-    if (!agreedToPrivacy) {
-      setError("Please check and agree to the Privacy Policy to sign in.");
-      return;
-    }
-
-    setLoading(true);
-    setError(null);
-    try {
-      const session = await loginOrRegisterStudent(usn.trim(), password.trim());
-      // Persist authenticated student session across page reloads and mobile sleep cycles
-      setStoredStudentSession(session);
-
-      sfx.playMechanicalClick();
-      onSuccess(session);
-      resetForm();
-      onClose();
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to authenticate";
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleDisputeSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!usn.trim()) {
@@ -223,49 +424,83 @@ export default function StudentAuthModal({
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/75 backdrop-blur-md animate-in fade-in duration-200"
       onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose();
+        if (e.target === e.currentTarget && onDemandState !== "connecting" && onDemandState !== "extracting") {
+          handleClose();
+        }
       }}
     >
       <div
-        className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden transition-all duration-200 ${isObsidian
+        className={`w-full max-w-md rounded-2xl border shadow-2xl overflow-hidden transition-all duration-200 ${
+          isObsidian
             ? "bg-[#0f1115] border-white/10 text-white"
             : "bg-white border-zinc-200 text-zinc-900"
-          }`}
+        }`}
       >
         {/* Modal Header */}
         <div
-          className={`flex items-center justify-between px-5 py-4 border-b ${isObsidian ? "border-white/10 bg-white/[0.02]" : "border-zinc-100 bg-zinc-50/50"
-            }`}
+          className={`flex items-center justify-between px-5 py-4 border-b ${
+            isObsidian ? "border-white/10 bg-white/[0.02]" : "border-zinc-100 bg-zinc-50/50"
+          }`}
         >
           <div className="flex items-center space-x-2.5">
             <span className="text-xl">
-              {mode === "auth" ? "🔐" : "🛡️"}
+              {onDemandState === "captcha_ready"
+                ? "🧩"
+                : onDemandState === "connecting" || onDemandState === "extracting"
+                ? "⚡"
+                : mode === "auth"
+                ? "🔐"
+                : "🛡️"}
             </span>
             <div>
               <h2 className="font-semibold text-base sm:text-lg tracking-tight">
-                {mode === "auth" ? "Student Access Portal" : "Verify USN Ownership"}
+                {onDemandState === "captcha_ready"
+                  ? "Solve VTU Security Captcha"
+                  : onDemandState === "connecting"
+                  ? "Connecting to VTU"
+                  : onDemandState === "extracting"
+                  ? "Extracting Marksheet"
+                  : onDemandState === "success"
+                  ? "Registration Complete"
+                  : mode === "auth"
+                  ? "Student Access Portal"
+                  : "Verify USN Ownership"}
               </h2>
               <p className={`text-xs ${isObsidian ? "text-zinc-400" : "text-zinc-500"}`}>
-                {mode === "auth"
-                  ? "Enter USN & password to unlock your complete rank"
+                {onDemandState === "captcha_ready"
+                  ? "Type the characters from the official VTU image"
+                  : onDemandState === "connecting"
+                  ? "Connecting directly to VTU examination servers"
+                  : onDemandState === "extracting"
+                  ? "Parsing subjects, grades, and computing rankings"
+                  : onDemandState === "success"
+                  ? "Your marksheet has been saved and secured"
+                  : mode === "auth"
+                  ? "Enter USN & password to unlock full rank and marksheet"
                   : "Submit photo verification for admin review"}
               </p>
             </div>
           </div>
-          <button
-            onClick={handleClose}
-            className={`p-2 rounded-xl transition-colors ${isObsidian ? "hover:bg-white/10 text-zinc-400" : "hover:bg-zinc-100 text-zinc-500"
+          {onDemandState !== "connecting" && onDemandState !== "extracting" && (
+            <button
+              onClick={handleClose}
+              className={`p-2 rounded-xl transition-colors cursor-pointer ${
+                isObsidian ? "hover:bg-white/10 text-zinc-400" : "hover:bg-zinc-100 text-zinc-500"
               }`}
-          >
-            <IconClose className="w-5 h-5" />
-          </button>
+            >
+              <IconClose className="w-5 h-5" />
+            </button>
+          )}
         </div>
 
         {/* Modal Body */}
-        <div className="p-5 space-y-4 max-h-[80vh] overflow-y-auto">
+        <div className="p-5 space-y-4 max-h-[82vh] overflow-y-auto">
           {error && (
-            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs sm:text-sm leading-relaxed space-y-2">
-              <p>⚠️ {error}</p>
+            <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs sm:text-sm leading-relaxed space-y-2 animate-in fade-in">
+              <p className="flex items-start gap-1.5">
+                <span className="shrink-0 mt-0.5">⚠️</span>
+                <span>{error}</span>
+              </p>
               {error.toLowerCase().includes("selfie") && mode === "auth" && (
                 <button
                   type="button"
@@ -282,7 +517,240 @@ export default function StudentAuthModal({
             </div>
           )}
 
-          {disputeSuccess ? (
+          {/* ========================================================================= */}
+          {/* STAGE 1: CONNECTING & GENERATING CAPTCHA LOADING SCREEN (15-30s wait)    */}
+          {/* ========================================================================= */}
+          {onDemandState === "connecting" ? (
+            <div className="py-6 px-1 space-y-5 text-center animate-in fade-in duration-200">
+              {/* Radar pulse animation */}
+              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping opacity-75" />
+                <div className="absolute inset-2 rounded-full bg-cyan-500/30 animate-pulse" />
+                <div className="relative w-12 h-12 rounded-full bg-slate-900 border border-cyan-400/50 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
+                  🌐
+                </div>
+              </div>
+
+              {/* Slow VTU Portal Warning Box (Critical Requirement) */}
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2">
+                <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs sm:text-sm">
+                  <span>⏱️</span>
+                  <span>VTU examination servers take 15–30 seconds</span>
+                </div>
+                <p className={`text-xs leading-relaxed ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                  Please keep this window open and do not reload. We are launching a secure session to connect to the VTU portal and generate your verification captcha.
+                </p>
+                <div className="pt-1 flex items-center justify-between text-[11px] font-mono text-amber-400/90">
+                  <span>Target USN: {usn.trim().toUpperCase()}</span>
+                  <span className="font-semibold bg-amber-500/20 px-2 py-0.5 rounded-md">
+                    {elapsedSeconds}s elapsed
+                  </span>
+                </div>
+              </div>
+
+              {/* Progress steps checklist */}
+              <div className={`p-3.5 rounded-xl border text-xs text-left space-y-2 ${
+                isObsidian ? "bg-white/[0.02] border-white/10" : "bg-zinc-50 border-zinc-200"
+              }`}>
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <span>✓</span>
+                  <span>USN format validated: <code className="font-mono">{usn}</code></span>
+                </div>
+                <div className="flex items-center gap-2 text-cyan-400">
+                  <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+                  <span>Connecting to official VTU results portal...</span>
+                </div>
+                <div className="flex items-center gap-2 text-zinc-500">
+                  <span>○</span>
+                  <span>Generating live security captcha image</span>
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOnDemandState("idle");
+                    setError(null);
+                  }}
+                  className={`text-xs transition-colors cursor-pointer ${
+                    isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"
+                  }`}
+                >
+                  Cancel Connection
+                </button>
+              </div>
+            </div>
+
+          ) : onDemandState === "captcha_ready" ? (
+            /* ========================================================================= */
+            /* STAGE 2: CAPTCHA SOLVING SCREEN                                          */
+            /* ========================================================================= */
+            <form onSubmit={handleSubmitCaptcha} className="space-y-4 animate-in fade-in duration-200">
+              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                isObsidian ? "bg-white/[0.02] border-white/10 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-700"
+              }`}>
+                Solve the live VTU security captcha below to securely fetch your marksheet and register your account.
+              </div>
+
+              {/* Captcha Image Container with High Contrast & Hairline Border */}
+              <div className="p-3.5 rounded-2xl bg-zinc-950 border border-white/15 flex flex-col items-center justify-center space-y-2.5 shadow-inner">
+                <div className="p-2 bg-white rounded-xl shadow-md border border-zinc-200">
+                  {captchaBase64 ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`data:image/png;base64,${captchaBase64}`}
+                      alt="VTU Security Captcha"
+                      className="h-14 sm:h-16 mx-auto object-contain select-none"
+                    />
+                  ) : (
+                    <div className="h-14 w-44 flex items-center justify-center text-xs text-zinc-400 font-mono">
+                      Loading Captcha...
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshCaptcha}
+                    disabled={refreshingCaptcha}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 transition-colors cursor-pointer"
+                  >
+                    <span>{refreshingCaptcha ? "⏳" : "🔄"}</span>
+                    <span>{refreshingCaptcha ? "Refreshing..." : "Cannot read? Refresh Captcha"}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Captcha Input Field */}
+              <div>
+                <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                  Enter Captcha Code <span className="text-[11px] font-normal text-zinc-400">(exact characters)</span>
+                </label>
+                <input
+                  ref={captchaInputRef}
+                  type="text"
+                  value={captchaInput}
+                  onChange={(e) => setCaptchaInput(e.target.value)}
+                  placeholder="e.g. 5K9P2X"
+                  maxLength={10}
+                  className={`w-full px-4 py-3 text-lg font-mono text-center tracking-widest uppercase rounded-xl border outline-none transition-all ${
+                    isObsidian
+                      ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                      : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
+                  }`}
+                  required
+                />
+              </div>
+
+              {/* Submit Buttons */}
+              <button
+                type="submit"
+                disabled={!captchaInput.trim()}
+                className="w-full py-3.5 px-4 rounded-xl text-sm font-semibold tracking-wide bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                Verify Captcha & Save Marksheet →
+              </button>
+
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOnDemandState("idle");
+                    setError(null);
+                  }}
+                  className={`text-xs transition-colors cursor-pointer ${
+                    isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"
+                  }`}
+                >
+                  ← Back to details
+                </button>
+              </div>
+            </form>
+
+          ) : onDemandState === "extracting" ? (
+            /* ========================================================================= */
+            /* STAGE 3: EXTRACTING & SECURING ACCOUNT LOADING SCREEN                     */
+            /* ========================================================================= */
+            <div className="py-6 px-1 space-y-5 text-center animate-in fade-in duration-200">
+              <div className="relative w-18 h-18 mx-auto flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border-2 border-emerald-400/20 animate-spin border-t-emerald-400" />
+                <span className="text-2xl">📊</span>
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-semibold text-base">Verifying & Extracting Marksheet</h3>
+                <p className={`text-xs leading-relaxed px-2 ${isObsidian ? "text-zinc-400" : "text-zinc-600"}`}>
+                  Submitting your captcha to VTU servers, extracting marks and SGPA, and locking your account.
+                </p>
+              </div>
+
+              <div className={`p-3.5 rounded-xl border text-xs text-left space-y-2 ${
+                isObsidian ? "bg-white/[0.02] border-white/10" : "bg-zinc-50 border-zinc-200"
+              }`}>
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <span>✓</span>
+                  <span>Captcha submitted to VTU</span>
+                </div>
+                <div className="flex items-center gap-2 text-emerald-400">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+                  <span>Parsing marks table, subject credits & SGPA...</span>
+                </div>
+                <div className="flex items-center gap-2 text-zinc-500">
+                  <span>○</span>
+                  <span>Hashing password and creating session</span>
+                </div>
+              </div>
+
+              <div className="text-[11px] font-mono text-zinc-400">
+                ⏱️ {elapsedSeconds}s elapsed • Please do not close
+              </div>
+            </div>
+
+          ) : onDemandState === "success" && extractedStudent ? (
+            /* ========================================================================= */
+            /* STAGE 4: REGISTRATION SUCCESS CELEBRATION                                 */
+            /* ========================================================================= */
+            <div className="py-5 space-y-4 text-center animate-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-3xl text-emerald-400">
+                ✓
+              </div>
+
+              <div className="space-y-1">
+                <h3 className="font-bold text-lg text-emerald-400">Marksheet Saved Successfully!</h3>
+                <p className={`text-xs ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                  Welcome, <strong className="text-white">{extractedStudent.name}</strong> ({extractedStudent.branch})
+                </p>
+              </div>
+
+              {/* Marks snapshot */}
+              <div className={`p-3.5 rounded-xl border text-xs space-y-1.5 ${
+                isObsidian ? "bg-white/[0.02] border-white/10 text-zinc-300" : "bg-zinc-50 border-zinc-200 text-zinc-800"
+              }`}>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">University Seat Number:</span>
+                  <span className="font-mono font-bold">{usn.trim().toUpperCase()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Total Marks Scored:</span>
+                  <span className="font-semibold">{extractedStudent.totalMarks} / {extractedStudent.maxMarks}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">Overall Percentage:</span>
+                  <span className="font-semibold text-emerald-400">{extractedStudent.percentage}%</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-zinc-400 animate-pulse">
+                Locking profile with your chosen password & logging in...
+              </p>
+            </div>
+
+          ) : disputeSuccess ? (
+            /* ========================================================================= */
+            /* DISPUTE SUCCESS SCREEN                                                   */
+            /* ========================================================================= */
             <div className="text-center py-6 space-y-3">
               <div className="w-14 h-14 mx-auto rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-2xl text-emerald-400">
                 ✓
@@ -298,14 +766,18 @@ export default function StudentAuthModal({
                     setDisputeSuccess(null);
                     setMode("auth");
                   }}
-                  className="px-5 py-2.5 text-xs font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-colors"
+                  className="px-5 py-2.5 text-xs font-semibold rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white transition-colors cursor-pointer"
                 >
                   Return to Login
                 </button>
               </div>
             </div>
+
           ) : mode === "auth" ? (
-            <form onSubmit={handleAuthSubmit} className="space-y-4">
+            /* ========================================================================= */
+            /* STANDARD AUTH / REGISTER FORM                                             */
+            /* ========================================================================= */
+            <form onSubmit={handleStandardAuthSubmit} className="space-y-4">
               {/* USN Field */}
               <div>
                 <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
@@ -323,10 +795,11 @@ export default function StudentAuthModal({
                     onBlur={() => handleCheckUsn(usn)}
                     placeholder="e.g. 1DB22CS001"
                     maxLength={10}
-                    className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${isObsidian
+                    className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
+                      isObsidian
                         ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
                         : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
-                      }`}
+                    }`}
                     required
                   />
                   {checkingUsn && (
@@ -367,101 +840,30 @@ export default function StudentAuthModal({
                     </div>
                   )
                 ) : authStatus && !authStatus.exists ? (
-                  <div className="mt-3">
-                    {missingReportSuccess ? (
-                      <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs space-y-1">
-                        <p className="font-bold">✅ Report Received by Admin</p>
-                        <p className="text-[11px] opacity-90">{missingReportSuccess}</p>
-                      </div>
-                    ) : (
-                      <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3">
-                        <div>
-                          <span className="text-xs font-bold text-amber-400 block">⚠️ USN Not Found in Records</span>
-                          <p className={`text-[11px] mt-0.5 ${isObsidian ? "text-zinc-400" : "text-zinc-600"}`}>
-                            We haven&apos;t added this USN yet. Enter your details below, and the administrator will add your marksheet.
-                          </p>
-                        </div>
-
-                        {/* Quick Report to Admin Form */}
-                        <div className="space-y-2 pt-1">
-                          <div className="grid grid-cols-2 gap-2">
-                            <input
-                              type="text"
-                              value={missingStudentName}
-                              onChange={(e) => setMissingStudentName(e.target.value)}
-                              placeholder="Your Name (Optional)"
-                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none transition-colors ${
-                                isObsidian
-                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
-                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
-                              }`}
-                            />
-                            <select
-                              value={missingStudentBranch}
-                              onChange={(e) => setMissingStudentBranch(e.target.value)}
-                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none transition-colors ${
-                                isObsidian
-                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
-                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
-                              }`}
-                            >
-                              <option value="CSE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CSE</option>
-                              <option value="DS" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>DS</option>
-                              <option value="AIML" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>AIML</option>
-                              <option value="ISE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ISE</option>
-                              <option value="ECE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ECE</option>
-                              <option value="MECH" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>MECH</option>
-                              <option value="CIVIL" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CIVIL</option>
-                            </select>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={handleReportMissingUsn}
-                            disabled={reportingMissing}
-                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-500/20 cursor-pointer"
-                          >
-                            {reportingMissing ? (
-                              <span>Sending Request...</span>
-                            ) : (
-                              <span>📢 Request Admin to Add My USN</span>
-                            )}
-                          </button>
-                        </div>
-
-                        {/* Data Transparency & Privacy Notice */}
-                        <div className="pt-2 border-t border-amber-500/10">
-                          <button
-                            type="button"
-                            onClick={() => setShowPrivacyNotice(!showPrivacyNotice)}
-                            className="text-[10px] text-amber-400/80 hover:text-amber-400 underline flex items-center gap-1"
-                          >
-                            <span>{showPrivacyNotice ? "Hide" : "View"} Data Collection & Privacy Notice</span>
-                          </button>
-
-                          {showPrivacyNotice && (
-                            <div className="mt-2 p-2.5 rounded-xl bg-black/30 border border-white/10 text-[10px] text-zinc-300 space-y-1.5 leading-relaxed">
-                              <p><strong>📋 Collected Fields:</strong> University Seat Number (USN), Student Name, Branch, VTU Semester Marks, and encrypted password hash.</p>
-                              <p><strong>🎯 Purpose:</strong> College academic analytics, branch percentiles, and private student-controlled performance comparisons.</p>
-                              <p><strong>👁️ Visibility:</strong> Public preview is strictly limited to Top 3 per branch & Top 5 campus-wide. Complete marksheets and ranking insights require verified student login.</p>
-                              <p><strong>🔒 Data Retention:</strong> Maintained during active academic semesters. Identity selfies used for ownership dispute verification are purged post-approval.</p>
-                              <p><strong>⚖️ Correction & Complaint Route:</strong> To request marks correction, USN unlinking, or profile deletion, students can submit a request through this portal or reach college administration directly.</p>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
+                  /* USN NOT in DB: Inform student they can instantly register via live VTU captcha */
+                  <div className="mt-3 p-3 rounded-xl bg-cyan-500/10 border border-cyan-500/20 space-y-1.5 animate-in fade-in">
+                    <div className="flex items-center gap-1.5 font-semibold text-xs text-cyan-400">
+                      <span>✨</span>
+                      <span>New USN • Instant VTU Extraction</span>
+                    </div>
+                    <p className={`text-[11px] leading-relaxed ${isObsidian ? "text-zinc-300" : "text-zinc-600"}`}>
+                      This USN is not in the database yet. Set your password below and solve a live VTU captcha to automatically extract your marksheet!
+                    </p>
                   </div>
                 ) : null}
               </div>
 
-              {/* Password Field & Submit (Only when USN exists and is not hidden, or not yet checked) */}
-              {(!authStatus || (authStatus.exists && !authStatus.is_hidden)) && (
+              {/* Password Field (Rendered when USN is not hidden) */}
+              {(!authStatus || !authStatus.is_hidden) && (
                 <>
                   <div>
                     <div className="flex items-center justify-between mb-1.5">
                       <label className={`text-xs font-medium ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                        {authStatus?.is_claimed ? "Password" : "Create Password (to claim USN)"}
+                        {authStatus?.is_claimed
+                          ? "Password"
+                          : authStatus && !authStatus.exists
+                          ? "Create New Password (to lock your account)"
+                          : "Create Password (to claim USN)"}
                       </label>
                       {authStatus?.is_claimed && (
                         <button
@@ -471,28 +873,38 @@ export default function StudentAuthModal({
                             setMode("dispute");
                             setError(null);
                           }}
-                          className="text-[11px] text-emerald-400 hover:underline"
+                          className="text-[11px] text-emerald-400 hover:underline cursor-pointer"
                         >
                           Not you? Claim USN
                         </button>
                       )}
                     </div>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      placeholder={
-                        authStatus?.is_claimed
-                          ? "Enter your account password"
-                          : "Create a password (min 4 chars)"
-                      }
-                      minLength={4}
-                      className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${isObsidian
-                          ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
-                          : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        placeholder={
+                          authStatus?.is_claimed
+                            ? "Enter your account password"
+                            : "Create a password (min 4 chars)"
+                        }
+                        minLength={4}
+                        className={`w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl border outline-none transition-all ${
+                          isObsidian
+                            ? "bg-white/5 border-white/10 text-white focus:border-emerald-500 focus:bg-white/[0.08]"
+                            : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500 focus:bg-white"
                         }`}
-                      required
-                    />
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className={`absolute right-3 top-3 text-zinc-400 hover:text-white transition-colors cursor-pointer`}
+                      >
+                        {showPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Privacy Policy Agreement Checkbox */}
@@ -520,40 +932,128 @@ export default function StudentAuthModal({
                   </div>
 
                   {/* Submit Button */}
-                  <button
-                    type="submit"
-                    disabled={loading || !agreedToPrivacy}
-                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
-                  >
-                    {loading
-                      ? "Signing In..."
-                      : authStatus?.is_claimed
-                        ? "Unlock Results & Rankings"
-                        : "Claim USN & Create Password"}
-                  </button>
-
-                  <div className="pt-2 text-center">
+                  {authStatus && !authStatus.exists ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        sfx.playMechanicalClick();
-                        setMode("dispute");
-                        setError(null);
-                      }}
-                      className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                      onClick={handleStartOnDemand}
+                      disabled={loading || !agreedToPrivacy || !password.trim()}
+                      className="w-full py-3.5 px-4 rounded-xl text-sm font-semibold tracking-wide bg-cyan-500 hover:bg-cyan-600 text-slate-950 shadow-lg shadow-cyan-500/20 active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
                     >
-                      Did someone else take your USN? <span className="text-emerald-400 underline">Send Selfie Verification</span>
+                      <span>⚡</span>
+                      <span>Fetch VTU Marksheet & Register</span>
                     </button>
+                  ) : (
+                    <button
+                      type="submit"
+                      disabled={loading || !agreedToPrivacy}
+                      className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.99] transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    >
+                      {loading
+                        ? "Signing In..."
+                        : authStatus?.is_claimed
+                        ? "Unlock Results & Rankings"
+                        : "Claim USN & Create Password"}
+                    </button>
+                  )}
+
+                  {/* Optional: Dispute Link or Admin Report Drawer */}
+                  <div className="pt-2 text-center space-y-2">
+                    {authStatus && !authStatus.exists ? (
+                      <div>
+                        <button
+                          type="button"
+                          onClick={() => setShowAdminReport(!showAdminReport)}
+                          className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                        >
+                          Having trouble with VTU? <span className="text-amber-400 underline">{showAdminReport ? "Hide" : "Request Admin to Add USN manually"}</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          sfx.playMechanicalClick();
+                          setMode("dispute");
+                          setError(null);
+                        }}
+                        className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"}`}
+                      >
+                        Did someone else take your USN? <span className="text-emerald-400 underline">Send Selfie Verification</span>
+                      </button>
+                    )}
                   </div>
+
+                  {/* Collapsible Admin Report Form (Fallback for missing USN) */}
+                  {showAdminReport && authStatus && !authStatus.exists && (
+                    <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 space-y-3 text-left animate-in fade-in">
+                      <div>
+                        <span className="text-xs font-bold text-amber-400 block">📢 Request Admin Scrape</span>
+                        <p className={`text-[11px] mt-0.5 ${isObsidian ? "text-zinc-400" : "text-zinc-600"}`}>
+                          If the live scraper cannot connect, request the administrator to batch import your semester marks.
+                        </p>
+                      </div>
+
+                      {missingReportSuccess ? (
+                        <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs">
+                          {missingReportSuccess}
+                        </div>
+                      ) : (
+                        <div className="space-y-2 pt-1">
+                          <div className="grid grid-cols-2 gap-2">
+                            <input
+                              type="text"
+                              value={missingStudentName}
+                              onChange={(e) => setMissingStudentName(e.target.value)}
+                              placeholder="Your Name (Optional)"
+                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none ${
+                                isObsidian
+                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
+                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
+                              }`}
+                            />
+                            <select
+                              value={missingStudentBranch}
+                              onChange={(e) => setMissingStudentBranch(e.target.value)}
+                              className={`px-2.5 py-1.5 text-xs rounded-lg border outline-none ${
+                                isObsidian
+                                  ? "bg-black/30 border-white/10 text-white focus:border-amber-400"
+                                  : "bg-white border-zinc-300 text-zinc-900 focus:border-amber-500"
+                              }`}
+                            >
+                              <option value="CSE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CSE</option>
+                              <option value="DS" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>DS</option>
+                              <option value="AIML" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>AIML</option>
+                              <option value="ISE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ISE</option>
+                              <option value="ECE" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>ECE</option>
+                              <option value="MECH" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>MECH</option>
+                              <option value="CIVIL" className={isObsidian ? "bg-zinc-900" : "bg-white text-zinc-900"}>CIVIL</option>
+                            </select>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={handleReportMissingUsn}
+                            disabled={reportingMissing}
+                            className="w-full py-2 px-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            {reportingMissing ? "Sending Report..." : "Submit Report to Admin"}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </>
               )}
             </form>
           ) : (
-            /* Dispute / Ownership Form */
-            <form onSubmit={handleDisputeSubmit} className="space-y-4">
-              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${isObsidian ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
-                }`}>
-                📸 <strong>Selfie Verification:</strong> To ensure privacy and prevent unauthorized account takeover, take or upload a selfie. The admin will verify your identity against the college records and approve your ownership.
+            /* ========================================================================= */
+            /* DISPUTE / OWNERSHIP FORM                                                  */
+            /* ========================================================================= */
+            <form onSubmit={handleDisputeSubmit} className="space-y-4 animate-in fade-in">
+              <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
+                isObsidian ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}>
+                📸 <strong>Selfie Verification:</strong> To ensure privacy and prevent unauthorized account takeover, take or upload a selfie. The admin will verify your identity against college records and approve your ownership.
               </div>
 
               {/* USN Field */}
@@ -567,10 +1067,11 @@ export default function StudentAuthModal({
                   onChange={(e) => setUsn(e.target.value.toUpperCase())}
                   placeholder="e.g. 1DB22CS001"
                   maxLength={10}
-                  className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${isObsidian
+                  className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
+                    isObsidian
                       ? "bg-white/5 border-white/10 text-white focus:border-emerald-500"
                       : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500"
-                    }`}
+                  }`}
                   required
                 />
               </div>
@@ -580,18 +1081,28 @@ export default function StudentAuthModal({
                 <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
                   Set New Password (activated upon admin approval)
                 </label>
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Create new password (min 4 chars)"
-                  minLength={4}
-                  className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none transition-all ${isObsidian
-                      ? "bg-white/5 border-white/10 text-white focus:border-emerald-500"
-                      : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500"
+                <div className="relative">
+                  <input
+                    type={showNewPassword ? "text" : "password"}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    placeholder="Create new password (min 4 chars)"
+                    minLength={4}
+                    className={`w-full px-3.5 py-2.5 pr-10 text-sm rounded-xl border outline-none transition-all ${
+                      isObsidian
+                        ? "bg-white/5 border-white/10 text-white focus:border-emerald-500"
+                        : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-emerald-500"
                     }`}
-                  required
-                />
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowNewPassword(!showNewPassword)}
+                    className="absolute right-3 top-3 text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                  >
+                    {showNewPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                  </button>
+                </div>
               </div>
 
               {/* Selfie Upload / Camera */}
@@ -612,10 +1123,11 @@ export default function StudentAuthModal({
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className={`flex-1 py-2.5 px-3.5 rounded-xl border text-xs font-medium flex items-center justify-center space-x-2 transition-all ${isObsidian
+                    className={`flex-1 py-2.5 px-3.5 rounded-xl border text-xs font-medium flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                      isObsidian
                         ? "bg-white/5 border-white/10 hover:bg-white/10 text-white"
                         : "bg-zinc-100 border-zinc-300 hover:bg-zinc-200 text-zinc-800"
-                      }`}
+                    }`}
                   >
                     <span>📷</span>
                     <span>{selfiePreview ? "Change Photo" : "Take / Choose Selfie"}</span>
@@ -638,7 +1150,7 @@ export default function StudentAuthModal({
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-[0.99] transition-all disabled:opacity-50"
+                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer"
               >
                 {loading ? "Submitting..." : "Submit Verification to Admin"}
               </button>
@@ -651,7 +1163,7 @@ export default function StudentAuthModal({
                     setMode("auth");
                     setError(null);
                   }}
-                  className="text-xs text-zinc-400 hover:text-zinc-200"
+                  className="text-xs text-zinc-400 hover:text-zinc-200 cursor-pointer"
                 >
                   ← Back to standard login
                 </button>
@@ -663,4 +1175,3 @@ export default function StudentAuthModal({
     </div>
   );
 }
-

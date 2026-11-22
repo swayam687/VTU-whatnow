@@ -184,6 +184,49 @@ class DisputeReviewRequest(BaseModel):
     action: str  # "approve" or "reject"
     admin_notes: Optional[str] = ""
 
+# ---------------- On-Demand Live Registration & Captcha ----------------
+class OnDemandStartRequest(BaseModel):
+    usn: str
+    semester: Optional[str] = "1"
+    semester_link_id: Optional[int] = None
+    custom_url: Optional[str] = None
+
+class OnDemandStartResponse(BaseModel):
+    ok: bool
+    session_id: Optional[str] = None
+    captcha_base64: Optional[str] = None
+    usn: str
+    message: Optional[str] = None
+
+class OnDemandRefreshRequest(BaseModel):
+    session_id: str
+
+class OnDemandRefreshResponse(BaseModel):
+    ok: bool
+    captcha_base64: Optional[str] = None
+    message: Optional[str] = None
+
+class OnDemandSubmitRequest(BaseModel):
+    session_id: str
+    captcha: str
+    usn: str
+    password: str
+
+class OnDemandSubmitResponse(BaseModel):
+    ok: bool
+    status: Optional[str] = None
+    token: Optional[str] = None
+    usn: Optional[str] = None
+    name: Optional[str] = None
+    branch: Optional[str] = None
+    login_count: Optional[int] = None
+    total_marks: Optional[int] = None
+    max_marks: Optional[int] = None
+    percentage: Optional[float] = None
+    reason: Optional[str] = None
+    new_captcha_base64: Optional[str] = None
+    message: Optional[str] = None
+
 class LoginLogOut(BaseModel):
     id: int
     usn: str
