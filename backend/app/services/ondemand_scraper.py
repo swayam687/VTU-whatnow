@@ -126,7 +126,7 @@ class OnDemandScraperManager:
         Initializes an asyncio.Semaphore to throttle active browser sessions to max concurrent slots.
         """
         if self._semaphore is None:
-            max_concurrent = getattr(settings, "MAX_CONCURRENT_SCRAPERS", 25)
+            max_concurrent = getattr(settings, "MAX_CONCURRENT_SCRAPERS", 10)
             self._semaphore = asyncio.Semaphore(max_concurrent)
         if self._browser_lock is None:
             self._browser_lock = asyncio.Lock()

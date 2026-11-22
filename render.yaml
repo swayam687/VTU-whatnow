@@ -32,6 +32,9 @@ services:
       # Admin panel protection password
       ADMIN_PASSWORD: admin
 
+      # Safe Playwright concurrency limit for Render 512MB free tier
+      MAX_CONCURRENT_SCRAPERS: "10"
+
   # ---------- Frontend ----------
   - type: web
     name: vtu-frontend
