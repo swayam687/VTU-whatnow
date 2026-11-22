@@ -177,7 +177,7 @@ export default function PrivacySettingsModal({
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-xs tracking-tight">Show Pending Subjects / Re-attempts</span>
+                      <span className="font-bold text-xs tracking-tight">Show backlogs to everyone?</span>
                       <span
                         className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
                           settings.show_my_backlogs
@@ -185,13 +185,13 @@ export default function PrivacySettingsModal({
                             : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                         }`}
                       >
-                        {settings.show_my_backlogs ? "Public (Default)" : "Masked (Opted Out)"}
+                        {settings.show_my_backlogs ? "Public (Default)" : "Protected (Opted Out)"}
                       </span>
                     </div>
                     <p className="text-[11px] opacity-65 mt-1 leading-snug">
                       {settings.show_my_backlogs
-                        ? "Default is ON. Public badge shows your re-attempts count, and pending subjects appear with status \"F\" in your marks breakdown."
-                        : "Opted out (OFF). Public badge shows \"All Clear\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
+                        ? "Default is ON. Anyone and everyone can see your backlog number and backlog subjects in your marksheet."
+                        : "Opted out (OFF). Public badge shows \"Protected\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
                     </p>
                   </div>
                   {/* Switch */}

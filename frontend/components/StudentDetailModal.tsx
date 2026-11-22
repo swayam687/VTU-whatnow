@@ -701,7 +701,7 @@ export default function StudentDetailModal({
                       </p>
                       <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                         {isHidden
-                          ? "Hidden"
+                          ? "Protected"
                           : hasBacklogs
                             ? `${student.total_backlogs} Pending`
                             : "All Clear"}
