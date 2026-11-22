@@ -262,6 +262,14 @@ export default function StudentAuthModal({
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const captchaInputRef = useRef<HTMLInputElement | null>(null);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Clear pending retry timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) clearTimeout(retryTimeoutRef.current);
+    };
+  }, []);
 
   // Ticker timer for slow VTU connection wait
   useEffect(() => {
@@ -286,8 +294,6 @@ export default function StudentAuthModal({
       }, 100);
     }
   }, [onDemandState]);
-
-  if (!isOpen) return null;
 
   const resetForm = () => {
     setError(null);
@@ -318,8 +324,6 @@ export default function StudentAuthModal({
     resetForm();
     onClose();
   };
-
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Check USN status on blur or when user finishes typing 7+ chars
   const handleCheckUsn = async (candidateUsn: string, isRetry = false) => {
@@ -723,6 +727,8 @@ export default function StudentAuthModal({
       setLoading(false);
     }
   };
+
+  if (!isOpen) return null;
 
   return (
     <div

@@ -198,6 +198,11 @@ export default function AdminPanel() {
   const [linkActionMsg, setLinkActionMsg] = useState("");
   const [savingLinkId, setSavingLinkId] = useState<number | null>(null);
 
+  // Real-time credit sync & Totals recalculation
+  const [syncingCredits, setSyncingCredits] = useState(false);
+  const [lastCreditsSyncTime, setLastCreditsSyncTime] = useState<string | null>(null);
+  const [recalculatingTotals, setRecalculatingTotals] = useState(false);
+
   // Scraper status & Captcha
   const [status, setStatus] = useState<ScrapeStatus>({
     is_running: false,
@@ -489,10 +494,6 @@ export default function AdminPanel() {
     }
   };
 
-  // Real-time credit sync
-  const [syncingCredits, setSyncingCredits] = useState(false);
-  const [lastCreditsSyncTime, setLastCreditsSyncTime] = useState<string | null>(null);
-
   const handleSyncCreditsRealtime = async () => {
     if (!adminKey) return;
     setSyncingCredits(true);
@@ -526,7 +527,7 @@ export default function AdminPanel() {
   const loadStudentRecords = () => {
     fetchStudents({ sort: "recent", adminKey: adminKey || undefined })
       .then((data) => setAllStudents(data))
-      .catch(() => {});
+      .catch(() => { });
   };
 
   // Load Disputes
@@ -769,7 +770,6 @@ export default function AdminPanel() {
   };
 
   // Load Semester Coverage Audit
-  const [recalculatingTotals, setRecalculatingTotals] = useState(false);
   const loadSemesterAudit = async () => {
     if (!adminKey) return;
     setSemesterAuditLoading(true);
@@ -1240,13 +1240,12 @@ export default function AdminPanel() {
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex items-center gap-1.5 bg-white dark:bg-[#0c0e12] border border-slate-200 dark:border-slate-800 px-2.5 py-1 rounded-full shadow-2xs">
               <span
-                className={`w-2 h-2 rounded-full ${
-                  status.is_running
-                    ? "bg-emerald-500 animate-pulse"
-                    : status.status === "error"
+                className={`w-2 h-2 rounded-full ${status.is_running
+                  ? "bg-emerald-500 animate-pulse"
+                  : status.status === "error"
                     ? "bg-rose-500"
                     : "bg-slate-400 dark:bg-slate-600"
-                }`}
+                  }`}
               />
               <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-700 dark:text-slate-300 font-mono">
                 {status.is_running ? "Scraping Active" : status.status === "error" ? "Error" : "Scraper Idle"}
@@ -1254,11 +1253,10 @@ export default function AdminPanel() {
             </div>
 
             <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-2xs ${
-                browserStatus?.status === "ready"
-                  ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300"
-                  : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/80 dark:border-amber-900/50 text-amber-800 dark:text-amber-300"
-              }`}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold border shadow-2xs ${browserStatus?.status === "ready"
+                ? "bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-200/80 dark:border-emerald-900/50 text-emerald-800 dark:text-emerald-300"
+                : "bg-amber-50/70 dark:bg-amber-950/30 border-amber-200/80 dark:border-amber-900/50 text-amber-800 dark:text-amber-300"
+                }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"}`} />
               <span className="font-mono">{browserStatus?.status === "ready" ? "Browser Ready" : "Browser Check"}</span>
@@ -1303,11 +1301,10 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("scraper");
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "scraper"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "scraper"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconBolt className="w-3.5 h-3.5" />
           <span>Scraper</span>
@@ -1319,11 +1316,10 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("semesters");
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "semesters"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "semesters"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconLayers className="w-3.5 h-3.5" />
           <span>Semesters</span>
@@ -1338,11 +1334,10 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("records");
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "records"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "records"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconUsers className="w-3.5 h-3.5" />
           <span>Students</span>
@@ -1358,11 +1353,10 @@ export default function AdminPanel() {
             setActiveTab("disputes");
             loadDisputes();
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "disputes"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "disputes"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconShield className="w-3.5 h-3.5" />
           <span>Claims</span>
@@ -1381,21 +1375,20 @@ export default function AdminPanel() {
             loadMissingReports();
             loadRescrapeRequests();
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "missing_usn"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "missing_usn"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconBell className="w-3.5 h-3.5" />
           <span>Requests</span>
           {rescrapeRequests.filter((r) => r.status === "pending").length +
             missingReports.filter((r) => r.status === "pending").length > 0 && (
-            <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-600 text-white font-mono font-bold">
-              {rescrapeRequests.filter((r) => r.status === "pending").length +
-                missingReports.filter((r) => r.status === "pending").length}
-            </span>
-          )}
+              <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-blue-600 text-white font-mono font-bold">
+                {rescrapeRequests.filter((r) => r.status === "pending").length +
+                  missingReports.filter((r) => r.status === "pending").length}
+              </span>
+            )}
         </button>
 
         <button
@@ -1405,11 +1398,10 @@ export default function AdminPanel() {
             setActiveTab("audit");
             loadSemesterAudit();
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "audit"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "audit"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconRotateCcw className="w-3.5 h-3.5" />
           <span>Audit</span>
@@ -1427,11 +1419,10 @@ export default function AdminPanel() {
             setActiveTab("logs");
             loadLoginLogs();
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "logs"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "logs"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconFileText className="w-3.5 h-3.5" />
           <span>Logs</span>
@@ -1448,11 +1439,10 @@ export default function AdminPanel() {
             sfx.playClick();
             setActiveTab("system");
           }}
-          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${
-            activeTab === "system"
-              ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
-              : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
-          }`}
+          className={`min-h-[42px] sm:min-h-[38px] px-3.5 text-xs font-medium rounded-xl transition-all whitespace-nowrap shrink-0 sm:flex-1 flex items-center justify-center gap-1.5 active:scale-[0.98] ${activeTab === "system"
+            ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold"
+            : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/5"
+            }`}
         >
           <IconSettings className="w-3.5 h-3.5" />
           <span>System</span>
@@ -1478,11 +1468,10 @@ export default function AdminPanel() {
                     sfx.playClick();
                     setMode("single");
                   }}
-                  className={`py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${
-                    mode === "single"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                  }`}
+                  className={`py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${mode === "single"
+                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
                 >
                   Single Student USN
                 </button>
@@ -1492,11 +1481,10 @@ export default function AdminPanel() {
                     sfx.playClick();
                     setMode("range");
                   }}
-                  className={`py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${
-                    mode === "range"
-                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold"
-                      : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                  }`}
+                  className={`py-2 text-xs font-bold rounded-lg transition-all active:scale-[0.98] ${mode === "range"
+                    ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs font-bold"
+                    : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                    }`}
                 >
                   Batch Range Scraper
                 </button>
@@ -1535,28 +1523,25 @@ export default function AdminPanel() {
                         setSelectedSemesterLinkId(link.id);
                       }}
                       disabled={status.is_running}
-                      className={`p-3 rounded-xl border text-left transition-all relative active:scale-[0.99] cursor-pointer ${
-                        isSelected
-                          ? "border-slate-900 dark:border-cyan-500 bg-slate-900 dark:bg-cyan-950/30 text-white dark:text-cyan-100 shadow-xs ring-1 ring-slate-900 dark:ring-cyan-500/50"
-                          : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 bg-white dark:bg-slate-950"
-                      } disabled:opacity-50`}
+                      className={`p-3 rounded-xl border text-left transition-all relative active:scale-[0.99] cursor-pointer ${isSelected
+                        ? "border-slate-900 dark:border-cyan-500 bg-slate-900 dark:bg-cyan-950/30 text-white dark:text-cyan-100 shadow-xs ring-1 ring-slate-900 dark:ring-cyan-500/50"
+                        : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 bg-white dark:bg-slate-950"
+                        } disabled:opacity-50`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs sm:text-sm font-bold truncate">{link.title}</span>
                         <span
-                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded-md uppercase shrink-0 font-bold ${
-                            isSelected
-                              ? "bg-slate-800 dark:bg-cyan-900/60 text-slate-200 dark:text-cyan-300"
-                              : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
-                          }`}
+                          className={`text-[9px] font-mono px-1.5 py-0.5 rounded-md uppercase shrink-0 font-bold ${isSelected
+                            ? "bg-slate-800 dark:bg-cyan-900/60 text-slate-200 dark:text-cyan-300"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400"
+                            }`}
                         >
                           Sem {link.semester}
                         </span>
                       </div>
                       <div
-                        className={`text-[10px] truncate mt-1 font-mono ${
-                          isSelected ? "text-slate-300 dark:text-cyan-300/70" : "text-slate-400 dark:text-slate-500"
-                        }`}
+                        className={`text-[10px] truncate mt-1 font-mono ${isSelected ? "text-slate-300 dark:text-cyan-300/70" : "text-slate-400 dark:text-slate-500"
+                          }`}
                       >
                         {link.url}
                       </div>
@@ -1572,17 +1557,15 @@ export default function AdminPanel() {
                     setUseCustomUrl(true);
                   }}
                   disabled={status.is_running}
-                  className={`p-3 rounded-xl border text-left transition-all active:scale-[0.99] cursor-pointer ${
-                    useCustomUrl
-                      ? "border-slate-900 dark:border-cyan-500 bg-slate-900 dark:bg-cyan-950/30 text-white dark:text-cyan-100 shadow-xs ring-1 ring-slate-900 dark:ring-cyan-500/50"
-                      : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 bg-white dark:bg-slate-950"
-                  } disabled:opacity-50`}
+                  className={`p-3 rounded-xl border text-left transition-all active:scale-[0.99] cursor-pointer ${useCustomUrl
+                    ? "border-slate-900 dark:border-cyan-500 bg-slate-900 dark:bg-cyan-950/30 text-white dark:text-cyan-100 shadow-xs ring-1 ring-slate-900 dark:ring-cyan-500/50"
+                    : "border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-900/60 bg-white dark:bg-slate-950"
+                    } disabled:opacity-50`}
                 >
                   <div className="text-xs sm:text-sm font-bold">Custom Portal URL</div>
                   <div
-                    className={`text-[10px] mt-1 font-mono ${
-                      useCustomUrl ? "text-slate-300 dark:text-cyan-300/70" : "text-slate-400 dark:text-slate-500"
-                    }`}
+                    className={`text-[10px] mt-1 font-mono ${useCustomUrl ? "text-slate-300 dark:text-cyan-300/70" : "text-slate-400 dark:text-slate-500"
+                      }`}
                   >
                     Enter any VTU index.php result endpoint manually
                   </div>
@@ -1710,9 +1693,8 @@ export default function AdminPanel() {
 
             <div className="w-full h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
               <div
-                className={`h-full transition-all duration-500 ease-out ${
-                  status.status === "error" ? "bg-rose-500" : "bg-slate-900 dark:bg-cyan-400"
-                }`}
+                className={`h-full transition-all duration-500 ease-out ${status.status === "error" ? "bg-rose-500" : "bg-slate-900 dark:bg-cyan-400"
+                  }`}
                 style={{ width: `${status.total_count > 0 ? progressPercent : 0}%` }}
               />
             </div>
@@ -1753,11 +1735,10 @@ export default function AdminPanel() {
                       key={z}
                       type="button"
                       onClick={() => setCaptchaZoom(z)}
-                      className={`px-2 py-0.5 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer active:scale-95 ${
-                        captchaZoom === z
-                          ? "bg-slate-900 dark:bg-cyan-500 text-white dark:text-slate-950 shadow-2xs"
-                          : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
-                      }`}
+                      className={`px-2 py-0.5 text-[11px] font-semibold rounded-lg transition-colors cursor-pointer active:scale-95 ${captchaZoom === z
+                        ? "bg-slate-900 dark:bg-cyan-500 text-white dark:text-slate-950 shadow-2xs"
+                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-800"
+                        }`}
                     >
                       {z}x
                     </button>
@@ -1766,11 +1747,10 @@ export default function AdminPanel() {
                   <button
                     type="button"
                     onClick={() => setCaptchaInvert((v) => !v)}
-                    className={`px-2 py-0.5 text-[10px] font-medium rounded-lg border transition-colors cursor-pointer active:scale-95 ${
-                      captchaInvert
-                        ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white font-bold"
-                        : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
+                    className={`px-2 py-0.5 text-[10px] font-medium rounded-lg border transition-colors cursor-pointer active:scale-95 ${captchaInvert
+                      ? "bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white font-bold"
+                      : "bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800"
+                      }`}
                   >
                     {captchaInvert ? "Normal" : "High Contrast"}
                   </button>
@@ -1780,9 +1760,8 @@ export default function AdminPanel() {
               {/* Captcha Image & Form */}
               <div className="bg-slate-50/60 dark:bg-slate-900/50 p-3 sm:p-4 rounded-xl border border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center gap-4">
                 <div
-                  className={`bg-white p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all ${
-                    captchaInvert ? "filter invert" : ""
-                  }`}
+                  className={`bg-white p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 flex items-center justify-center transition-all ${captchaInvert ? "filter invert" : ""
+                    }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
@@ -1828,13 +1807,12 @@ export default function AdminPanel() {
                           return (
                             <div
                               key={idx}
-                              className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold flex items-center gap-1 border ${
-                                isLower
-                                  ? "bg-blue-100 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-300"
-                                  : isUpper
+                              className={`px-2 py-0.5 rounded-md text-xs font-mono font-bold flex items-center gap-1 border ${isLower
+                                ? "bg-blue-100 dark:bg-blue-950/60 border-blue-300 dark:border-blue-800 text-blue-900 dark:text-blue-300"
+                                : isUpper
                                   ? "bg-purple-100 dark:bg-purple-950/60 border-purple-300 dark:border-purple-800 text-purple-900 dark:text-purple-300"
                                   : "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-300"
-                              }`}
+                                }`}
                             >
                               <span className="text-sm font-black underline underline-offset-2">{ch}</span>
                               <span className="text-[9px] uppercase font-bold opacity-75">
@@ -1882,10 +1860,10 @@ export default function AdminPanel() {
                         log.includes("✅")
                           ? "text-emerald-400 font-semibold"
                           : log.includes("❌")
-                          ? "text-rose-400 font-semibold"
-                          : log.includes("⚠️")
-                          ? "text-amber-300"
-                          : "text-slate-300"
+                            ? "text-rose-400 font-semibold"
+                            : log.includes("⚠️")
+                              ? "text-amber-300"
+                              : "text-slate-300"
                       }
                     >
                       {log}
@@ -2025,14 +2003,12 @@ export default function AdminPanel() {
                     sfx.playMechanicalClick();
                     setTargetForceUpdate(!targetForceUpdate);
                   }}
-                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden self-start sm:self-auto ${
-                    targetForceUpdate ? "bg-cyan-500" : "bg-slate-300 dark:bg-slate-700"
-                  }`}
+                  className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden self-start sm:self-auto ${targetForceUpdate ? "bg-cyan-500" : "bg-slate-300 dark:bg-slate-700"
+                    }`}
                 >
                   <span
-                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${
-                      targetForceUpdate ? "translate-x-5" : "translate-x-0"
-                    }`}
+                    className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out ${targetForceUpdate ? "translate-x-5" : "translate-x-0"
+                      }`}
                   />
                 </button>
               </div>
@@ -2074,9 +2050,8 @@ export default function AdminPanel() {
                       <div className="space-y-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span
-                            className={`w-2 h-2 rounded-full shrink-0 ${
-                              t.status === "COMPLETED" ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
-                            }`}
+                            className={`w-2 h-2 rounded-full shrink-0 ${t.status === "COMPLETED" ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
+                              }`}
                           />
                           <span className="font-mono font-bold text-slate-900 dark:text-white">
                             {t.start_usn} → {t.end_usn}
@@ -2090,11 +2065,10 @@ export default function AdminPanel() {
                             </span>
                           )}
                           <span
-                            className={`text-[9px] uppercase font-bold font-mono px-1.5 py-0.5 rounded ${
-                              t.status === "COMPLETED"
-                                ? "bg-emerald-500/20 text-emerald-400"
-                                : "bg-amber-500/20 text-amber-400"
-                            }`}
+                            className={`text-[9px] uppercase font-bold font-mono px-1.5 py-0.5 rounded ${t.status === "COMPLETED"
+                              ? "bg-emerald-500/20 text-emerald-400"
+                              : "bg-amber-500/20 text-amber-400"
+                              }`}
                           >
                             {t.status}
                           </span>
@@ -2348,11 +2322,10 @@ export default function AdminPanel() {
                     sfx.playClick();
                     setRecordsVisibilityFilter(f.id as "all" | "visible" | "hidden");
                   }}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${
-                    recordsVisibilityFilter === f.id
-                      ? "bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950"
-                      : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                  }`}
+                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${recordsVisibilityFilter === f.id
+                    ? "bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950"
+                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
+                    }`}
                 >
                   {f.label}
                 </button>
@@ -2448,11 +2421,10 @@ export default function AdminPanel() {
 
                     <div className="flex items-center gap-2 flex-wrap">
                       <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                          s.total_backlogs > 0
-                            ? "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                            : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                        }`}
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.total_backlogs > 0
+                          ? "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
+                          : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                          }`}
                       >
                         {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
                       </span>
@@ -2498,11 +2470,10 @@ export default function AdminPanel() {
                         type="button"
                         onClick={() => handleToggleVisibility(s.usn, !s.is_hidden)}
                         title={s.is_hidden ? `Unhide ${s.name} (${s.usn}) - Restore to public view` : `Hide ${s.name} (${s.usn}) - Remove from public view`}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                          s.is_hidden
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${s.is_hidden
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
+                          }`}
                       >
                         {s.is_hidden ? "✅ Unhide" : "🚫 Hide USN"}
                       </button>
@@ -2538,19 +2509,19 @@ export default function AdminPanel() {
       {/* ------------------------------------------------------------- */}
       {activeTab === "disputes" && (
         <div className="space-y-4 sm:space-y-6">
-          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
-                  <IconShield className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                  <IconShield className="w-4 h-4 text-slate-700" />
                   <span>USN Ownership Claims &amp; Disputes</span>
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Review selfie verifications submitted by students claiming verified account ownership.
                 </p>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <div className="flex items-center bg-slate-100/80 dark:bg-slate-900/60 p-0.5 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+                <div className="flex items-center bg-slate-100/80 p-0.5 rounded-xl border border-slate-200 text-xs">
                   {["all", "pending", "approved", "rejected"].map((f) => (
                     <button
                       key={f}
@@ -2559,9 +2530,8 @@ export default function AdminPanel() {
                         sfx.playClick();
                         setDisputeFilter(f);
                       }}
-                      className={`px-2.5 py-1 rounded-lg font-medium capitalize transition-colors text-[11px] sm:text-xs ${
-                        disputeFilter === f ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-2xs font-semibold" : "text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                      }`}
+                      className={`px-2.5 py-1 rounded-lg font-medium capitalize transition-colors text-[11px] sm:text-xs ${disputeFilter === f ? "bg-white text-slate-900 shadow-2xs font-semibold" : "text-slate-500 hover:text-slate-900"
+                        }`}
                     >
                       {f}
                     </button>
@@ -2573,7 +2543,7 @@ export default function AdminPanel() {
                     sfx.playClick();
                     loadDisputes();
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5"
                 >
                   <IconRotateCcw className="w-3 h-3" />
                   <span>Refresh</span>
@@ -2582,9 +2552,9 @@ export default function AdminPanel() {
             </div>
 
             {disputeActionMsg && (
-              <div className="p-3 bg-blue-50/70 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-800 dark:text-blue-300 text-xs rounded-xl font-medium flex items-center justify-between">
+              <div className="p-3 bg-blue-50/70 border border-blue-200 text-blue-800 text-xs rounded-xl font-medium flex items-center justify-between">
                 <span>{disputeActionMsg}</span>
-                <button onClick={() => setDisputeActionMsg("")} className="text-blue-500 hover:text-blue-800 dark:hover:text-blue-200 font-bold p-1">
+                <button onClick={() => setDisputeActionMsg("")} className="text-blue-500 hover:text-blue-800 font-bold p-1">
                   <IconClose className="w-3 h-3" />
                 </button>
               </div>
@@ -2593,10 +2563,10 @@ export default function AdminPanel() {
             {disputesLoading ? (
               <div className="text-center py-12 text-xs text-slate-400">Loading dispute requests...</div>
             ) : disputes.length === 0 ? (
-              <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
-                <IconShield className="w-6 h-6 text-slate-400 dark:text-slate-500 mx-auto" />
-                <p className="font-semibold text-xs text-slate-700 dark:text-slate-300 mt-2">No dispute requests found</p>
-                <p className="text-[11px] text-slate-400 dark:text-slate-500">
+              <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
+                <IconShield className="w-6 h-6 text-slate-400 mx-auto" />
+                <p className="font-semibold text-xs text-slate-700 mt-2">No dispute requests found</p>
+                <p className="text-[11px] text-slate-400">
                   {disputeFilter === "all"
                     ? "No students have submitted dispute claims yet."
                     : `No disputes matching filter '${disputeFilter}'.`}
@@ -2607,44 +2577,43 @@ export default function AdminPanel() {
                 {disputes.map((d) => (
                   <div
                     key={d.id}
-                    className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800/90 bg-white dark:bg-[#0f1117] hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs space-y-3"
+                    className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
+                          <span className="font-mono text-xs font-bold text-slate-900 px-2 py-0.5 rounded bg-slate-100">
                             {d.usn}
                           </span>
-                          <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800">
+                          <span className="text-[10px] font-bold text-slate-600 uppercase px-1.5 py-0.5 rounded bg-slate-100">
                             {d.branch}
                           </span>
                         </div>
-                        <h3 className="font-bold text-sm text-slate-900 dark:text-white mt-1">{d.name}</h3>
+                        <h3 className="font-bold text-sm text-slate-900 mt-1">{d.name}</h3>
                         {d.created_at && (
-                          <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-mono">
+                          <p className="text-[10px] text-slate-400 mt-0.5 font-mono">
                             Submitted: {formatDateTime(d.created_at).full}
                           </p>
                         )}
                       </div>
 
                       <span
-                        className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${
-                          d.status === "pending"
-                            ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
-                            : d.status === "approved"
-                            ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-                            : "bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60"
-                        }`}
+                        className={`text-[9px] sm:text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0 ${d.status === "pending"
+                          ? "bg-amber-100 text-amber-800 border border-amber-200"
+                          : d.status === "approved"
+                            ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                            : "bg-rose-100 text-rose-800 border border-rose-200"
+                          }`}
                       >
                         {d.status}
                       </span>
                     </div>
 
                     {/* Selfie Preview */}
-                    <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-3 p-2 rounded-xl bg-slate-50 border border-slate-100">
                       <div
                         onClick={() => setSelectedSelfieZoom(d.selfie_base64)}
-                        className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 cursor-pointer hover:opacity-90 shrink-0 relative group"
+                        className="w-14 h-14 rounded-lg overflow-hidden border border-slate-200 cursor-pointer hover:opacity-90 shrink-0 relative group"
                         title="Click to zoom selfie"
                       >
                         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2658,11 +2627,11 @@ export default function AdminPanel() {
                         </span>
                       </div>
                       <div className="text-xs min-w-0">
-                        <p className="font-semibold text-slate-700 dark:text-slate-300">Verification Photo</p>
+                        <p className="font-semibold text-slate-700">Verification Photo</p>
                         <button
                           type="button"
                           onClick={() => setSelectedSelfieZoom(d.selfie_base64)}
-                          className="text-[11px] text-blue-600 dark:text-cyan-400 hover:underline font-medium block mt-0.5 cursor-pointer"
+                          className="text-[11px] text-blue-600 hover:underline font-medium block mt-0.5"
                         >
                           Inspect full photo
                         </button>
@@ -2671,12 +2640,12 @@ export default function AdminPanel() {
 
                     {/* Actions */}
                     {d.status === "pending" ? (
-                      <div className="flex items-center gap-2 pt-1 border-t border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
                         <button
                           type="button"
                           disabled={processingDisputeId === d.id}
                           onClick={() => handleReviewDispute(d.id, "approve")}
-                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-2xs transition-colors disabled:opacity-50 text-center active:scale-[0.98] cursor-pointer"
+                          className="flex-1 py-2 px-3 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-2xs transition-colors disabled:opacity-50 text-center active:scale-[0.98]"
                         >
                           {processingDisputeId === d.id ? "Processing..." : "Approve & Transfer"}
                         </button>
@@ -2687,7 +2656,7 @@ export default function AdminPanel() {
                             const notes = prompt("Enter rejection reason (optional):") || undefined;
                             handleReviewDispute(d.id, "reject", notes);
                           }}
-                          className="py-2 px-3 text-xs font-semibold rounded-xl border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors disabled:opacity-50 text-center active:scale-[0.98] cursor-pointer"
+                          className="py-2 px-3 text-xs font-semibold rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 transition-colors disabled:opacity-50 text-center active:scale-[0.98]"
                         >
                           ✕ Reject
                         </button>
@@ -2695,25 +2664,25 @@ export default function AdminPanel() {
                           type="button"
                           onClick={() => handleDeleteDispute(d.id)}
                           title="Permanently delete this claim record"
-                          className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-center cursor-pointer"
+                          className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
                         >
                           <IconTrash className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     ) : (
-                      <div className="text-[11px] text-slate-500 dark:text-slate-400 pt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                      <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
                         <span>
                           Reviewed: {d.reviewed_at ? formatDateTime(d.reviewed_at).date : "Done"}
                         </span>
                         <div className="flex items-center gap-2">
                           {d.admin_notes && (
-                            <span className="text-slate-400 dark:text-slate-500 italic">Note: {d.admin_notes}</span>
+                            <span className="text-slate-400 italic">Note: {d.admin_notes}</span>
                           )}
                           <button
                             type="button"
                             onClick={() => handleDeleteDispute(d.id)}
                             title="Permanently delete this claim record"
-                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                           >
                             <IconTrash className="w-3.5 h-3.5" />
                           </button>
@@ -2733,21 +2702,21 @@ export default function AdminPanel() {
       {/* ------------------------------------------------------------- */}
       {activeTab === "missing_usn" && (
         <div className="space-y-4 sm:space-y-6">
-          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <IconBell className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <IconBell className="w-4 h-4 text-slate-700" />
                   <span>Student Update &amp; Scrape Requests</span>
                   {rescrapeRequests.filter((r) => r.status === "pending").length +
                     missingReports.filter((r) => r.status === "pending").length > 0 && (
-                    <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/50">
-                      {rescrapeRequests.filter((r) => r.status === "pending").length +
-                        missingReports.filter((r) => r.status === "pending").length} pending
-                    </span>
-                  )}
+                      <span className="px-2 py-0.5 text-[11px] font-bold rounded-full bg-blue-100 text-blue-700">
+                        {rescrapeRequests.filter((r) => r.status === "pending").length +
+                          missingReports.filter((r) => r.status === "pending").length} pending
+                      </span>
+                    )}
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Review student requests for revaluation results, missing semester marks, and unindexed USNs.
                 </p>
               </div>
@@ -2758,7 +2727,7 @@ export default function AdminPanel() {
                   loadMissingReports();
                   loadRescrapeRequests();
                 }}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
               >
                 <IconRotateCcw className="w-3 h-3" />
                 <span>Refresh</span>
@@ -2766,7 +2735,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Sub-tab Switcher: Revaluation/Re-scrape vs Missing USN Reports */}
-            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
               <button
                 type="button"
                 onClick={() => {
@@ -2774,11 +2743,10 @@ export default function AdminPanel() {
                   setRequestsSubTab("rescrape");
                   loadRescrapeRequests();
                 }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-                  requestsSubTab === "rescrape"
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-white"
-                }`}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${requestsSubTab === "rescrape"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <IconRotateCcw className="w-3 h-3" />
                 <span>Revaluation &amp; Re-scrape</span>
@@ -2796,16 +2764,15 @@ export default function AdminPanel() {
                   setRequestsSubTab("missing");
                   loadMissingReports();
                 }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-                  requestsSubTab === "missing"
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-white"
-                }`}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${requestsSubTab === "missing"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <IconUsers className="w-3 h-3" />
                 <span>Unindexed USN Reports</span>
                 {missingReports.filter((r) => r.status === "pending").length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-600 dark:bg-slate-700 text-white font-mono">
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-600 text-white font-mono">
                     {missingReports.filter((r) => r.status === "pending").length}
                   </span>
                 )}
@@ -2825,11 +2792,10 @@ export default function AdminPanel() {
                         sfx.playClick();
                         setRescrapeFilter(f);
                       }}
-                      className={`py-1 px-2.5 text-[11px] font-semibold rounded-lg capitalize transition-colors ${
-                        rescrapeFilter === f
-                          ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950"
-                          : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                      }`}
+                      className={`py-1 px-2.5 text-[11px] font-semibold rounded-lg capitalize transition-colors ${rescrapeFilter === f
+                        ? "bg-slate-900 text-white"
+                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                        }`}
                     >
                       {f === "in_progress" ? "In Progress" : f} (
                       {f === "all"
@@ -2855,33 +2821,32 @@ export default function AdminPanel() {
                       .map((r) => (
                         <div
                           key={r.id}
-                          className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#0f1117] hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs space-y-3"
+                          className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{r.usn}</span>
+                                <span className="font-mono font-bold text-sm text-slate-900">{r.usn}</span>
                                 {r.branch && (
-                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold uppercase">
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
                                     {r.branch}
                                   </span>
                                 )}
-                                <span className="px-2 py-0.5 rounded-md bg-cyan-50 dark:bg-cyan-950/40 border border-cyan-200 dark:border-cyan-800/60 text-cyan-800 dark:text-cyan-300 text-[10px] font-bold">
+                                <span className="px-2 py-0.5 rounded-md bg-cyan-50 border border-cyan-200 text-cyan-800 text-[10px] font-bold">
                                   Sem {r.target_semester}
                                 </span>
                               </div>
-                              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5">{r.name}</p>
+                              <p className="text-xs font-medium text-slate-700 mt-0.5">{r.name}</p>
                             </div>
                             <span
-                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                                r.status === "pending"
-                                  ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
-                                  : r.status === "in_progress"
-                                  ? "bg-blue-100 dark:bg-blue-950/40 text-blue-800 dark:text-blue-300 border border-blue-200 dark:border-blue-800/60"
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${r.status === "pending"
+                                ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                : r.status === "in_progress"
+                                  ? "bg-blue-100 text-blue-800 border border-blue-200"
                                   : r.status === "resolved"
-                                  ? "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-                                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700"
-                              }`}
+                                    ? "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                                }`}
                             >
                               {r.status === "in_progress" ? "Scraping" : r.status}
                             </span>
@@ -2889,36 +2854,35 @@ export default function AdminPanel() {
 
                           {/* Request Reason & Subject Code */}
                           <div className="flex items-center gap-2 flex-wrap text-xs">
-                            <span className={`font-semibold px-2 py-0.5 rounded ${
-                              r.request_type === "DATA_DELETION"
-                                ? "bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300 border border-rose-300 dark:border-rose-800 font-bold"
-                                : "text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800"
-                            }`}>
+                            <span className={`font-semibold px-2 py-0.5 rounded ${r.request_type === "DATA_DELETION"
+                              ? "bg-rose-100 text-rose-800 border border-rose-300 font-bold"
+                              : "text-slate-800 bg-slate-100"
+                              }`}>
                               {r.request_type === "REVALUATION"
                                 ? "Revaluation Passed"
                                 : r.request_type === "MISSING_SEMESTER"
-                                ? "Missing Semester"
-                                : r.request_type === "RE_EXAM"
-                                ? "Makeup Exam"
-                                : r.request_type === "DATA_DELETION"
-                                ? "Deletion Request"
-                                : "Update Request"}
+                                  ? "Missing Semester"
+                                  : r.request_type === "RE_EXAM"
+                                    ? "Makeup Exam"
+                                    : r.request_type === "DATA_DELETION"
+                                      ? "Deletion Request"
+                                      : "Update Request"}
                             </span>
                             {r.subject_codes && (
-                              <span className="font-mono text-slate-600 dark:text-slate-400 text-[11px]">
-                                Subjects: <strong className="text-slate-900 dark:text-white">{r.subject_codes}</strong>
+                              <span className="font-mono text-slate-600 text-[11px]">
+                                Subjects: <strong>{r.subject_codes}</strong>
                               </span>
                             )}
                           </div>
 
                           {/* VTU Link / Custom URL if provided */}
                           {(r.vtu_link || r.custom_url) && (
-                            <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-900/60 border border-slate-200/90 dark:border-slate-800 space-y-2 text-xs">
+                            <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2 text-xs">
                               <div>
-                                <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block mb-1">
+                                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
                                   Student Provided VTU Result Link:
                                 </span>
-                                <span className="text-[11px] font-mono text-slate-800 dark:text-slate-200 break-all select-all block bg-white dark:bg-slate-950 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 font-medium">
+                                <span className="text-[11px] font-mono text-slate-800 break-all select-all block bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 font-medium">
                                   {r.vtu_link || r.custom_url}
                                 </span>
                               </div>
@@ -2936,7 +2900,7 @@ export default function AdminPanel() {
                                   type="button"
                                   onClick={() => handlePrefillSemesterForm(r)}
                                   title="Open in Add Semester Link form pre-filled with this link & context title"
-                                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 dark:text-slate-200 bg-white dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-300 dark:border-slate-700 px-2.5 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 border border-slate-300 px-2.5 py-1.5 rounded-xl shadow-xs transition-colors cursor-pointer"
                                 >
                                   <span>Pre-fill in Semesters Form ↗</span>
                                 </button>
@@ -2944,7 +2908,7 @@ export default function AdminPanel() {
                                   href={r.vtu_link || r.custom_url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 dark:text-cyan-400 hover:text-blue-800 dark:hover:text-cyan-300 px-2.5 py-1.5 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl shadow-xs hover:bg-blue-50 dark:hover:bg-slate-700 transition-colors"
+                                  className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600 hover:text-blue-800 px-2.5 py-1.5 bg-white border border-slate-300 rounded-xl shadow-xs hover:bg-blue-50 transition-colors"
                                 >
                                   <span>Open Link</span>
                                   <IconExternalLink className="w-3 h-3" />
@@ -2955,20 +2919,20 @@ export default function AdminPanel() {
 
                           {/* Student Note */}
                           {r.message && (
-                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
-                              <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
+                              <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
                                 Student Message:
                               </p>
                               <p className="italic">&ldquo;{r.message}&rdquo;</p>
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
                             <span>
                               {formatDateTime(r.created_at).time} • {formatDateTime(r.created_at).date}
                             </span>
                             {r.ip_address && (
-                              <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-slate-400">
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
                                 IP: {r.ip_address}
                               </span>
                             )}
@@ -2976,7 +2940,7 @@ export default function AdminPanel() {
 
                           {/* Action Buttons */}
                           {r.status === "pending" || r.status === "in_progress" ? (
-                            <div className="pt-2 border-t border-slate-100 dark:border-slate-800/80 space-y-2">
+                            <div className="pt-2 border-t border-slate-100 space-y-2">
                               {r.request_type === "DATA_DELETION" ? (
                                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                                   <button
@@ -2993,7 +2957,7 @@ export default function AdminPanel() {
                                     type="button"
                                     disabled={actionLoadingId === r.id}
                                     onClick={() => handleRescrapeAction(r.id, "reject", "Ignored by admin")}
-                                    className="min-h-[40px] py-2.5 px-3 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-center cursor-pointer"
+                                    className="min-h-[40px] py-2.5 px-3 text-xs font-medium rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors text-center cursor-pointer"
                                     title="Ignore deletion request"
                                   >
                                     ✕ Ignore
@@ -3019,7 +2983,7 @@ export default function AdminPanel() {
                                           type="button"
                                           onClick={() => handlePrefillCrowdsourceForm(r)}
                                           title="Open and inspect in Crowdsourced Gate form pre-filled with link and Force Update ON"
-                                          className="min-h-[42px] py-2.5 px-3 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-center cursor-pointer"
+                                          className="min-h-[42px] py-2.5 px-3 text-xs font-semibold rounded-xl border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 transition-colors text-center cursor-pointer"
                                         >
                                           Configure in Gate ↗
                                         </button>
@@ -3030,7 +2994,7 @@ export default function AdminPanel() {
                                           type="button"
                                           disabled={actionLoadingId === r.id}
                                           onClick={() => handleRescrapeAction(r.id, "scrape_now")}
-                                          className="flex-1 min-h-[38px] py-2 px-3 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                                          className="flex-1 min-h-[38px] py-2 px-3 text-xs font-semibold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                                         >
                                           <span>Scrape Now (Manual)</span>
                                         </button>
@@ -3039,7 +3003,7 @@ export default function AdminPanel() {
                                           type="button"
                                           disabled={actionLoadingId === r.id}
                                           onClick={() => handleRescrapeAction(r.id, "resolve")}
-                                          className="min-h-[38px] py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors text-center cursor-pointer"
+                                          className="min-h-[38px] py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
                                         >
                                           ✓ Done
                                         </button>
@@ -3048,7 +3012,7 @@ export default function AdminPanel() {
                                           type="button"
                                           disabled={actionLoadingId === r.id}
                                           onClick={() => handleRescrapeAction(r.id, "reject")}
-                                          className="min-h-[38px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-center cursor-pointer"
+                                          className="min-h-[38px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
                                           title="Dismiss / Reject request"
                                         >
                                           ✕
@@ -3058,7 +3022,7 @@ export default function AdminPanel() {
                                           type="button"
                                           onClick={() => handleDeleteRescrapeRequest(r.id)}
                                           title="Permanently delete this request record"
-                                          className="min-h-[38px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-center cursor-pointer"
+                                          className="min-h-[38px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
                                         >
                                           <IconTrash className="w-3.5 h-3.5" />
                                         </button>
@@ -3067,7 +3031,7 @@ export default function AdminPanel() {
                                   ) : (
                                     /* No link provided by student: clear indicator + manual scrape option */
                                     <div className="space-y-2">
-                                      <div className="p-2 rounded-xl bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200/60 dark:border-amber-800/50 text-[11px] text-amber-900 dark:text-amber-200 flex items-center gap-1.5">
+                                      <div className="p-2 rounded-xl bg-amber-50/70 border border-amber-200/60 text-[11px] text-amber-900 flex items-center gap-1.5">
                                         <span className="font-bold">ℹ️ No custom link:</span>
                                         <span>Manual admin scrape or enter link in Gate</span>
                                       </div>
@@ -3077,7 +3041,7 @@ export default function AdminPanel() {
                                           type="button"
                                           disabled={actionLoadingId === r.id}
                                           onClick={() => handleRescrapeAction(r.id, "scrape_now")}
-                                          className="flex-1 min-h-[42px] py-2.5 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                                          className="flex-1 min-h-[42px] py-2.5 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                                         >
                                           <IconBolt className="w-3.5 h-3.5" />
                                           <span>{actionLoadingId === r.id ? "Launching..." : "Scrape Now (Manual)"}</span>
@@ -3087,7 +3051,7 @@ export default function AdminPanel() {
                                           type="button"
                                           onClick={() => handlePrefillCrowdsourceForm(r)}
                                           title="Pre-fill USN and semester into Gate form to add custom link"
-                                          className="min-h-[42px] py-2.5 px-3 text-xs font-semibold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-center cursor-pointer"
+                                          className="min-h-[42px] py-2.5 px-3 text-xs font-semibold rounded-xl border border-slate-300 bg-white text-slate-800 hover:bg-slate-50 transition-colors text-center cursor-pointer"
                                         >
                                           + Add Link & Queue
                                         </button>
@@ -3097,7 +3061,7 @@ export default function AdminPanel() {
                                             type="button"
                                             disabled={actionLoadingId === r.id}
                                             onClick={() => handleRescrapeAction(r.id, "resolve")}
-                                            className="min-h-[42px] py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors text-center cursor-pointer"
+                                            className="min-h-[42px] py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
                                           >
                                             ✓ Done
                                           </button>
@@ -3106,7 +3070,7 @@ export default function AdminPanel() {
                                             type="button"
                                             disabled={actionLoadingId === r.id}
                                             onClick={() => handleRescrapeAction(r.id, "reject")}
-                                            className="min-h-[42px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-center cursor-pointer"
+                                            className="min-h-[42px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-500 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
                                             title="Dismiss / Reject request"
                                           >
                                             ✕
@@ -3116,7 +3080,7 @@ export default function AdminPanel() {
                                             type="button"
                                             onClick={() => handleDeleteRescrapeRequest(r.id)}
                                             title="Permanently delete this request record"
-                                            className="min-h-[42px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-center cursor-pointer"
+                                            className="min-h-[42px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
                                           >
                                             <IconTrash className="w-3.5 h-3.5" />
                                           </button>
@@ -3128,15 +3092,15 @@ export default function AdminPanel() {
                               )}
                             </div>
                           ) : (
-                            <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium pt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
-                              <span className={r.status === "resolved" ? "text-emerald-600 dark:text-emerald-400 font-semibold" : "text-slate-400"}>
+                            <div className="text-[11px] text-slate-500 font-medium pt-1 border-t border-slate-100 flex items-center justify-between">
+                              <span className={r.status === "resolved" ? "text-emerald-600 font-semibold" : "text-slate-400"}>
                                 {r.status === "resolved"
                                   ? (r.request_type === "DATA_DELETION" ? "✓ Hidden" : "✓ Resolved")
                                   : (r.request_type === "DATA_DELETION" ? "✕ Ignored" : "✕ Rejected")}
                               </span>
                               <div className="flex items-center gap-2">
                                 {r.resolved_at && (
-                                  <span className="font-mono text-[10px] text-slate-400 dark:text-slate-500">
+                                  <span className="font-mono text-[10px] text-slate-400">
                                     {formatDateTime(r.resolved_at).date}
                                   </span>
                                 )}
@@ -3144,7 +3108,7 @@ export default function AdminPanel() {
                                   type="button"
                                   onClick={() => handleDeleteRescrapeRequest(r.id)}
                                   title="Permanently delete this request record"
-                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                                 >
                                   <IconTrash className="w-3.5 h-3.5" />
                                 </button>
@@ -3162,18 +3126,17 @@ export default function AdminPanel() {
             {requestsSubTab === "missing" && (
               <div className="space-y-4">
                 {/* Filter buttons */}
-                <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+                <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
                   <button
                     type="button"
                     onClick={() => {
                       sfx.playClick();
                       setMissingFilter("pending");
                     }}
-                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                      missingFilter === "pending"
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${missingFilter === "pending"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:bg-slate-100"
+                      }`}
                   >
                     Pending ({missingReports.filter((r) => r.status === "pending").length})
                   </button>
@@ -3183,11 +3146,10 @@ export default function AdminPanel() {
                       sfx.playClick();
                       setMissingFilter("resolved");
                     }}
-                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                      missingFilter === "resolved"
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${missingFilter === "resolved"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:bg-slate-100"
+                      }`}
                   >
                     Resolved ({missingReports.filter((r) => r.status === "resolved").length})
                   </button>
@@ -3197,11 +3159,10 @@ export default function AdminPanel() {
                       sfx.playClick();
                       setMissingFilter("all");
                     }}
-                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                      missingFilter === "all"
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                        : "text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
-                    }`}
+                    className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${missingFilter === "all"
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "text-slate-600 hover:bg-slate-100"
+                      }`}
                   >
                     All ({missingReports.length})
                   </button>
@@ -3223,46 +3184,45 @@ export default function AdminPanel() {
                       .map((r) => (
                         <div
                           key={r.id}
-                          className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-white dark:bg-[#0f1117] hover:border-slate-300 dark:hover:border-slate-700 transition-all shadow-xs space-y-3"
+                          className="p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 bg-white hover:border-slate-300 transition-all shadow-xs space-y-3"
                         >
                           <div className="flex items-start justify-between gap-2">
                             <div>
                               <div className="flex items-center gap-2">
-                                <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">{r.usn}</span>
+                                <span className="font-mono font-bold text-sm text-slate-900">{r.usn}</span>
                                 {r.branch && (
-                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 text-[10px] font-bold uppercase">
+                                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10px] font-bold uppercase">
                                     {r.branch}
                                   </span>
                                 )}
                               </div>
-                              <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mt-0.5">{r.name}</p>
+                              <p className="text-xs font-medium text-slate-700 mt-0.5">{r.name}</p>
                             </div>
                             <span
-                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${
-                                r.status === "pending"
-                                  ? "bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
-                                  : "bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-                              }`}
+                              className={`px-2 py-0.5 text-[10px] font-bold rounded-full uppercase tracking-wider ${r.status === "pending"
+                                ? "bg-amber-100 text-amber-800 border border-amber-200"
+                                : "bg-emerald-100 text-emerald-800 border border-emerald-200"
+                                }`}
                             >
                               {r.status}
                             </span>
                           </div>
 
                           {r.message && (
-                            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300">
-                              <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">
+                            <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-100 text-xs text-slate-600">
+                              <p className="font-bold text-[10px] uppercase tracking-wider text-slate-400 mb-0.5">
                                 Student Note:
                               </p>
                               <p className="italic">&ldquo;{r.message}&rdquo;</p>
                             </div>
                           )}
 
-                          <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 font-mono">
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono">
                             <span>
                               {formatDateTime(r.reported_at).time} • {formatDateTime(r.reported_at).date}
                             </span>
                             {r.ip_address && (
-                              <span className="bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-[10px] text-slate-600 dark:text-slate-400">
+                              <span className="bg-slate-100 px-1.5 py-0.5 rounded text-[10px] text-slate-600">
                                 IP: {r.ip_address}
                               </span>
                             )}
@@ -3270,11 +3230,11 @@ export default function AdminPanel() {
 
                           {/* Action buttons */}
                           {r.status === "pending" ? (
-                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                            <div className="flex items-center gap-2 pt-2 border-t border-slate-100">
                               <button
                                 type="button"
                                 onClick={() => handleScrapeMissingReport(r.usn)}
-                                className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                                className="flex-1 py-2 px-3 text-xs font-bold rounded-xl bg-slate-900 hover:bg-slate-800 text-white shadow-xs transition-colors text-center flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
                               >
                                 <IconBolt className="w-3.5 h-3.5" />
                                 <span>Scrape Now</span>
@@ -3282,7 +3242,7 @@ export default function AdminPanel() {
                               <button
                                 type="button"
                                 onClick={() => handleResolveMissingReport(r.id)}
-                                className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/60 transition-colors text-center cursor-pointer"
+                                className="py-2 px-3 text-xs font-bold rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors text-center cursor-pointer"
                               >
                                 ✓ Mark Done
                               </button>
@@ -3290,13 +3250,13 @@ export default function AdminPanel() {
                                 type="button"
                                 onClick={() => handleDeleteMissingReport(r.id)}
                                 title="Delete missing report"
-                                className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 dark:border-slate-800 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors text-center cursor-pointer"
+                                className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
                               >
                                 <IconTrash className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           ) : (
-                            <div className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold pt-1 border-t border-slate-100 dark:border-slate-800/80 flex items-center justify-between">
+                            <div className="text-[11px] text-emerald-600 font-semibold pt-1 border-t border-slate-100 flex items-center justify-between">
                               <div className="flex items-center gap-1">
                                 <span>✓</span>
                                 <span>Resolved</span>
@@ -3305,7 +3265,7 @@ export default function AdminPanel() {
                                 type="button"
                                 onClick={() => handleDeleteMissingReport(r.id)}
                                 title="Delete missing report"
-                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
                               >
                                 <IconTrash className="w-3.5 h-3.5" />
                               </button>
@@ -3326,14 +3286,14 @@ export default function AdminPanel() {
       {/* ------------------------------------------------------------- */}
       {activeTab === "audit" && (
         <div className="space-y-4 sm:space-y-6">
-          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                  <IconRotateCcw className="w-4 h-4 text-slate-700 dark:text-slate-300" />
+                <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
+                  <IconRotateCcw className="w-4 h-4 text-slate-700" />
                   <span>Semester Coverage Audit</span>
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   Real-time detection of Sem 1 vs Sem 2 coverage. Instantly identify missing semester marks and trigger scrapes.
                 </p>
               </div>
@@ -3344,9 +3304,9 @@ export default function AdminPanel() {
                   onClick={handleRecalculateTotals}
                   disabled={recalculatingTotals}
                   title="Recalculate and combine multi-semester totals and deduplicate backlogs for all students from database marks without re-scraping VTU"
-                  className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/40 hover:bg-blue-100 dark:hover:bg-blue-900/60 border border-blue-200/80 dark:border-blue-800/60 text-blue-700 dark:text-blue-300 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-700 text-xs font-semibold rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
                 >
-                  <IconBolt className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  <IconBolt className="w-3.5 h-3.5 text-blue-600" />
                   <span>{recalculatingTotals ? "Recalculating..." : "⚡ Sync / Recalculate Totals"}</span>
                 </button>
 
@@ -3356,7 +3316,7 @@ export default function AdminPanel() {
                     sfx.playClick();
                     loadSemesterAudit();
                   }}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <IconRotateCcw className="w-3 h-3" />
                   <span>Refresh Audit</span>
@@ -3366,36 +3326,36 @@ export default function AdminPanel() {
 
             {/* Summary Metric Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
-              <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
-                <p className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Total Students</p>
-                <p className="text-xl sm:text-2xl font-black font-mono text-slate-900 dark:text-white mt-1">
+              <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Total Students</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-slate-900 mt-1">
                   {semesterAudit?.total_students || 0}
                 </p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Registered in database</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Registered in database</p>
               </div>
 
-              <div className="p-3 sm:p-4 rounded-2xl border border-emerald-200 dark:border-emerald-800/60 bg-emerald-50/40 dark:bg-emerald-950/20">
-                <p className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 tracking-wider">Both Sems (1 &amp; 2)</p>
-                <p className="text-xl sm:text-2xl font-black font-mono text-emerald-800 dark:text-emerald-300 mt-1">
+              <div className="p-3 sm:p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40">
+                <p className="text-[10px] uppercase font-bold text-emerald-700 tracking-wider">Both Sems (1 &amp; 2)</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-emerald-800 mt-1">
                   {semesterAudit?.complete_both_sems || 0}
                 </p>
-                <p className="text-[10px] text-emerald-600 dark:text-emerald-500 mt-0.5">Complete records</p>
+                <p className="text-[10px] text-emerald-600 mt-0.5">Complete records</p>
               </div>
 
-              <div className="p-3 sm:p-4 rounded-2xl border border-amber-200 dark:border-amber-800/60 bg-amber-50/50 dark:bg-amber-950/20">
-                <p className="text-[10px] uppercase font-bold text-amber-800 dark:text-amber-400 tracking-wider">Missing Sem 2</p>
-                <p className="text-xl sm:text-2xl font-black font-mono text-amber-900 dark:text-amber-300 mt-1">
+              <div className="p-3 sm:p-4 rounded-2xl border border-amber-200 bg-amber-50/50">
+                <p className="text-[10px] uppercase font-bold text-amber-800 tracking-wider">Missing Sem 2</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-amber-900 mt-1">
                   {semesterAudit?.missing_sem2 || 0}
                 </p>
-                <p className="text-[10px] text-amber-700 dark:text-amber-500 mt-0.5">Sem 1 scraped only</p>
+                <p className="text-[10px] text-amber-700 mt-0.5">Sem 1 scraped only</p>
               </div>
 
-              <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40">
-                <p className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400 tracking-wider">Missing Sem 1</p>
-                <p className="text-xl sm:text-2xl font-black font-mono text-slate-800 dark:text-slate-200 mt-1">
+              <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60">
+                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Missing Sem 1</p>
+                <p className="text-xl sm:text-2xl font-black font-mono text-slate-800 mt-1">
                   {semesterAudit?.missing_sem1 || 0}
                 </p>
-                <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Sem 2 scraped only</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">Sem 2 scraped only</p>
               </div>
             </div>
 
@@ -3415,11 +3375,10 @@ export default function AdminPanel() {
                       sfx.playClick();
                       setSemesterAuditFilter(tab.id as "all" | "missing_sem2" | "missing_sem1" | "complete");
                     }}
-                    className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${
-                      semesterAuditFilter === tab.id
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white"
-                    }`}
+                    className={`py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${semesterAuditFilter === tab.id
+                      ? "bg-slate-900 text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                      }`}
                   >
                     <span>{tab.label}</span>
                     <span className="ml-1.5 font-mono text-[10px] opacity-75">({tab.count})</span>
@@ -3433,7 +3392,7 @@ export default function AdminPanel() {
                   value={semesterAuditSearch}
                   onChange={(e) => setSemesterAuditSearch(e.target.value)}
                   placeholder="Search USN, name, or branch..."
-                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500"
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 text-xs focus:outline-none focus:ring-2 focus:ring-slate-900"
                 />
                 <span className="absolute left-2.5 top-2 text-slate-400">
                   <IconSearch className="w-3.5 h-3.5" />
@@ -3447,7 +3406,7 @@ export default function AdminPanel() {
             ) : !semesterAudit || semesterAudit.students.length === 0 ? (
               <div className="py-12 text-center text-xs text-slate-400">No student records to audit.</div>
             ) : (
-              <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 max-h-[550px] overflow-y-auto">
+              <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-[550px] overflow-y-auto">
                 {semesterAudit.students
                   .filter((s) => {
                     if (semesterAuditFilter === "missing_sem2") return !s.has_sem2;
@@ -3463,7 +3422,7 @@ export default function AdminPanel() {
                   .map((s) => (
                     <div
                       key={s.usn}
-                      className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 dark:hover:bg-slate-900/40 transition-colors"
+                      className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-50/70 transition-colors"
                     >
                       <div className="flex items-center gap-3 min-w-0 flex-1">
                         <Identicon
@@ -3474,32 +3433,30 @@ export default function AdminPanel() {
                         />
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate">{s.name}</span>
-                            <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 uppercase">
+                            <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{s.name}</span>
+                            <span className="text-[10px] font-bold text-slate-500 px-1.5 py-0.5 rounded bg-slate-100 uppercase">
                               {s.branch}
                             </span>
                           </div>
                           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                            <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{s.usn}</span>
+                            <span className="font-mono text-xs text-slate-400">{s.usn}</span>
 
                             {/* Semester Status Indicators */}
                             <span
-                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
-                                s.has_sem1
-                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-                                  : "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800/60"
-                              }`}
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${s.has_sem1
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-rose-50 text-rose-700 border border-rose-200"
+                                }`}
                             >
                               <span>{s.has_sem1 ? "✓" : "✕"}</span>
                               <span>Sem 1</span>
                             </span>
 
                             <span
-                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${
-                                s.has_sem2
-                                  ? "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/60"
-                                  : "bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300 border border-amber-200 dark:border-amber-800/60"
-                              }`}
+                              className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-md flex items-center gap-1 ${s.has_sem2
+                                ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                : "bg-amber-50 text-amber-800 border border-amber-200"
+                                }`}
                             >
                               <span>{s.has_sem2 ? "✓" : "✕"}</span>
                               <span>Sem 2 {s.has_sem2 ? "" : "(Missing)"}</span>
@@ -3508,15 +3465,15 @@ export default function AdminPanel() {
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80">
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                         <div className="text-left sm:text-right font-mono text-xs">
-                          <span className="font-bold text-slate-900 dark:text-white">{s.percentage.toFixed(1)}%</span>
-                          <span className="text-[11px] text-slate-400 dark:text-slate-500 ml-1">({s.total_marks} pts)</span>
+                          <span className="font-bold text-slate-900">{s.percentage.toFixed(1)}%</span>
+                          <span className="text-[11px] text-slate-400 ml-1">({s.total_marks} pts)</span>
                           <div className="text-[10px] mt-0.5">
                             {s.total_backlogs > 0 ? (
-                              <span className="text-rose-600 dark:text-rose-400 font-bold">{s.total_backlogs} BL</span>
+                              <span className="text-rose-600 font-bold">{s.total_backlogs} BL</span>
                             ) : (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">0 Backlogs</span>
+                              <span className="text-emerald-600 font-medium">0 Backlogs</span>
                             )}
                           </div>
                         </div>
@@ -3541,7 +3498,7 @@ export default function AdminPanel() {
                             <span>Scrape Sem 1</span>
                           </button>
                         ) : (
-                          <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/60 px-3 py-1.5 rounded-xl flex items-center gap-1">
+                          <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1">
                             <IconCheck className="w-3.5 h-3.5" />
                             <span>Both Complete</span>
                           </span>
@@ -3560,13 +3517,13 @@ export default function AdminPanel() {
       {/* ------------------------------------------------------------- */}
       {activeTab === "logs" && (
         <div className="space-y-4 sm:space-y-6">
-          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900 dark:text-white">
+                <h2 className="text-base font-bold text-slate-900">
                   {logsSubTab === "logins" ? "📋 Student Login Audit Logs" : "🔍 Student Comparison Tracker"}
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-slate-400">
+                <p className="text-xs text-slate-500">
                   {logsSubTab === "logins"
                     ? "Real-time record of students who logged in, how many times, with timestamps and network IPs."
                     : "Real-time record of which students compared themselves or their peers to whom."}
@@ -3579,7 +3536,7 @@ export default function AdminPanel() {
                   if (logsSubTab === "logins") loadLoginLogs();
                   else loadComparisonLogs();
                 }}
-                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
+                className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5"
               >
                 <IconRotateCcw className="w-3 h-3" />
                 <span>Refresh</span>
@@ -3587,7 +3544,7 @@ export default function AdminPanel() {
             </div>
 
             {/* Sub-tab switcher: Logins vs Comparisons */}
-            <div className="flex items-center gap-2 border-b border-slate-100 dark:border-slate-800/80 pb-2">
+            <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
               <button
                 type="button"
                 onClick={() => {
@@ -3595,11 +3552,10 @@ export default function AdminPanel() {
                   setLogsSubTab("logins");
                   loadLoginLogs();
                 }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${
-                  logsSubTab === "logins"
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-white"
-                }`}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all ${logsSubTab === "logins"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 📋 Student Logins ({loginLogsData?.total_logins || 0})
               </button>
@@ -3611,15 +3567,14 @@ export default function AdminPanel() {
                   setLogsSubTab("comparisons");
                   loadComparisonLogs();
                 }}
-                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${
-                  logsSubTab === "comparisons"
-                    ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-xs"
-                    : "bg-slate-100 text-slate-600 hover:text-slate-900 dark:bg-slate-800/60 dark:text-slate-400 dark:hover:text-white"
-                }`}
+                className={`py-1.5 px-3 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 ${logsSubTab === "comparisons"
+                  ? "bg-slate-900 text-white shadow-xs"
+                  : "bg-slate-100 text-slate-600 hover:text-slate-900"
+                  }`}
               >
                 <span>🔍 Who Compared Whom</span>
                 {comparisonLogsData && (
-                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-700 dark:bg-slate-600 text-white font-mono">
+                  <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-700 text-white font-mono">
                     {comparisonLogsData.total_comparisons}
                   </span>
                 )}
@@ -3630,23 +3585,23 @@ export default function AdminPanel() {
               compareLogsLoading ? (
                 <div className="text-center py-12 text-xs text-slate-400">Loading student comparison tracker...</div>
               ) : compareLogsError ? (
-                <div className="text-center py-10 border border-rose-200 dark:border-rose-900/60 bg-rose-50/50 dark:bg-rose-950/30 rounded-2xl p-4">
+                <div className="text-center py-10 border border-rose-200 bg-rose-50/50 rounded-2xl p-4">
                   <span className="text-2xl">⚠️</span>
-                  <p className="font-bold text-xs text-rose-700 dark:text-rose-400 mt-2">Error loading comparison logs</p>
-                  <p className="text-[11px] text-rose-500 dark:text-rose-400/80 mt-0.5">{compareLogsError}</p>
+                  <p className="font-bold text-xs text-rose-700 mt-2">Error loading comparison logs</p>
+                  <p className="text-[11px] text-rose-500 mt-0.5">{compareLogsError}</p>
                   <button
                     type="button"
                     onClick={() => loadComparisonLogs()}
-                    className="mt-3 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                    className="mt-3 px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold"
                   >
                     Retry
                   </button>
                 </div>
               ) : !comparisonLogsData || comparisonLogsData.recent_logs.length === 0 ? (
-                <div className="text-center py-12 border border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+                <div className="text-center py-12 border border-dashed border-slate-200 rounded-2xl">
                   <span className="text-2xl">🔍</span>
-                  <p className="font-bold text-xs text-slate-700 dark:text-slate-300 mt-2">No comparisons recorded yet</p>
-                  <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                  <p className="font-bold text-xs text-slate-700 mt-2">No comparisons recorded yet</p>
+                  <p className="text-[11px] text-slate-400">
                     Whenever students compare themselves or peers, the exact who-compared-whom record appears here for the admin.
                   </p>
                 </div>
@@ -3654,29 +3609,29 @@ export default function AdminPanel() {
                 <>
                   {/* Metrics Cards */}
                   <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-center sm:text-left">
-                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block truncate">
+                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                         Comparisons
                       </span>
-                      <p className="text-lg sm:text-2xl font-black font-mono text-slate-900 dark:text-white mt-0.5 sm:mt-1">
+                      <p className="text-lg sm:text-2xl font-black font-mono text-slate-900 mt-0.5 sm:mt-1">
                         {comparisonLogsData.total_comparisons}
                       </p>
                     </div>
-                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-center sm:text-left">
-                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block truncate">
+                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                         Most Compared Peer
                       </span>
-                      <p className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate">
+                      <p className="text-xs sm:text-sm font-bold text-emerald-600 mt-1 truncate">
                         {comparisonLogsData.top_targets[0]
                           ? `${comparisonLogsData.top_targets[0].name.split(" ")[0]} (${comparisonLogsData.top_targets[0].count}x)`
                           : "None"}
                       </p>
                     </div>
-                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-center sm:text-left">
-                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block truncate">
+                    <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                      <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                         Active Viewer
                       </span>
-                      <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-1 truncate">
+                      <p className="text-xs sm:text-sm font-bold text-slate-900 mt-1 truncate">
                         {comparisonLogsData.active_viewers[0]
                           ? `${comparisonLogsData.active_viewers[0].name || comparisonLogsData.active_viewers[0].usn}`
                           : "Anonymous"}
@@ -3687,21 +3642,21 @@ export default function AdminPanel() {
                   {/* Top Targeted Students Leaderboard */}
                   {comparisonLogsData.top_targets.length > 0 && (
                     <div className="space-y-2.5">
-                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                      <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
                         Most Compared-Against Students (Peers Being Checked)
                       </h3>
-                      <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 max-h-48 overflow-y-auto">
+                      <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-48 overflow-y-auto">
                         {comparisonLogsData.top_targets.map((target) => (
                           <div
                             key={target.usn}
-                            className="p-2.5 sm:p-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-slate-900/40"
+                            className="p-2.5 sm:p-3 flex items-center justify-between text-xs hover:bg-slate-50/50"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="font-mono font-bold text-slate-900 dark:text-white shrink-0">{target.usn}</span>
-                              <span className="text-slate-700 dark:text-slate-300 truncate">{target.name}</span>
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase shrink-0">({target.branch})</span>
+                              <span className="font-mono font-bold text-slate-900 shrink-0">{target.usn}</span>
+                              <span className="text-slate-700 truncate">{target.name}</span>
+                              <span className="text-[10px] text-slate-400 uppercase shrink-0">({target.branch})</span>
                             </div>
-                            <span className="px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-950/50 text-blue-800 dark:text-blue-300 text-[10px] font-bold shrink-0 border border-blue-200/50 dark:border-blue-800/50">
+                            <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-bold shrink-0">
                               {target.count} peer compares
                             </span>
                           </div>
@@ -3712,46 +3667,46 @@ export default function AdminPanel() {
 
                   {/* Real-time Who Compared Whom Live Stream */}
                   <div className="space-y-2.5">
-                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                    <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
                       Live Stream: Who Compared Themselves To Whom
                     </h3>
-                    <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 max-h-80 overflow-y-auto">
+                    <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-80 overflow-y-auto">
                       {comparisonLogsData.recent_logs.map((log) => (
                         <div
                           key={log.id}
-                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs hover:bg-slate-50/50 dark:hover:bg-slate-900/40"
+                          className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs hover:bg-slate-50/50"
                         >
                           <div className="space-y-1.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="font-medium text-slate-500 dark:text-slate-400">Student:</span>
-                              <span className="font-semibold text-slate-900 dark:text-white px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 font-mono text-[11px]">
+                              <span className="font-medium text-slate-500">Student:</span>
+                              <span className="font-semibold text-slate-900 px-2 py-0.5 rounded-md bg-slate-100 border border-slate-200 font-mono text-[11px]">
                                 {log.viewer_name ? `${log.viewer_name} (${log.viewer_usn})` : log.viewer_usn}
                               </span>
-                              <span className="text-slate-400 dark:text-slate-500 font-medium text-[11px]">compared</span>
+                              <span className="text-slate-400 font-medium text-[11px]">compared</span>
                             </div>
-                            <div className="flex items-center gap-2 text-slate-800 dark:text-slate-200 flex-wrap text-xs">
-                              <span className="font-semibold text-slate-900 dark:text-white bg-slate-100/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 font-mono">
+                            <div className="flex items-center gap-2 text-slate-800 flex-wrap text-xs">
+                              <span className="font-semibold text-slate-900 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60 font-mono">
                                 {log.student1_name ? `${log.student1_name} (${log.student1_usn})` : log.student1_usn}
                               </span>
-                              <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-widest px-0.5">
+                              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest px-0.5">
                                 vs
                               </span>
-                              <span className="font-semibold text-slate-900 dark:text-white bg-slate-100/80 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200/60 dark:border-slate-700/60 font-mono">
+                              <span className="font-semibold text-slate-900 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60 font-mono">
                                 {log.student2_name ? `${log.student2_name} (${log.student2_usn})` : log.student2_usn}
                               </span>
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between sm:justify-end gap-2.5 text-[11px] text-slate-500 dark:text-slate-400 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80 shrink-0">
+                          <div className="flex items-center justify-between sm:justify-end gap-2.5 text-[11px] text-slate-500 pt-1.5 sm:pt-0 border-t sm:border-t-0 border-slate-100 shrink-0">
                             {log.compared_at && (
-                              <div className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums bg-slate-50 dark:bg-slate-900 px-2.5 py-1 rounded-lg border border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-300">
+                              <div className="flex items-center gap-1.5 font-mono text-[11px] tabular-nums bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200 text-slate-600">
                                 <span>{formatDateTime(log.compared_at).date}</span>
-                                <span className="text-slate-300 dark:text-slate-600">·</span>
+                                <span className="text-slate-300">·</span>
                                 <span>{formatDateTime(log.compared_at).time}</span>
                               </div>
                             )}
                             {log.ip_address && (
-                              <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded text-slate-500 dark:text-slate-400 hidden sm:inline-block">
+                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-500 hidden sm:inline-block">
                                 IP: {log.ip_address}
                               </span>
                             )}
@@ -3759,7 +3714,7 @@ export default function AdminPanel() {
                               type="button"
                               onClick={() => handleDeleteCompareLog(log.id)}
                               title="Delete this comparison log entry"
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-transparent hover:border-rose-200 dark:hover:border-rose-800 transition-colors cursor-pointer"
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
                             >
                               <IconTrash className="w-3.5 h-3.5" />
                             </button>
@@ -3778,27 +3733,27 @@ export default function AdminPanel() {
               <>
                 {/* Metrics Cards: 3 columns on all screen sizes */}
                 <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-center sm:text-left">
-                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block truncate">
+                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                       Total Logins
                     </span>
-                    <p className="text-lg sm:text-2xl font-black font-mono text-slate-900 dark:text-white mt-0.5 sm:mt-1">
+                    <p className="text-lg sm:text-2xl font-black font-mono text-slate-900 mt-0.5 sm:mt-1">
                       {loginLogsData.total_logins}
                     </p>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-center sm:text-left">
-                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block truncate">
+                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                       Unique Students
                     </span>
-                    <p className="text-lg sm:text-2xl font-black font-mono text-emerald-600 dark:text-emerald-400 mt-0.5 sm:mt-1">
+                    <p className="text-lg sm:text-2xl font-black font-mono text-emerald-600 mt-0.5 sm:mt-1">
                       {loginLogsData.unique_students}
                     </p>
                   </div>
-                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/60 dark:bg-slate-900/40 text-center sm:text-left">
-                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block truncate">
+                  <div className="p-3 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/60 text-center sm:text-left">
+                    <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 block truncate">
                       Top User
                     </span>
-                    <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-1 truncate">
+                    <p className="text-xs sm:text-sm font-bold text-slate-900 mt-1 truncate">
                       {loginLogsData.frequency[0]
                         ? `${loginLogsData.frequency[0].name.split(" ")[0]} (${loginLogsData.frequency[0].login_count}x)`
                         : "None"}
@@ -3808,29 +3763,29 @@ export default function AdminPanel() {
 
                 {/* Most Active Frequency Table */}
                 <div className="space-y-2.5">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
                     Student Login Frequency
                   </h3>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 max-h-60 overflow-y-auto">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-60 overflow-y-auto">
                     {loginLogsData.frequency.length === 0 ? (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 p-4 text-center">No student logins recorded yet.</p>
+                      <p className="text-xs text-slate-400 p-4 text-center">No student logins recorded yet.</p>
                     ) : (
                       loginLogsData.frequency.map((item) => (
                         <div
                           key={item.usn}
-                          className="p-2.5 sm:p-3 flex items-center justify-between text-xs hover:bg-slate-50/50 dark:hover:bg-slate-900/40"
+                          className="p-2.5 sm:p-3 flex items-center justify-between text-xs hover:bg-slate-50/50"
                         >
                           <div className="flex items-center gap-1.5 min-w-0 flex-1 mr-2">
-                            <span className="font-mono font-bold text-slate-900 dark:text-white shrink-0">{item.usn}</span>
-                            <span className="text-slate-600 dark:text-slate-300 truncate">• {item.name}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase shrink-0">({item.branch})</span>
+                            <span className="font-mono font-bold text-slate-900 shrink-0">{item.usn}</span>
+                            <span className="text-slate-600 truncate">• {item.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase shrink-0">({item.branch})</span>
                           </div>
                           <div className="flex items-center gap-2 shrink-0">
-                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/50 text-emerald-800 dark:text-emerald-300 text-[10px] font-bold shrink-0 border border-emerald-200/50 dark:border-emerald-800/50">
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold shrink-0">
                               {item.login_count}x
                             </span>
                             {item.last_login && (
-                              <span className="text-[10px] text-slate-400 dark:text-slate-500 hidden sm:inline">
+                              <span className="text-[10px] text-slate-400 hidden sm:inline">
                                 {formatDateTime(item.last_login).date}
                               </span>
                             )}
@@ -3843,38 +3798,38 @@ export default function AdminPanel() {
 
                 {/* Recent Login Audit Stream */}
                 <div className="space-y-2.5">
-                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                  <h3 className="font-bold text-xs uppercase tracking-wider text-slate-600">
                     Recent Login Audit Stream
                   </h3>
-                  <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 max-h-72 overflow-y-auto">
+                  <div className="border border-slate-200 rounded-2xl overflow-hidden divide-y divide-slate-100 max-h-72 overflow-y-auto">
                     {loginLogsData.recent_logs.length === 0 ? (
-                      <p className="text-xs text-slate-400 dark:text-slate-500 p-4 text-center">No logins recorded yet.</p>
+                      <p className="text-xs text-slate-400 p-4 text-center">No logins recorded yet.</p>
                     ) : (
                       loginLogsData.recent_logs.map((log) => (
                         <div
                           key={log.id}
-                          className="p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs hover:bg-slate-50/50 dark:hover:bg-slate-900/40"
+                          className="p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-xs hover:bg-slate-50/50"
                         >
                           <div className="flex items-center gap-2 min-w-0">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                            <span className="font-mono font-bold text-slate-900 dark:text-white shrink-0">{log.usn}</span>
-                            <span className="text-slate-700 dark:text-slate-300 truncate">{log.name}</span>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 uppercase shrink-0">({log.branch})</span>
+                            <span className="font-mono font-bold text-slate-900 shrink-0">{log.usn}</span>
+                            <span className="text-slate-700 truncate">{log.name}</span>
+                            <span className="text-[10px] text-slate-400 uppercase shrink-0">({log.branch})</span>
                           </div>
-                          <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px] text-slate-500 dark:text-slate-400 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800/80">
+                          <div className="flex items-center justify-between sm:justify-end gap-2 text-[11px] text-slate-500 pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-100">
                             {log.ip_address && (
-                              <span className="font-mono text-[10px] bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded text-slate-600 dark:text-slate-400">
+                              <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.2 rounded text-slate-600">
                                 IP: {log.ip_address}
                               </span>
                             )}
-                            <span className="text-slate-400 dark:text-slate-500 font-mono text-[10px]">
+                            <span className="text-slate-400 font-mono text-[10px]">
                               {formatDateTime(log.login_at).time} • {formatDateTime(log.login_at).date}
                             </span>
                             <button
                               type="button"
                               onClick={() => handleDeleteLoginLog(log.id)}
                               title="Delete this login record"
-                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-transparent hover:border-rose-200 dark:hover:border-rose-800 transition-colors cursor-pointer shrink-0"
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer shrink-0"
                             >
                               <IconTrash className="w-3.5 h-3.5" />
                             </button>
@@ -3895,57 +3850,56 @@ export default function AdminPanel() {
       {/* ------------------------------------------------------------- */}
       {activeTab === "system" && (
         <div className="space-y-4 sm:space-y-6">
-          <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
+          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 p-4 sm:p-6 shadow-xs space-y-4 sm:space-y-5">
             <div>
-              <h2 className="text-base font-bold text-slate-900 dark:text-white">Host &amp; Browser Engine Diagnostics</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
+              <h2 className="text-base font-bold text-slate-900">Host &amp; Browser Engine Diagnostics</h2>
+              <p className="text-xs text-slate-500">
                 Verify Playwright Chromium installation status to prevent scraper launch errors.
               </p>
             </div>
 
             {browserMsg && (
-              <div className="p-3 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800/60 text-blue-800 dark:text-blue-300 text-xs rounded-xl font-medium">
+              <div className="p-3 bg-blue-50 border border-blue-200 text-blue-800 text-xs rounded-xl font-medium">
                 {browserMsg}
               </div>
             )}
 
             {/* Status Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Backend API Service
                 </span>
                 <div className="flex items-center gap-2 mt-1">
                   <span
                     className={`w-2 h-2 rounded-full ${backendOnline ? "bg-emerald-500" : "bg-rose-500"}`}
                   />
-                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900">
                     {backendOnline ? "Online (Healthy)" : "Offline"}
                   </span>
                 </div>
               </div>
 
-              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Playwright Chromium
                 </span>
                 <div className="flex items-center gap-2 mt-1">
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"
-                    }`}
+                    className={`w-2 h-2 rounded-full ${browserStatus?.status === "ready" ? "bg-emerald-500" : "bg-amber-500"
+                      }`}
                   />
-                  <span className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900">
                     {browserStatus?.status === "ready" ? "Ready & Installed" : "Not Detected"}
                   </span>
                 </div>
               </div>
 
-              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/40">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+              <div className="p-3.5 sm:p-4 rounded-2xl border border-slate-200 bg-slate-50/50">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Operating Platform
                 </span>
-                <div className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white mt-1 capitalize font-mono">
+                <div className="text-xs sm:text-sm font-bold text-slate-900 mt-1 capitalize font-mono">
                   {browserStatus?.platform || "Linux / Windows"}
                 </div>
               </div>
@@ -3953,11 +3907,11 @@ export default function AdminPanel() {
 
             {/* Detected Cache Paths */}
             <div>
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">
                 Detected Browser Cache Paths
               </label>
               {browserStatus?.detected_paths && browserStatus.detected_paths.length > 0 ? (
-                <div className="bg-slate-900 dark:bg-[#08090a] border border-slate-800 text-slate-200 p-3 rounded-xl font-mono text-xs space-y-1 overflow-x-auto">
+                <div className="bg-slate-900 text-slate-200 p-3 rounded-xl font-mono text-xs space-y-1 overflow-x-auto">
                   {browserStatus.detected_paths.map((p, i) => (
                     <div key={i} className="truncate text-emerald-400">
                       ✓ {p}
@@ -3965,22 +3919,22 @@ export default function AdminPanel() {
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 p-3 rounded-xl">
+                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 p-3 rounded-xl">
                   No default Chromium browser cache was detected in standard directories. Click below to verify or prewarm the browser.
                 </p>
               )}
             </div>
 
             {/* Prewarm / Check Browser Button */}
-            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100 dark:border-slate-800/80">
-              <span className="text-xs text-slate-500 dark:text-slate-400">
+            <div className="pt-2 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t border-slate-100">
+              <span className="text-xs text-slate-500">
                 Playwright self-healing auto-installs Chromium if missing during scrape.
               </span>
               <button
                 type="button"
                 onClick={handleVerifyBrowser}
                 disabled={verifyingBrowser}
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 text-center cursor-pointer"
+                className="w-full sm:w-auto px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all disabled:opacity-50 text-center"
               >
                 {verifyingBrowser ? "Verifying Chromium..." : "Verify / Prewarm Browser"}
               </button>
@@ -3993,22 +3947,22 @@ export default function AdminPanel() {
       {/* Socials Edit Modal                                            */}
       {/* ------------------------------------------------------------- */}
       {editingStudent && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="bg-white dark:bg-[#0c0e12] rounded-3xl border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-md p-5 sm:p-6 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-md p-5 sm:p-6 space-y-4">
             <div className="flex items-start justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   Profile Editor
                 </span>
-                <h3 className="font-bold text-slate-900 dark:text-white text-base mt-0.5">
+                <h3 className="font-bold text-slate-900 text-base mt-0.5">
                   Edit Socials for {editingStudent.name}
                 </h3>
-                <p className="font-mono text-xs text-slate-400 dark:text-slate-500">{editingStudent.usn}</p>
+                <p className="font-mono text-xs text-slate-400">{editingStudent.usn}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setEditingStudent(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-lg cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg"
               >
                 <IconClose className="w-4 h-4" />
               </button>
@@ -4016,7 +3970,7 @@ export default function AdminPanel() {
 
             <div className="space-y-3 pt-1">
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
                   GitHub Profile URL or Username
                 </label>
                 <div className="relative">
@@ -4025,7 +3979,7 @@ export default function AdminPanel() {
                     value={editGithub}
                     onChange={(e) => setEditGithub(e.target.value)}
                     placeholder="e.g. username or github.com/username"
-                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 font-mono"
+                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
                   />
                   <span className="absolute left-2.5 top-2.5 text-slate-400">
                     <IconGitHub className="w-3.5 h-3.5" />
@@ -4034,7 +3988,7 @@ export default function AdminPanel() {
               </div>
 
               <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
                   LinkedIn Profile URL or Username
                 </label>
                 <div className="relative">
@@ -4043,26 +3997,26 @@ export default function AdminPanel() {
                     value={editLinkedin}
                     onChange={(e) => setEditLinkedin(e.target.value)}
                     placeholder="e.g. username or linkedin.com/in/username"
-                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 font-mono"
+                    className="w-full pl-8 pr-3 py-2 text-xs rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-900 font-mono"
                   />
-                  <span className="absolute left-2.5 top-2.5 text-blue-600 dark:text-blue-400">
+                  <span className="absolute left-2.5 top-2.5 text-blue-600">
                     <IconLinkedIn className="w-3.5 h-3.5" />
                   </span>
                 </div>
               </div>
 
               {saveSocialsMsg && (
-                <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800/50 p-2 rounded-xl text-center">
+                <p className="text-xs font-semibold text-emerald-600 bg-emerald-50 p-2 rounded-xl text-center">
                   {saveSocialsMsg}
                 </p>
               )}
             </div>
 
-            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100 dark:border-slate-800/80">
+            <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setEditingStudent(null)}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl cursor-pointer"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl"
               >
                 Cancel
               </button>
@@ -4070,7 +4024,7 @@ export default function AdminPanel() {
                 type="button"
                 onClick={handleSaveSocials}
                 disabled={savingSocials}
-                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-slate-900 font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50"
               >
                 {savingSocials ? "Saving..." : "Save Profiles"}
               </button>
