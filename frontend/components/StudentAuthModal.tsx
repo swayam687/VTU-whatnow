@@ -441,16 +441,8 @@ export default function StudentAuthModal({
         return;
       }
 
-      // Direct Login (no queue or already completed)
-      if (challenge.auth_response) {
-        setStoredStudentSession(challenge.auth_response);
-        sfx.playMechanicalClick();
-        onSuccess(challenge.auth_response);
-        resetForm();
-        onClose();
-      } else {
-        setOnDemandState("idle");
-      }
+      // Mandatory Captcha Gate: If backend unexpectedly didn't return a captcha session, do not auto-login
+      throw new Error(challenge.message || "Security verification challenge could not be loaded. Please try again.");
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to authenticate";
       setError(msg);
