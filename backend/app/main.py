@@ -327,6 +327,8 @@ app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 
 # CORS setup - dynamically allows localhost, 127.0.0.1, LAN IPs, and production origins with credentials
 origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+if "https://vtu-whatnow.vercel.app" not in origins and "*" not in origins:
+    origins.append("https://vtu-whatnow.vercel.app")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins if (origins and "*" not in origins) else [],

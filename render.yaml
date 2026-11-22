@@ -25,9 +25,8 @@ services:
       DELAY_MIN: "2"
       DELAY_MAX: "3"
 
-      # Allow the frontend service to call the API (will be overwritten by the
-      # actual frontend URL after it is created)
-      ALLOWED_ORIGINS: https://vtu-frontend.onrender.com
+      # Allow the frontend service to call the API
+      ALLOWED_ORIGINS: https://vtu-whatnow.vercel.app,https://vtu-frontend.onrender.com,*
 
       # Admin panel protection password
       ADMIN_PASSWORD: admin
