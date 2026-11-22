@@ -123,10 +123,11 @@ class OnDemandScraperManager:
     async def _ensure_browser(self) -> Browser:
         """
         Guarantees a persistent single Chromium browser process is running on the worker loop.
-        Initializes an asyncio.Semaphore(3) to throttle active browser sessions to max 3 concurrent slots.
+        Initializes an asyncio.Semaphore to throttle active browser sessions to max concurrent slots.
         """
         if self._semaphore is None:
-            self._semaphore = asyncio.Semaphore(3)
+            max_concurrent = getattr(settings, "MAX_CONCURRENT_SCRAPERS", 25)
+            self._semaphore = asyncio.Semaphore(max_concurrent)
         if self._browser_lock is None:
             self._browser_lock = asyncio.Lock()
 

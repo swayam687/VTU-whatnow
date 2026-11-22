@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     # Admin Panel Protection
     ADMIN_PASSWORD: str = "admin"
 
+    # Playwright Concurrency Throttle (active simultaneous browser contexts)
+    MAX_CONCURRENT_SCRAPERS: int = 25
+
     class Config:
         env_file = ".env"
         extra = "allow"
