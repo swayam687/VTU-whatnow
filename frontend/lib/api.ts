@@ -1248,6 +1248,28 @@ export async function submitCompareCaptcha(
   return data;
 }
 
+export async function cancelCompareCaptcha(sessionId: string): Promise<void> {
+  if (!sessionId) return;
+  try {
+    await fetch(`${API_BASE}/api/compare/cancel-captcha`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+  } catch {}
+}
+
+export async function cancelOnDemandCaptcha(sessionId: string): Promise<void> {
+  if (!sessionId) return;
+  try {
+    await fetch(`${API_BASE}/api/auth/on-demand/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+  } catch {}
+}
+
 export async function updateStudentCredits(
   usn: string,
   payload: { amount?: number; set?: number },

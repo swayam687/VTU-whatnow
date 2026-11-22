@@ -9,6 +9,7 @@ import {
   compareStudents,
   solveCompareCaptcha,
   submitCompareCaptcha,
+  cancelCompareCaptcha,
 } from "../lib/api";
 import { IconClose, IconCompare, IconShield, IconRotateCcw } from "./Icons";
 import Identicon from "./Identicon";
@@ -62,6 +63,17 @@ export default function CompareModal({
     } finally {
       setCaptchaLoading(false);
     }
+  };
+
+  const handleCancelVerification = () => {
+    sfx.playMechanicalClick();
+    if (captchaSessionId) {
+      cancelCompareCaptcha(captchaSessionId);
+    }
+    setIsVerificationRequired(false);
+    setCaptchaSessionId(null);
+    setCaptchaBase64(null);
+    onClose();
   };
 
   const executeComparisonGate = async (usnA: string, usnB: string) => {
@@ -257,11 +269,7 @@ export default function CompareModal({
                 </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    sfx.playMechanicalClick();
-                    setIsVerificationRequired(false);
-                    onClose();
-                  }}
+                  onClick={handleCancelVerification}
                   className="p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
                   title="Cancel & Close"
                 >
@@ -286,11 +294,7 @@ export default function CompareModal({
                   <p className="text-xs font-mono text-zinc-400">Loading security verification challenge...</p>
                   <button
                     type="button"
-                    onClick={() => {
-                      sfx.playMechanicalClick();
-                      setIsVerificationRequired(false);
-                      onClose();
-                    }}
+                    onClick={handleCancelVerification}
                     className="mt-3 px-4 py-1.5 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 text-white transition-colors cursor-pointer"
                   >
                     Cancel

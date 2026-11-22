@@ -71,20 +71,17 @@ class OnDemandSession:
         session_id: str,
         usn: str,
         semester: str,
-        playwright: Playwright,
-        browser: Browser,
         context: BrowserContext,
         page: Page,
         target_url: str,
         student_usn: str,
         is_self_scrape: bool = True,
         target_id: Optional[int] = None,
+        on_close_cb: Optional[object] = None,
     ):
         self.session_id = session_id
         self.usn = usn  # Target USN being scraped on VTU
         self.semester = semester
-        self.playwright = playwright
-        self.browser = browser
         self.context = context
         self.page = page
         self.target_url = target_url
@@ -94,20 +91,22 @@ class OnDemandSession:
         self.fail_count = 0  # Failed captcha attempts (anti-lockout gate)
         self.created_at = time.time()
         self.last_alert_msg = {"text": ""}
+        self.on_close_cb = on_close_cb
+        self._is_closed = False
 
     async def close(self):
+        if self._is_closed:
+            return
+        self._is_closed = True
         try:
             await self.context.close()
         except Exception:
             pass
-        try:
-            await self.browser.close()
-        except Exception:
-            pass
-        try:
-            await self.playwright.stop()
-        except Exception:
-            pass
+        if self.on_close_cb:
+            try:
+                self.on_close_cb()
+            except Exception:
+                pass
 
 
 class OnDemandScraperManager:
@@ -115,16 +114,73 @@ class OnDemandScraperManager:
         self._sessions: Dict[str, OnDemandSession] = {}
         self._lock = threading.Lock()
         self._worker_loop = ProactorLoopThread()
+        self._reserved_usns: set = set()
+        self._playwright: Optional[Playwright] = None
+        self._browser: Optional[Browser] = None
+        self._semaphore: Optional[asyncio.Semaphore] = None
+        self._browser_lock: Optional[asyncio.Lock] = None
+
+    async def _ensure_browser(self) -> Browser:
+        """
+        Guarantees a persistent single Chromium browser process is running on the worker loop.
+        Initializes an asyncio.Semaphore(3) to throttle active browser sessions to max 3 concurrent slots.
+        """
+        if self._semaphore is None:
+            self._semaphore = asyncio.Semaphore(3)
+        if self._browser_lock is None:
+            self._browser_lock = asyncio.Lock()
+
+        if self._browser and self._browser.is_connected():
+            return self._browser
+
+        async with self._browser_lock:
+            if self._browser and self._browser.is_connected():
+                return self._browser
+
+            if not self._playwright:
+                self._playwright = await async_playwright().start()
+
+            launch_args = [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--no-zygote",
+                "--disable-blink-features=AutomationControlled",
+                "--ignore-certificate-errors",
+                "--ignore-certificate-errors-spki-list",
+            ]
+            try:
+                self._browser = await self._playwright.chromium.launch(
+                    headless=True,
+                    args=launch_args,
+                )
+            except Exception as launch_err:
+                err_msg = str(launch_err)
+                if "Executable doesn't exist" in err_msg or "playwright install" in err_msg:
+                    import subprocess
+                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                    self._browser = await self._playwright.chromium.launch(
+                        headless=True,
+                        args=launch_args,
+                    )
+                else:
+                    raise launch_err
+
+            return self._browser
 
     async def _cleanup_expired(self):
-        """Purge sessions older than 6 minutes to avoid browser resource leaks."""
+        """Purge sessions older than 5 minutes to avoid browser context and semaphore leaks."""
         now = time.time()
         with self._lock:
             expired_ids = [
                 sid for sid, s in self._sessions.items()
-                if now - s.created_at > 360
+                if now - s.created_at > 300
             ]
             expired_sessions = [self._sessions.pop(sid) for sid in expired_ids if sid in self._sessions]
+            for s in expired_sessions:
+                self._reserved_usns.discard(s.usn)
+
         for session in expired_sessions:
             try:
                 await session.close()
@@ -135,7 +191,12 @@ class OnDemandScraperManager:
         """
         Finds the next unscraped USN from the administrator's queued ScrapeTargets.
         Sequential range progression: from start_usn to end_usn.
+        Filters out USNs that are currently active or reserved in in-flight sessions so concurrent
+        users are assigned distinct USNs simultaneously.
         """
+        with self._lock:
+            in_flight_usns = {s.usn for s in self._sessions.values()} | set(self._reserved_usns)
+
         targets = db.query(ScrapeTarget).filter(
             ScrapeTarget.status == "PENDING"
         ).order_by(ScrapeTarget.id.asc()).all()
@@ -150,6 +211,8 @@ class OnDemandScraperManager:
             target_sem = str(target.semester or "1").strip()
             found_usn = None
             for candidate in usn_list[start_idx:]:
+                if candidate in in_flight_usns:
+                    continue
                 has_marks = db.query(Mark.id).filter(
                     Mark.usn == candidate,
                     Mark.semester == target_sem
@@ -159,14 +222,22 @@ class OnDemandScraperManager:
                     break
 
             if found_usn:
+                with self._lock:
+                    self._reserved_usns.add(found_usn)
                 target.current_usn_index = found_usn
                 db.commit()
                 return target, found_usn
             else:
-                # All USNs in this range have already been scraped for this semester
-                target.status = "COMPLETED"
-                target.completed_at = datetime.utcnow()
-                db.commit()
+                # Check if all USNs in this range have marks
+                all_have_marks = True
+                for candidate in usn_list:
+                    if not db.query(Mark.id).filter(Mark.usn == candidate, Mark.semester == target_sem).first():
+                        all_have_marks = False
+                        break
+                if all_have_marks:
+                    target.status = "COMPLETED"
+                    target.completed_at = datetime.utcnow()
+                    db.commit()
 
         return None
 
@@ -200,12 +271,41 @@ class OnDemandScraperManager:
         target_id: Optional[int] = None,
     ) -> dict:
         """
-        Launches an isolated Playwright browser instance, navigates to the VTU portal,
-        fills the target USN, captures the captcha image Base64, and records the session.
+        Uses persistent single Chromium process, creates a lightweight BrowserContext (~10MB),
+        and strictly limits active sessions to max 3 via asyncio.Semaphore(3).
         """
         clean_target_usn = target_usn.strip().upper()
         clean_student_usn = (student_usn or clean_target_usn).strip().upper()
         await self._cleanup_expired()
+
+        browser = await self._ensure_browser()
+
+        # Strict Concurrency Throttle: acquire 1 of 3 concurrent browser slots
+        try:
+            assert self._semaphore is not None
+            await asyncio.wait_for(self._semaphore.acquire(), timeout=30.0)
+        except asyncio.TimeoutError:
+            with self._lock:
+                self._reserved_usns.discard(clean_target_usn)
+            return {
+                "ok": False,
+                "usn": clean_target_usn,
+                "message": "Verification servers are busy with maximum concurrent sessions. Please retry in a few seconds.",
+            }
+
+        slot_acquired = True
+
+        def release_slot():
+            nonlocal slot_acquired
+            if slot_acquired:
+                slot_acquired = False
+                with self._lock:
+                    self._reserved_usns.discard(clean_target_usn)
+                if self._semaphore:
+                    try:
+                        self._semaphore.release()
+                    except Exception:
+                        pass
 
         if not target_url or not target_url.strip():
             target_url = settings.VTU_URL_SEM1
@@ -217,44 +317,12 @@ class OnDemandScraperManager:
             target_url = target_url.rstrip("/") + "/index.php"
 
         session_id = str(uuid.uuid4())
-        p: Optional[Playwright] = None
-        browser: Optional[Browser] = None
         context: Optional[BrowserContext] = None
         page: Optional[Page] = None
+        session: Optional[OnDemandSession] = None
 
         try:
-            p = await async_playwright().start()
-
-            # Launch Chromium with anti-detection flags & SSL cert bypass
-            try:
-                browser = await p.chromium.launch(
-                    headless=True,
-                    args=[
-                        "--no-sandbox",
-                        "--disable-setuid-sandbox",
-                        "--disable-blink-features=AutomationControlled",
-                        "--ignore-certificate-errors",
-                        "--ignore-certificate-errors-spki-list",
-                    ],
-                )
-            except Exception as launch_err:
-                err_msg = str(launch_err)
-                if "Executable doesn't exist" in err_msg or "playwright install" in err_msg:
-                    import subprocess
-                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-                    browser = await p.chromium.launch(
-                        headless=True,
-                        args=[
-                            "--no-sandbox",
-                            "--disable-setuid-sandbox",
-                            "--disable-blink-features=AutomationControlled",
-                            "--ignore-certificate-errors",
-                            "--ignore-certificate-errors-spki-list",
-                        ],
-                    )
-                else:
-                    raise launch_err
-
+            # Lightweight context: isolated cookies & storage (~10MB instead of 100MB+)
             context = await browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
                 ignore_https_errors=True,
@@ -265,14 +333,13 @@ class OnDemandScraperManager:
                 session_id=session_id,
                 usn=clean_target_usn,
                 semester=semester,
-                playwright=p,
-                browser=browser,
                 context=context,
                 page=page,
                 target_url=target_url,
                 student_usn=clean_student_usn,
                 is_self_scrape=is_self_scrape,
                 target_id=target_id,
+                on_close_cb=release_slot,
             )
 
             # Dialog listener for JS alerts
@@ -338,16 +405,16 @@ class OnDemandScraperManager:
         except Exception as e:
             traceback.print_exc()
             err_msg = str(e).strip() or type(e).__name__
-            if p or browser:
-                try:
-                    if context:
+            if session:
+                await session.close()
+            else:
+                if context:
+                    try:
                         await context.close()
-                    if browser:
-                        await browser.close()
-                    if p:
-                        await p.stop()
-                except Exception:
-                    pass
+                    except Exception:
+                        pass
+                release_slot()
+
             return {
                 "ok": False,
                 "usn": clean_target_usn,
@@ -726,6 +793,53 @@ class OnDemandScraperManager:
             }
         finally:
             db.close()
+
+    async def cancel_session(self, session_id: str) -> dict:
+        """Explicitly cancels an active verification session and releases semaphore slot immediately."""
+        return await self._worker_loop.run(
+            self._cancel_session_internal(session_id)
+        )
+
+    async def _cancel_session_internal(self, session_id: str) -> dict:
+        with self._lock:
+            session = self._sessions.pop(session_id, None)
+            if session:
+                self._reserved_usns.discard(session.usn)
+
+        if session:
+            await session.close()
+
+        return {"ok": True, "message": "Verification session cancelled."}
+
+    async def shutdown(self):
+        """Cleanly close all browser contexts, persistent Chromium process, and Playwright worker."""
+        await self._worker_loop.run(self._shutdown_internal())
+
+    async def _shutdown_internal(self):
+        with self._lock:
+            sessions = list(self._sessions.values())
+            self._sessions.clear()
+            self._reserved_usns.clear()
+
+        for session in sessions:
+            try:
+                await session.close()
+            except Exception:
+                pass
+
+        if self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+
+        if self._playwright:
+            try:
+                await self._playwright.stop()
+            except Exception:
+                pass
+            self._playwright = None
 
 
 ondemand_scraper = OnDemandScraperManager()

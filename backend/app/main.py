@@ -80,6 +80,7 @@ from .schemas import (
     CompareCaptchaChallengeResponse,
     CompareCaptchaSubmitRequest,
     AdminCreditUpdateRequest,
+    SessionCancelRequest,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -322,6 +323,10 @@ async def lifespan(app: FastAPI):
     # Execute database schema check synchronously before accepting traffic
     init_db()
     yield
+    try:
+        await ondemand_scraper.shutdown()
+    except Exception as e:
+        print(f"⚠️ Notice during ondemand_scraper shutdown: {e}")
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 
@@ -641,6 +646,13 @@ async def refresh_on_demand_captcha(req: OnDemandRefreshRequest):
         captcha_base64=res.get("captcha_base64"),
         message="New captcha loaded."
     )
+
+
+@app.post("/api/auth/on-demand/cancel")
+async def cancel_on_demand_captcha(req: SessionCancelRequest):
+    if req.session_id:
+        await ondemand_scraper.cancel_session(req.session_id)
+    return {"ok": True, "message": "Verification session cancelled."}
 
 
 @app.post("/api/auth/on-demand/submit", response_model=OnDemandSubmitResponse)
@@ -1810,6 +1822,13 @@ async def submit_compare_captcha(
         }
     else:
         return res
+
+
+@app.post("/api/compare/cancel-captcha")
+async def cancel_compare_captcha(req: SessionCancelRequest):
+    if req.session_id:
+        await ondemand_scraper.cancel_session(req.session_id)
+    return {"ok": True, "message": "Verification session cancelled."}
 
 
 @app.patch("/api/admin/students/{usn}/credits", dependencies=[Depends(require_admin)])

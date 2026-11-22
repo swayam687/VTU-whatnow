@@ -434,6 +434,10 @@ class AdminCreditUpdateRequest(BaseModel):
     set: Optional[int] = None
 
 
+class SessionCancelRequest(BaseModel):
+    session_id: str
+
+
 
 
 
