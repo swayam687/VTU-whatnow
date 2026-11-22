@@ -374,15 +374,29 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
     if not student:
         default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
         target_url = default_link.url if default_link else settings.VTU_URL_SEM1
-        res = await ondemand_scraper.start_session(
-            target_usn=clean_usn,
-            semester="1",
-            target_url=target_url,
-            student_usn=clean_usn,
-            is_self_scrape=True,
-        )
-        if not res.get("ok"):
-            raise HTTPException(status_code=502, detail=res.get("message", "Unable to reach VTU portal for self-registration."))
+        urls_to_try = [target_url, settings.VTU_URL_SEM1, settings.VTU_URL_MAKEUP, settings.VTU_URL_SEM2]
+        deduped_urls = []
+        for u in urls_to_try:
+            if u and u not in deduped_urls:
+                deduped_urls.append(u)
+
+        res = None
+        for portal_url in deduped_urls:
+            res = await ondemand_scraper.start_session(
+                target_usn=clean_usn,
+                semester="1",
+                target_url=portal_url,
+                student_usn=clean_usn,
+                is_self_scrape=True,
+            )
+            if res.get("ok"):
+                break
+
+        if not res or not res.get("ok"):
+            raise HTTPException(
+                status_code=503,
+                detail=res.get("message", "Unable to reach VTU portal for self-registration.") if res else "VTU servers unresponsive."
+            )
 
         return LoginGateChallengeResponse(
             ok=False,
@@ -455,27 +469,28 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
 
     target, target_usn = target_info
     print(f"[LOGIN GATE] Initiating mandatory crowdsourced captcha for student {clean_usn} (target: {target_usn}, portal: {target.vtu_link})")
-    res = await ondemand_scraper.start_session(
-        target_usn=target_usn,
-        semester=target.semester,
-        target_url=target.vtu_link,
-        student_usn=clean_usn,
-        is_self_scrape=False,
-        target_id=target.id,
-    )
-    if not res.get("ok"):
-        print(f"[LOGIN GATE] Target {target_usn} on {target.vtu_link} failed: {res.get('message')}. Retrying with default URL...")
-        if target.vtu_link != settings.VTU_URL_SEM1:
-            res = await ondemand_scraper.start_session(
-                target_usn=target_usn,
-                semester="1",
-                target_url=settings.VTU_URL_SEM1,
-                student_usn=clean_usn,
-                is_self_scrape=False,
-                target_id=target.id,
-            )
 
-    if res.get("ok"):
+    urls_to_try = [target.vtu_link, settings.VTU_URL_SEM1, settings.VTU_URL_MAKEUP, settings.VTU_URL_SEM2]
+    deduped_urls = []
+    for u in urls_to_try:
+        if u and u not in deduped_urls:
+            deduped_urls.append(u)
+
+    res = None
+    for portal_url in deduped_urls:
+        res = await ondemand_scraper.start_session(
+            target_usn=target_usn,
+            semester=target.semester or "1",
+            target_url=portal_url,
+            student_usn=clean_usn,
+            is_self_scrape=False,
+            target_id=target.id,
+        )
+        if res.get("ok"):
+            break
+        print(f"[LOGIN GATE] Target {target_usn} on {portal_url} failed: {res.get('message')}. Trying next candidate...")
+
+    if res and res.get("ok"):
         return LoginGateChallengeResponse(
             ok=False,
             require_captcha=True,
@@ -484,9 +499,10 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
             message="Please solve this captcha to verify your session and update campus records.",
         )
     else:
+        err_msg = res.get("message", "Timeout") if res else "VTU examination servers unresponsive"
         raise HTTPException(
             status_code=503,
-            detail=f"VTU examination servers are currently slow or unreachable ({res.get('message', 'Timeout')}). Please try again in 5 seconds."
+            detail=f"VTU examination servers are currently slow or unreachable ({err_msg}). Please try again in 5 seconds."
         )
 
 
