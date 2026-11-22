@@ -276,12 +276,18 @@ export default function AdminPanel() {
     setCreatingTarget(true);
     setTargetError("");
     sfx.playMechanicalClick();
+
+    const selectedLink = targetSemesterLinkId
+      ? semesterLinks.find((l) => l.id === targetSemesterLinkId)
+      : semesterLinks.find((l) => l.is_default);
+    const resolvedSemester = selectedLink?.semester || targetSemester || "1";
+
     try {
       await createScrapeTarget(
         {
           start_usn: targetStartUsn.trim().toUpperCase(),
           end_usn: targetEndUsn.trim().toUpperCase(),
-          semester: targetSemester,
+          semester: resolvedSemester,
           semester_link_id: targetSemesterLinkId,
         },
         adminKey
@@ -1729,7 +1735,19 @@ export default function AdminPanel() {
                   </label>
                   <select
                     value={targetSemesterLinkId ?? ""}
-                    onChange={(e) => setTargetSemesterLinkId(e.target.value ? Number(e.target.value) : undefined)}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : undefined;
+                      setTargetSemesterLinkId(val);
+                      if (val) {
+                        const found = semesterLinks.find((l) => l.id === val);
+                        if (found && found.semester) {
+                          setTargetSemester(found.semester);
+                        }
+                      } else {
+                        const def = semesterLinks.find((l) => l.is_default);
+                        setTargetSemester(def?.semester || "1");
+                      }
+                    }}
                     className="w-full px-3 py-2 text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
                   >
                     <option value="">Default Portal Link</option>

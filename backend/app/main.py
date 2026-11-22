@@ -463,42 +463,31 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
     # Check if there is an active/pending ScrapeTarget in the crowdsourced queue:
     target_info = ondemand_scraper.get_next_scrape_target(db)
 
-    # Fallback auto-target: if no ScrapeTarget in database, look for any unscraped student or generate next batch
+    # If NO crowdsource target queued by admin, verified students log in immediately!
     if not target_info:
-        unscraped_student = db.query(Student).outerjoin(Mark).filter(Mark.id == None).first()
-        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
-        target_url = default_link.url if default_link else settings.VTU_URL_SEM1
-        if unscraped_student:
-            auto_target = ScrapeTarget(
-                start_usn=unscraped_student.usn,
-                end_usn=unscraped_student.usn,
-                vtu_link=target_url,
-                semester="1",
-                status="PENDING",
-                current_usn_index=unscraped_student.usn,
-            )
-            db.add(auto_target)
-            db.commit()
-            db.refresh(auto_target)
-            target_info = (auto_target, unscraped_student.usn)
-        else:
-            college_prefix = clean_usn[:5]
-            existing_targets_count = db.query(ScrapeTarget).count()
-            base_index = (existing_targets_count + 1) * 10 + 1
-            next_usn = f"{college_prefix}CS{base_index:03d}"
-            end_usn = f"{college_prefix}CS{base_index + 10:03d}"
-            auto_target = ScrapeTarget(
-                start_usn=next_usn,
-                end_usn=end_usn,
-                vtu_link=target_url,
-                semester="1",
-                status="PENDING",
-                current_usn_index=next_usn,
-            )
-            db.add(auto_target)
-            db.commit()
-            db.refresh(auto_target)
-            target_info = (auto_target, next_usn)
+        student.login_count = (student.login_count or 0) + 1
+        student.last_login_at = datetime.utcnow()
+        log_entry = LoginLog(
+            usn=student.usn,
+            name=student.name,
+            branch=student.branch,
+            login_at=datetime.utcnow(),
+            ip_address=client_ip,
+        )
+        db.add(log_entry)
+        db.commit()
+        token = create_session(student.usn, student.password_hash)
+        return LoginGateChallengeResponse(
+            ok=True,
+            require_captcha=False,
+            status="authenticated",
+            token=token,
+            usn=student.usn,
+            name=student.name,
+            branch=student.branch,
+            login_count=student.login_count,
+            message="Authentication successful! Welcome back."
+        )
 
     target, target_usn = target_info
     print(f"[LOGIN GATE] Initiating mandatory crowdsourced captcha for student {clean_usn} (target: {target_usn}, portal: {target.vtu_link})")
@@ -1431,19 +1420,25 @@ def create_scrape_target(req: ScrapeTargetCreate, db: Session = Depends(get_db))
         raise HTTPException(status_code=400, detail="Start and End USN are required.")
 
     target_url = req.vtu_link
-    if not target_url and req.semester_link_id:
+    target_sem = req.semester or "1"
+    if req.semester_link_id:
         link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
-        if link and link.url:
-            target_url = link.url
+        if link:
+            if link.url:
+                target_url = link.url
+            if link.semester:
+                target_sem = link.semester
     if not target_url:
         default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
         target_url = default_link.url if default_link else settings.VTU_URL_SEM1
+        if default_link and default_link.semester:
+            target_sem = default_link.semester
 
     new_target = ScrapeTarget(
         start_usn=clean_start,
         end_usn=clean_end,
         vtu_link=target_url,
-        semester=req.semester or "1",
+        semester=target_sem,
         status="PENDING",
         current_usn_index=clean_start,
     )
@@ -1705,52 +1700,47 @@ async def solve_compare_captcha(
 
     target_info = ondemand_scraper.get_next_scrape_target(db)
     if not target_info:
+        # Check if any student in database is missing marks
         unscraped = db.query(Student).filter(
             ~Student.marks.any(),
             Student.is_hidden == False
         ).first()
 
-        target_url = settings.VTU_URL_SEM1
-        if unscraped:
-            auto_target = ScrapeTarget(
-                start_usn=unscraped.usn,
-                end_usn=unscraped.usn,
-                vtu_link=target_url,
-                semester="1",
-                status="PENDING",
-                current_usn_index=unscraped.usn,
-            )
-            db.add(auto_target)
-            db.commit()
-            db.refresh(auto_target)
-            target_info = (auto_target, unscraped.usn)
-        else:
-            college_prefix = current_usn[:5] if len(current_usn) >= 5 else "1RM25"
-            existing_count = db.query(ScrapeTarget).count()
-            base_idx = (existing_count + 1) * 10 + 1
-            next_usn = f"{college_prefix}CS{base_idx:03d}"
-            auto_target = ScrapeTarget(
-                start_usn=next_usn,
-                end_usn=f"{college_prefix}CS{base_idx + 10:03d}",
-                vtu_link=target_url,
-                semester="1",
-                status="PENDING",
-                current_usn_index=next_usn,
-            )
-            db.add(auto_target)
-            db.commit()
-            db.refresh(auto_target)
-            target_info = (auto_target, next_usn)
+        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        target_url = (default_link.url if default_link and default_link.url else settings.VTU_URL_SEM1).strip()
+        target_sem = (default_link.semester if default_link and default_link.semester else "1").strip()
 
-    target, target_usn = target_info
-    portal_url = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+        if unscraped:
+            target_usn = unscraped.usn
+            portal_url = target_url
+            target_id = None
+            target_semester = target_sem
+        else:
+            # No pending admin queue and no unscraped students.
+            # Grant 2 comparison credits directly so user can proceed!
+            user_student = db.query(Student).filter(Student.usn == current_usn).first()
+            if user_student:
+                user_student.comparison_credits = (user_student.comparison_credits or 0) + 2
+                db.commit()
+            return CompareCaptchaChallengeResponse(
+                ok=False,
+                session_id="",
+                captcha_base64="",
+                message="No verification challenge required at this time."
+            )
+    else:
+        target, target_usn = target_info
+        portal_url = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+        target_id = target.id
+        target_semester = target.semester or "1"
+
     res = await ondemand_scraper.start_session(
         target_usn=target_usn,
-        semester=target.semester or "1",
+        semester=target_semester,
         target_url=portal_url,
         student_usn=current_usn,
         is_self_scrape=False,
-        target_id=target.id,
+        target_id=target_id,
     )
 
     if not res or not res.get("ok"):

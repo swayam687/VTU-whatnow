@@ -146,10 +146,14 @@ class OnDemandScraperManager:
             if target.current_usn_index and target.current_usn_index in usn_list:
                 start_idx = usn_list.index(target.current_usn_index)
 
-            # Look for the first USN in the range not yet extracted in database
+            # Look for the first USN in the range not yet extracted for THIS TARGET SEMESTER in database
+            target_sem = str(target.semester or "1").strip()
             found_usn = None
             for candidate in usn_list[start_idx:]:
-                has_marks = db.query(Mark.id).filter(Mark.usn == candidate).first()
+                has_marks = db.query(Mark.id).filter(
+                    Mark.usn == candidate,
+                    Mark.semester == target_sem
+                ).first()
                 if not has_marks:
                     found_usn = candidate
                     break
@@ -159,7 +163,7 @@ class OnDemandScraperManager:
                 db.commit()
                 return target, found_usn
             else:
-                # All USNs in this range have already been scraped
+                # All USNs in this range have already been scraped for this semester
                 target.status = "COMPLETED"
                 target.completed_at = datetime.utcnow()
                 db.commit()
@@ -541,10 +545,32 @@ class OnDemandScraperManager:
 
                 # If crowdsourced, student shouldn't be blocked if the other person's result isn't announced
                 if not session.is_self_scrape:
+                    # Advance target queue so next student gets the next USN in the range
+                    if session.target_id:
+                        db = SessionLocal()
+                        try:
+                            target = db.query(ScrapeTarget).filter(ScrapeTarget.id == session.target_id).first()
+                            if target:
+                                usn_list = generate_usn_range(target.start_usn, target.end_usn)
+                                try:
+                                    curr_idx = usn_list.index(session.usn)
+                                    if curr_idx + 1 < len(usn_list):
+                                        target.current_usn_index = usn_list[curr_idx + 1]
+                                    else:
+                                        target.status = "COMPLETED"
+                                        target.completed_at = datetime.utcnow()
+                                except ValueError:
+                                    pass
+                                db.commit()
+                        finally:
+                            db.close()
+
                     auth_resp = self._authenticate_student_directly(session.student_usn, client_ip)
                     return {
                         "ok": True,
                         "bypassed": True,
+                        "target_usn": session.usn,
+                        "portal_url": session.target_url,
                         "fail_count": session.fail_count,
                         "auth_response": auth_resp,
                         "message": "Verification completed. Campus records updated.",
@@ -567,13 +593,23 @@ class OnDemandScraperManager:
                 # Save extracted marksheet into database
                 scraper_worker._save_result(parsed, session.semester)
 
-                # Advance ScrapeTarget index if this was a crowdsourced job
+                # Advance ScrapeTarget index to the NEXT USN in the queue!
                 if session.target_id:
                     db = SessionLocal()
                     try:
                         target = db.query(ScrapeTarget).filter(ScrapeTarget.id == session.target_id).first()
                         if target:
-                            target.current_usn_index = session.usn
+                            usn_list = generate_usn_range(target.start_usn, target.end_usn)
+                            try:
+                                curr_idx = usn_list.index(session.usn)
+                                if curr_idx + 1 < len(usn_list):
+                                    target.current_usn_index = usn_list[curr_idx + 1]
+                                else:
+                                    target.current_usn_index = session.usn
+                                    target.status = "COMPLETED"
+                                    target.completed_at = datetime.utcnow()
+                            except ValueError:
+                                target.current_usn_index = session.usn
                             db.commit()
                     finally:
                         db.close()
