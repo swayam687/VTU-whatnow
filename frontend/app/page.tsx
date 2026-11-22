@@ -19,7 +19,6 @@ import {
   fetchLeaderboard,
   checkBackendHealth,
   AuthSession,
-  logStudentComparison,
   verifyStudentSession,
   getStoredStudentToken,
   getStoredStudentSession,
@@ -254,20 +253,6 @@ export default function Dashboard() {
       setCompareStudent2(targetStudent);
       setSelectedUsn(null);
       setIsCompareOpen(true);
-
-      // Log comparison for Admin visibility (logged-in user requirement)
-      if (studentSession?.usn || myUsn) {
-        logStudentComparison({
-          viewer_usn: studentSession?.usn || myUsn,
-          viewer_name: studentSession?.name || myProfile.name,
-          student1_usn: myProfile.usn,
-          student1_name: myProfile.name,
-          student1_branch: myProfile.branch,
-          student2_usn: targetStudent.usn,
-          student2_name: targetStudent.name,
-          student2_branch: targetStudent.branch,
-        });
-      }
     } else {
       alert(`Could not find profile for ${myUsn}. Please ensure your marks have been scraped.`);
     }
@@ -446,20 +431,6 @@ export default function Dashboard() {
       setCompareStudent1(s1);
       setCompareStudent2(s2);
       setIsCompareOpen(true);
-
-      // Log comparison for Admin visibility (logged-in user requirement)
-      if (studentSession?.usn || myUsn) {
-        logStudentComparison({
-          viewer_usn: studentSession?.usn || myUsn,
-          viewer_name: studentSession?.name,
-          student1_usn: s1.usn,
-          student1_name: s1.name,
-          student1_branch: s1.branch,
-          student2_usn: s2.usn,
-          student2_name: s2.name,
-          student2_branch: s2.branch,
-        });
-      }
     } catch (err) {
       console.error("Failed to fetch students for comparison", err);
     }

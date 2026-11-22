@@ -1901,6 +1901,20 @@ def log_student_comparison(
         s2_name = s2_name or st2.name
         s2_branch = s2_branch or st2.branch
 
+    # Deduplicate: Check if the exact same comparison was already recorded within the last 15 seconds
+    recent_threshold = datetime.utcnow() - timedelta(seconds=15)
+    existing_duplicate = db.query(ComparisonLog).filter(
+        ComparisonLog.viewer_usn == clean_viewer_usn,
+        ComparisonLog.compared_at >= recent_threshold,
+        (
+            ((ComparisonLog.student1_usn == s1_usn) & (ComparisonLog.student2_usn == s2_usn)) |
+            ((ComparisonLog.student1_usn == s2_usn) & (ComparisonLog.student2_usn == s1_usn))
+        )
+    ).first()
+
+    if existing_duplicate:
+        return {"ok": True, "message": "Duplicate comparison event debounced"}
+
     entry = ComparisonLog(
         viewer_usn=clean_viewer_usn,
         viewer_name=viewer_name,
@@ -1924,6 +1938,28 @@ def get_admin_compare_logs(db: Session = Depends(get_db)):
         ComparisonLog.viewer_usn.isnot(None),
         ComparisonLog.viewer_usn != ""
     )
+
+    # Clean up any historical duplicate rows in comparison_logs (created within 10s of each other)
+    try:
+        all_logs = base_query.order_by(desc(ComparisonLog.compared_at)).all()
+        seen_keys = set()
+        ids_to_delete = []
+        for c in all_logs:
+            time_sec = int(c.compared_at.timestamp()) if c.compared_at else 0
+            time_bucket = time_sec // 10
+            pair = tuple(sorted([c.student1_usn or "", c.student2_usn or ""]))
+            key = (c.viewer_usn, pair, time_bucket)
+            if key in seen_keys:
+                ids_to_delete.append(c.id)
+            else:
+                seen_keys.add(key)
+        if ids_to_delete:
+            db.query(ComparisonLog).filter(ComparisonLog.id.in_(ids_to_delete)).delete(synchronize_session=False)
+            db.commit()
+    except Exception as cleanup_err:
+        db.rollback()
+        print(f"⚠️ Comparison logs cleanup notice: {cleanup_err}")
+
     total_comparisons = base_query.count()
     recent = base_query.order_by(desc(ComparisonLog.compared_at)).limit(100).all()
 

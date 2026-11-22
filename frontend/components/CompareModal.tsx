@@ -73,6 +73,28 @@ export default function CompareModal({
   const [wrongAttempts, setWrongAttempts] = useState(0);
   const [verificationSuccess, setVerificationSuccess] = useState<string | null>(null);
   const captchaInputRef = useRef<HTMLInputElement>(null);
+  const lastLoggedKeyRef = useRef<string>("");
+
+  const safelyLogComparison = (
+    sA: { usn: string; name?: string; branch?: string },
+    sB: { usn: string; name?: string; branch?: string }
+  ) => {
+    if (!viewer?.usn || !sA?.usn || !sB?.usn) return;
+    const pairKey = `${viewer.usn}:${[sA.usn, sB.usn].sort().join("<=>")}`;
+    if (lastLoggedKeyRef.current === pairKey) return;
+    lastLoggedKeyRef.current = pairKey;
+
+    logStudentComparison({
+      viewer_usn: viewer.usn,
+      viewer_name: viewer.name,
+      student1_usn: sA.usn,
+      student1_name: sA.name,
+      student1_branch: sA.branch,
+      student2_usn: sB.usn,
+      student2_name: sB.name,
+      student2_branch: sB.branch,
+    });
+  };
 
   const loadCaptchaChallenge = async () => {
     setCaptchaLoading(true);
@@ -129,19 +151,10 @@ export default function CompareModal({
     }
   }, []);
 
-  // Guarantee compare event is recorded on mount if user is logged in
+  // Guarantee compare event is recorded on mount if user is logged in (debounced & guarded)
   useEffect(() => {
     if (viewer?.usn && initialS1?.usn && initialS2?.usn) {
-      logStudentComparison({
-        viewer_usn: viewer.usn,
-        viewer_name: viewer.name,
-        student1_usn: initialS1.usn,
-        student1_name: initialS1.name,
-        student1_branch: initialS1.branch,
-        student2_usn: initialS2.usn,
-        student2_name: initialS2.name,
-        student2_branch: initialS2.branch,
-      });
+      safelyLogComparison(initialS1, initialS2);
     }
   }, []);
 
@@ -214,16 +227,7 @@ export default function CompareModal({
         }
       }
       if (viewer?.usn) {
-        logStudentComparison({
-          viewer_usn: viewer.usn,
-          viewer_name: viewer.name,
-          student1_usn: found.usn,
-          student1_name: found.name,
-          student1_branch: found.branch,
-          student2_usn: s2.usn,
-          student2_name: s2.name,
-          student2_branch: s2.branch,
-        });
+        safelyLogComparison(found, s2);
       }
     }
   };
@@ -243,16 +247,7 @@ export default function CompareModal({
         }
       }
       if (viewer?.usn) {
-        logStudentComparison({
-          viewer_usn: viewer.usn,
-          viewer_name: viewer.name,
-          student1_usn: s1.usn,
-          student1_name: s1.name,
-          student1_branch: s1.branch,
-          student2_usn: found.usn,
-          student2_name: found.name,
-          student2_branch: found.branch,
-        });
+        safelyLogComparison(s1, found);
       }
     }
   };
