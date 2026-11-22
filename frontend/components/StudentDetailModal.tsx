@@ -432,11 +432,10 @@ export default function StudentDetailModal({
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
-        className={`rounded-2xl sm:rounded-3xl border shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-auto will-change-transform ${
-          isObsidian
+        className={`rounded-2xl sm:rounded-3xl border shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-auto will-change-transform ${isObsidian
             ? "bg-[#0b0d11] border-slate-800 text-white"
             : "bg-white border-slate-200 text-slate-900"
-        }`}
+          }`}
       >
         {/* Mobile Swipe-Down Handle & Touch Drag Bar */}
         <div
@@ -453,9 +452,8 @@ export default function StudentDetailModal({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
-          className={`px-3 sm:px-6 py-2.5 sm:py-4 border-b flex items-center justify-between gap-2 select-none ${
-            isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
-          }`}
+          className={`px-3 sm:px-6 py-2.5 sm:py-4 border-b flex items-center justify-between gap-2 select-none ${isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
+            }`}
         >
           <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
             {/* Mobile Left Back Arrow (Natural thumb reach) */}
@@ -470,11 +468,10 @@ export default function StudentDetailModal({
             </button>
             {/* Identicon - Clean avatar box without any overlapping fingerprint text */}
             <div
-              className={`transition-all duration-300 ease-out flex-shrink-0 ${
-                isScrambleComplete
+              className={`transition-all duration-300 ease-out flex-shrink-0 ${isScrambleComplete
                   ? "opacity-100 scale-100 translate-x-0"
                   : "opacity-0 scale-75 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
-              }`}
+                }`}
             >
               {isScrambleComplete && (
                 <Identicon
@@ -504,11 +501,10 @@ export default function StudentDetailModal({
                     {displayChars.map((item, idx) => (
                       <span
                         key={idx}
-                        className={`inline-block w-4 sm:w-5 text-center font-mono font-bold text-sm sm:text-base tabular-nums transition-colors duration-100 ${
-                          item.isLocked
+                        className={`inline-block w-4 sm:w-5 text-center font-mono font-bold text-sm sm:text-base tabular-nums transition-colors duration-100 ${item.isLocked
                             ? "text-cyan-300 font-extrabold"
                             : "text-amber-400 font-medium animate-pulse"
-                        }`}
+                          }`}
                       >
                         {item.char}
                       </span>
@@ -577,13 +573,12 @@ export default function StudentDetailModal({
                 sfx.playMechanicalClick();
                 onToggleCompare(usn);
               }}
-              className={`p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all ${
-                compareUsns.includes(usn)
+              className={`p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all ${compareUsns.includes(usn)
                   ? "bg-blue-600 text-white border-blue-600 font-bold"
                   : isObsidian
-                  ? "bg-slate-900 text-slate-300 border-slate-800"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
+                    ? "bg-slate-900 text-slate-300 border-slate-800"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                }`}
             >
               <IconCompare className="w-3.5 h-3.5" />
               <span className="hidden sm:inline text-[11px]">
@@ -649,9 +644,8 @@ export default function StudentDetailModal({
               {/* Key Metrics Grid - Ultra-compact on mobile, spacious on desktop */}
               <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 text-center">
                 <div
-                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
-                    isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
-                  }`}
+                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
+                    }`}
                 >
                   <p className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-60 tracking-tight sm:tracking-normal truncate">
                     Score
@@ -665,11 +659,10 @@ export default function StudentDetailModal({
                 </div>
 
                 <div
-                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
-                    isObsidian
+                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
                       ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
                       : "bg-blue-50/60 border-blue-100 text-blue-700"
-                  }`}
+                    }`}
                 >
                   <p className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate">
                     Percentage
@@ -686,19 +679,18 @@ export default function StudentDetailModal({
 
                   return (
                     <div
-                      className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${
-                        isHidden
+                      className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${isHidden
                           ? isObsidian
                             ? "bg-slate-900/60 border-slate-800 text-slate-400"
                             : "bg-slate-50 border-slate-200 text-slate-600"
                           : hasBacklogs
-                          ? isObsidian
-                            ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
-                            : "bg-rose-50 border-rose-200 text-rose-700"
-                          : isObsidian
-                          ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
-                          : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                      }`}
+                            ? isObsidian
+                              ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
+                              : "bg-rose-50 border-rose-200 text-rose-700"
+                            : isObsidian
+                              ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
+                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        }`}
                     >
                       <p
                         className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate"
@@ -711,8 +703,8 @@ export default function StudentDetailModal({
                         {isHidden
                           ? "Hidden"
                           : hasBacklogs
-                          ? `${student.total_backlogs} Pending`
-                          : "All Clear"}
+                            ? `${student.total_backlogs} Pending`
+                            : "All Clear"}
                       </p>
                     </div>
                   );
@@ -721,9 +713,8 @@ export default function StudentDetailModal({
 
               {/* Head-to-Head Comparison Banner */}
               <div
-                className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${
-                  isObsidian ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200/80"
-                }`}
+                className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${isObsidian ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200/80"
+                  }`}
               >
                 <div className="text-left w-full sm:w-auto">
                   <div className="flex items-center gap-1.5 text-xs font-bold">
@@ -737,8 +728,8 @@ export default function StudentDetailModal({
                     {myUsn && usn.toUpperCase() === myUsn.toUpperCase()
                       ? "This is your verified personal marksheet."
                       : myUsn
-                      ? "Evaluate subject marks and leads side-by-side."
-                      : "Sign in with your USN to compare marks side-by-side."}
+                        ? "Evaluate subject marks and leads side-by-side."
+                        : "Sign in with your USN to compare marks side-by-side."}
                   </p>
                 </div>
 
@@ -773,11 +764,10 @@ export default function StudentDetailModal({
               {/* Account Holder Marksheet Update Request Banner */}
               {isMyVerifiedProfile && (
                 <div
-                  className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${
-                    isObsidian
+                  className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isObsidian
                       ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-200"
                       : "bg-blue-50/70 border-blue-200 text-blue-900"
-                  }`}
+                    }`}
                 >
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5 text-xs font-bold">
@@ -805,9 +795,8 @@ export default function StudentDetailModal({
               {/* Social Profile Badges */}
               {(student.github_url || student.linkedin_url) && (
                 <div
-                  className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${
-                    isObsidian ? "bg-slate-900/40 border-slate-800" : "bg-slate-50 border-slate-100"
-                  }`}
+                  className={`p-2.5 rounded-xl border flex items-center justify-between text-xs ${isObsidian ? "bg-slate-900/40 border-slate-800" : "bg-slate-50 border-slate-100"
+                    }`}
                 >
                   <span className="opacity-60 text-[11px]">Public Profiles:</span>
                   <div className="flex items-center gap-2">
@@ -846,16 +835,14 @@ export default function StudentDetailModal({
                 </div>
 
                 <div
-                  className={`overflow-x-auto rounded-xl border ${
-                    isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"
-                  }`}
+                  className={`overflow-x-auto rounded-xl border ${isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-white"
+                    }`}
                 >
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr
-                        className={`border-b text-[10px] opacity-60 uppercase ${
-                          isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
-                        }`}
+                        className={`border-b text-[10px] opacity-60 uppercase ${isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-200"
+                          }`}
                       >
                         <th className="py-2 px-3 font-semibold">Code</th>
                         <th className="py-2 px-2 font-semibold text-center">Sem</th>
@@ -867,9 +854,8 @@ export default function StudentDetailModal({
                       </tr>
                     </thead>
                     <tbody
-                      className={`divide-y ${
-                        isObsidian ? "divide-slate-800/60" : "divide-slate-100"
-                      }`}
+                      className={`divide-y ${isObsidian ? "divide-slate-800/60" : "divide-slate-100"
+                        }`}
                     >
                       {student.marks && student.marks.length > 0 ? (
                         student.marks.map((m, i) => (
@@ -897,15 +883,14 @@ export default function StudentDetailModal({
                             </td>
                             <td className="py-2 px-3 text-right">
                               <span
-                                className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${
-                                  m.status === "P"
+                                className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${m.status === "P"
                                     ? isObsidian
                                       ? "bg-emerald-950 text-emerald-400 border-emerald-800"
                                       : "bg-emerald-50 text-emerald-700 border-emerald-200"
                                     : isObsidian
-                                    ? "bg-rose-950 text-rose-400 border-rose-800"
-                                    : "bg-rose-50 text-rose-700 border-rose-200"
-                                }`}
+                                      ? "bg-rose-950 text-rose-400 border-rose-800"
+                                      : "bg-rose-50 text-rose-700 border-rose-200"
+                                  }`}
                               >
                                 {m.status === "P" ? "PASS" : "F"}
                               </span>
@@ -929,9 +914,8 @@ export default function StudentDetailModal({
 
         {/* Modal Bottom Thumb-Friendly Navigation Bar */}
         <div
-          className={`px-3 sm:px-6 py-2.5 sm:py-3 border-t flex items-center justify-between gap-2 shrink-0 ${
-            isObsidian ? "border-slate-800/90 bg-[#08090b]/95" : "border-slate-200/90 bg-white/95"
-          } backdrop-blur-md`}
+          className={`px-3 sm:px-6 py-2.5 sm:py-3 border-t flex items-center justify-between gap-2 shrink-0 ${isObsidian ? "border-slate-800/90 bg-[#08090b]/95" : "border-slate-200/90 bg-white/95"
+            } backdrop-blur-md`}
         >
           {/* Previous Student Button */}
           <button
@@ -943,13 +927,12 @@ export default function StudentDetailModal({
               }
             }}
             disabled={!hasPrev || !onNavigatePrev}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-              hasPrev && onNavigatePrev
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${hasPrev && onNavigatePrev
                 ? isObsidian
                   ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
                   : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
                 : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
-            }`}
+              }`}
             title="View previous student (or press Left Arrow)"
           >
             <IconArrowLeft className="w-3.5 h-3.5" />
@@ -960,11 +943,10 @@ export default function StudentDetailModal({
           <button
             type="button"
             onClick={handleModalClose}
-            className={`flex-1 max-w-[220px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer ${
-              isObsidian
+            className={`flex-1 max-w-[220px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer ${isObsidian
                 ? "bg-white/10 hover:bg-white/15 text-white border border-white/15 hover:border-white/25 shadow-black/40"
                 : "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/10"
-            }`}
+              }`}
             title="Close marksheet and return to list"
           >
             <IconArrowLeft className="w-3.5 h-3.5 sm:hidden" />
@@ -986,13 +968,12 @@ export default function StudentDetailModal({
               }
             }}
             disabled={!hasNext || !onNavigateNext}
-            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${
-              hasNext && onNavigateNext
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${hasNext && onNavigateNext
                 ? isObsidian
                   ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
                   : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
                 : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
-            }`}
+              }`}
             title="View next student (or press Right Arrow)"
           >
             <span className="hidden xs:inline text-[11px]">Next</span>
