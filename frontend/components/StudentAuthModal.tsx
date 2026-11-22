@@ -1234,7 +1234,7 @@ export default function StudentAuthModal({
                     </div>
                   ) : (
                     <div className="mt-2 text-xs flex items-center justify-between animate-in fade-in">
-                      <span className={authStatus.is_claimed ? "text-amber-400 font-medium" : "text-emerald-400 font-medium"}>
+                      <span className={authStatus.is_claimed ? "text-amber-600 dark:text-amber-400 font-semibold" : "text-emerald-600 dark:text-emerald-400 font-semibold"}>
                         {authStatus.name} ({authStatus.branch}) •{" "}
                         {authStatus.is_claimed ? "🔒 Claimed (Password Protected)" : "🌱 Unclaimed (Create Password)"}
                       </span>
