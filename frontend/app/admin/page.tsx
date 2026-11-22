@@ -61,8 +61,6 @@ import {
   IconSettings,
   IconLock,
   IconRotateCcw,
-  IconEye,
-  IconEyeOff,
 } from "../../components/Icons";
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";

@@ -54,6 +54,11 @@ export default function CompareModal({
     setWrongAttempts(0);
     try {
       const data = await solveCompareCaptcha();
+      if (!data.captcha_base64) {
+        setIsVerificationRequired(false);
+        await executeComparisonGate(s1.usn, s2.usn);
+        return;
+      }
       setCaptchaSessionId(data.session_id);
       setCaptchaBase64(data.captcha_base64);
       setTimeout(() => captchaInputRef.current?.focus(), 150);

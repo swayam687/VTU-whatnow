@@ -153,15 +153,6 @@ class AuthLoginRequest(BaseModel):
     usn: str
     password: str
 
-class AuthResponse(BaseModel):
-    ok: bool
-    status: str  # "registered" or "authenticated"
-    token: str
-    usn: str
-    name: str
-    branch: str
-    login_count: int
-
 class DisputeCreateRequest(BaseModel):
     usn: str
     new_password: str

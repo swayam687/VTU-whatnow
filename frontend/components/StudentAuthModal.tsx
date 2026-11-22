@@ -10,7 +10,7 @@ import {
   setStoredStudentSession,
   startOnDemandRegistration,
   refreshOnDemandCaptcha,
-  submitOnDemandCaptcha,
+  cancelOnDemandCaptcha,
   submitLoginGateCaptcha,
   AuthStatus,
   AuthSession,
@@ -277,6 +277,9 @@ export default function StudentAuthModal({
 
   const handleClose = () => {
     sfx.playMechanicalClick();
+    if (onDemandSessionId) {
+      cancelOnDemandCaptcha(onDemandSessionId);
+    }
     resetForm();
     onClose();
   };

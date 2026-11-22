@@ -16,8 +16,6 @@ if str(backend_dir) not in sys.path:
 
 from typing import List, Optional
 from datetime import datetime, timezone, timedelta
-import hashlib
-import secrets
 
 def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
     """Ensures datetime is explicitly marked with timezone UTC (+00:00) so client browsers accurately convert to local time."""
@@ -50,7 +48,6 @@ from .schemas import (
     SemesterLinkOut,
     AuthStatusResponse,
     AuthLoginRequest,
-    AuthResponse,
     DisputeCreateRequest,
     DisputeOut,
     DisputeReviewRequest,
@@ -88,10 +85,8 @@ from .services.ondemand_scraper import ondemand_scraper
 from .auth import (
     hash_password,
     verify_password,
-    compute_pw_sig,
     create_session,
     verify_session_token,
-    get_current_student_usn,
     AUTH_SESSIONS,
 )
 
