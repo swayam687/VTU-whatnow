@@ -32,6 +32,36 @@ interface CharScramble {
   isLocked: boolean;
 }
 
+function cleanErrorMessage(rawMsg: string): string {
+  if (!rawMsg) return "Please try again.";
+  const lower = rawMsg.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("load failed") ||
+    lower.includes("err_failed") ||
+    lower.includes("bad gateway") ||
+    lower.includes("service unavailable")
+  ) {
+    return "Backend server is waking up. Please wait 10-15 seconds and try again.";
+  }
+  if (
+    lower.includes("browser logs") ||
+    lower.includes("playwright") ||
+    lower.includes("target page") ||
+    lower.includes("dbus") ||
+    lower.includes("chrome-headless") ||
+    lower.includes("traceback") ||
+    lower.includes("exception in asgi") ||
+    lower.includes("timed out") ||
+    lower.includes("unresponsive") ||
+    lower.includes("internal server error")
+  ) {
+    return "VTU examination servers are currently busy. Please try again.";
+  }
+  return rawMsg;
+}
+
 /**
  * Sequential character-by-character scramble animation (same high-tech decrypting as StudentDetailModal):
  * Staggers locks smoothly with natural character sequence progression.
@@ -361,7 +391,7 @@ export default function StudentAuthModal({
     }
 
     // 30 seconds expired without captcha: return to login screen
-    setError(lastError || "VTU examination portal did not provide a captcha within 30 seconds. Please try again.");
+    setError(cleanErrorMessage(lastError || "VTU examination portal did not provide a captcha within 30 seconds. Please try again."));
     setOnDemandState("idle");
     setLoading(false);
   };
@@ -376,11 +406,11 @@ export default function StudentAuthModal({
         setCaptchaBase64(res.captcha_base64);
         setCaptchaInput("");
       } else {
-        setError(res.message || "Could not reload captcha. Please try again.");
+        setError(cleanErrorMessage(res.message || "Could not reload captcha. Please try again."));
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to reload captcha";
-      setError(msg);
+      setError(cleanErrorMessage(msg));
     } finally {
       setRefreshingCaptcha(false);
     }
@@ -440,12 +470,12 @@ export default function StudentAuthModal({
           setCaptchaBase64(res.new_captcha_base64);
         }
         setCaptchaInput("");
-        setError(res.message || `Captcha code was incorrect. (${newFailCount}/3 attempts)`);
+        setError(cleanErrorMessage(res.message || `Captcha code was incorrect. (${newFailCount}/3 attempts)`));
         setOnDemandState("captcha_ready");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification request failed";
-      setError(msg);
+      setError(cleanErrorMessage(msg));
       setOnDemandState("idle");
     }
   };
@@ -523,7 +553,7 @@ export default function StudentAuthModal({
           msg.includes("503");
 
         if (isFatalError) {
-          setError(msg);
+          setError(cleanErrorMessage(msg));
           setOnDemandState("idle");
           setLoading(false);
           sfx.playMechanicalClick();
@@ -577,7 +607,7 @@ export default function StudentAuthModal({
 
     // 30 seconds elapsed without captcha: return to login screen
     setError(
-      lastError || "VTU examination servers did not provide a captcha within 30 seconds. Please try again."
+      cleanErrorMessage(lastError || "VTU examination servers did not provide a captcha within 30 seconds. Please try again.")
     );
     setOnDemandState("idle");
     setLoading(false);

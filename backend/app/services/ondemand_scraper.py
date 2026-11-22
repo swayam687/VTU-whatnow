@@ -138,6 +138,13 @@ class OnDemandScraperManager:
             if self._browser and self._browser.is_connected():
                 return self._browser
 
+            if self._browser:
+                try:
+                    await self._browser.close()
+                except Exception:
+                    pass
+                self._browser = None
+
             if not self._playwright:
                 self._playwright = await async_playwright().start()
 
@@ -156,8 +163,6 @@ class OnDemandScraperManager:
                 "--ignore-certificate-errors",
                 "--ignore-certificate-errors-spki-list",
             ]
-            if sys.platform != "win32":
-                launch_args.append("--single-process")
             try:
                 self._browser = await self._playwright.chromium.launch(
                     headless=True,
@@ -412,7 +417,6 @@ class OnDemandScraperManager:
 
         except Exception as e:
             traceback.print_exc()
-            err_msg = str(e).strip() or type(e).__name__
             if session:
                 await session.close()
             else:
@@ -426,7 +430,7 @@ class OnDemandScraperManager:
             return {
                 "ok": False,
                 "usn": clean_target_usn,
-                "message": f"Connection to VTU portal timed out ({err_msg}). VTU might be under heavy load.",
+                "message": "VTU examination servers are currently busy or slow. Please try again in a few moments.",
             }
 
     async def refresh_captcha(self, session_id: str) -> dict:

@@ -294,6 +294,20 @@ export default function Dashboard() {
     loadBranchData();
   }, []);
 
+  // Auto-recovery polling when Render free tier backend is spinning up from cold sleep
+  useEffect(() => {
+    if (backendOnline !== false) return;
+    const interval = setInterval(async () => {
+      const isUp = await checkBackendHealth();
+      if (isUp) {
+        setBackendOnline(true);
+        loadBranchData();
+        loadStudentsData();
+      }
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [backendOnline]);
+
   // Load students & leaderboard on branch or sort change (with 0ms local storage cache)
   const loadStudentsData = (authToken?: string | null) => {
     // 0ms Instant Cache Load: Render immediately if local cache exists

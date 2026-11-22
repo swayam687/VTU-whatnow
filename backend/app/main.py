@@ -432,7 +432,7 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
         if not res or not res.get("ok"):
             raise HTTPException(
                 status_code=503,
-                detail=res.get("message", "Unable to reach VTU portal for self-registration.") if res else "VTU servers unresponsive."
+                detail="VTU examination servers are currently busy or slow. Please try again."
             )
 
         return LoginGateChallengeResponse(
@@ -515,10 +515,9 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
             message="Please solve this captcha to verify your session and update campus records.",
         )
     else:
-        err_msg = res.get("message", "Timeout") if res else "VTU examination servers unresponsive"
         raise HTTPException(
             status_code=503,
-            detail=f"VTU examination servers are currently slow or unreachable ({err_msg}). Please try again in 5 seconds."
+            detail="VTU examination servers are currently busy or slow. Please try again."
         )
 
 
@@ -1755,10 +1754,9 @@ async def solve_compare_captcha(
     )
 
     if not res or not res.get("ok"):
-        err_msg = res.get("message", "Timeout") if res else "VTU examination servers unresponsive"
         raise HTTPException(
             status_code=503,
-            detail=f"VTU examination servers are currently slow or unreachable ({err_msg}). Please try again in 5 seconds."
+            detail="VTU examination servers are currently busy or slow. Please try again."
         )
 
     return CompareCaptchaChallengeResponse(

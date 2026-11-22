@@ -24,6 +24,32 @@ interface CompareModalProps {
   viewer?: { usn: string; name?: string } | null;
 }
 
+function cleanCompareError(rawMsg: string): string {
+  if (!rawMsg) return "Please try again.";
+  const lower = rawMsg.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("load failed") ||
+    lower.includes("err_failed")
+  ) {
+    return "Backend server is waking up. Please wait a moment and try again.";
+  }
+  if (
+    lower.includes("browser logs") ||
+    lower.includes("playwright") ||
+    lower.includes("target page") ||
+    lower.includes("dbus") ||
+    lower.includes("chrome-headless") ||
+    lower.includes("traceback") ||
+    lower.includes("timed out") ||
+    lower.includes("unresponsive")
+  ) {
+    return "VTU examination servers are currently busy. Please try again.";
+  }
+  return rawMsg;
+}
+
 export default function CompareModal({
   student1: initialS1,
   student2: initialS2,
@@ -64,7 +90,7 @@ export default function CompareModal({
       setTimeout(() => captchaInputRef.current?.focus(), 150);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to load verification challenge";
-      setCaptchaError(msg);
+      setCaptchaError(cleanCompareError(msg));
     } finally {
       setCaptchaLoading(false);
     }
@@ -154,7 +180,7 @@ export default function CompareModal({
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Verification failed";
-      setCaptchaError(msg);
+      setCaptchaError(cleanCompareError(msg));
     } finally {
       setCaptchaSubmitting(false);
     }
