@@ -86,11 +86,47 @@ export interface AuthSession {
   login_count: number;
 }
 
+/**
+ * Detects whether the app is currently running as an installed PWA (Home Screen / Standalone App).
+ */
+export function isStandaloneApp(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const isStandaloneDisplay = window.matchMedia("(display-mode: standalone)").matches;
+    const isIOSStandalone = (window.navigator as unknown as { standalone?: boolean }).standalone === true;
+    const isAndroidApp = typeof document !== "undefined" && document.referrer.includes("android-app://");
+    const isPwaUrl = typeof window !== "undefined" && window.location.search.includes("mode=pwa");
+    const isPwaInstalledFlag = localStorage.getItem("vtu_pwa_installed") === "true";
+
+    if (isStandaloneDisplay || isIOSStandalone || isAndroidApp || isPwaUrl) {
+      localStorage.setItem("vtu_pwa_standalone_active", "true");
+      return true;
+    }
+
+    return isPwaInstalledFlag && isStandaloneDisplay;
+  } catch {
+    return false;
+  }
+}
+
 export function getStoredStudentToken(): string | null {
   if (typeof window === "undefined") return null;
   try {
-    // Stored in sessionStorage only: user is logged out on tab exit
-    return sessionStorage.getItem("vtu_student_token") || null;
+    // 1. Check in-tab session storage (active during the session in both browser & app)
+    const sessionToken = sessionStorage.getItem("vtu_student_token");
+    if (sessionToken) return sessionToken;
+
+    // 2. Installed App (PWA) Mode: Permanent persistence (no need to log in again & again)
+    if (isStandaloneApp()) {
+      const installedToken = localStorage.getItem("vtu_installed_student_token");
+      if (installedToken) {
+        sessionStorage.setItem("vtu_student_token", installedToken);
+        return installedToken;
+      }
+    }
+
+    // Normal browser tab: logged out on exit/close
+    return null;
   } catch {
     return null;
   }
@@ -99,9 +135,23 @@ export function getStoredStudentToken(): string | null {
 export function getStoredStudentSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
   try {
+    // 1. Check in-tab session storage
     const raw = sessionStorage.getItem("vtu_student_session");
-    if (!raw) return null;
-    return JSON.parse(raw) as AuthSession;
+    if (raw) {
+      return JSON.parse(raw) as AuthSession;
+    }
+
+    // 2. Installed App (PWA) Mode: Permanent persistence (no need to log in again & again)
+    if (isStandaloneApp()) {
+      const installedRaw = localStorage.getItem("vtu_installed_student_session");
+      if (installedRaw) {
+        sessionStorage.setItem("vtu_student_session", installedRaw);
+        return JSON.parse(installedRaw) as AuthSession;
+      }
+    }
+
+    // Normal browser tab: logged out on exit/close
+    return null;
   } catch {
     return null;
   }
@@ -110,15 +160,20 @@ export function getStoredStudentSession(): AuthSession | null {
 export function setStoredStudentSession(session: AuthSession) {
   if (typeof window === "undefined") return;
   try {
-    // Store active token and session in sessionStorage (cleared on browser/tab exit)
+    // 1. Store active token and session in sessionStorage (cleared on browser/tab exit)
     sessionStorage.setItem("vtu_student_token", session.token);
     sessionStorage.setItem("vtu_student_session", JSON.stringify(session));
     sessionStorage.setItem("vtu_student_usn", session.usn);
 
-    // Save full USN in localStorage so next time they open the app, it pre-fills automatically
+    // 2. Save full USN in localStorage so next time they open the web or app, it pre-fills automatically
     localStorage.setItem("last_usn", session.usn);
 
-    // Remove any legacy persistent credentials from localStorage
+    // 3. Store permanent credentials for the installed app (PWA) so installed app users stay logged in
+    localStorage.setItem("vtu_installed_student_token", session.token);
+    localStorage.setItem("vtu_installed_student_session", JSON.stringify(session));
+    localStorage.setItem("vtu_installed_student_usn", session.usn);
+
+    // Clean up any old legacy keys
     localStorage.removeItem("vtu_student_token");
     localStorage.removeItem("vtu_student_session");
     localStorage.removeItem("vtu_student_usn");
@@ -134,6 +189,9 @@ export function clearStoredStudentSession() {
     sessionStorage.removeItem("vtu_student_token");
     sessionStorage.removeItem("vtu_student_session");
     sessionStorage.removeItem("vtu_student_usn");
+    localStorage.removeItem("vtu_installed_student_token");
+    localStorage.removeItem("vtu_installed_student_session");
+    localStorage.removeItem("vtu_installed_student_usn");
     localStorage.removeItem("vtu_student_token");
     localStorage.removeItem("vtu_student_session");
     localStorage.removeItem("vtu_student_usn");

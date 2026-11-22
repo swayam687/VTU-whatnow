@@ -52,6 +52,10 @@ export default function InstallAppModal({
     const handleAppInstalled = () => {
       setInstalledSuccessfully(true);
       setDeferredPrompt(null);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("vtu_pwa_installed", "true");
+        localStorage.setItem("vtu_pwa_standalone_active", "true");
+      }
     };
 
     window.addEventListener("appinstalled", handleAppInstalled);
