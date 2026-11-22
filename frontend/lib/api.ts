@@ -1233,6 +1233,109 @@ export async function deleteScrapeTarget(
   return res.json();
 }
 
+export async function deleteCompareLog(
+  logId: number,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/compare-logs/${logId}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to delete comparison log");
+  }
+  return res.json();
+}
+
+export async function deleteLoginLog(
+  logId: number,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/login-logs/${logId}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to delete login log");
+  }
+  return res.json();
+}
+
+export async function deleteRescrapeRequest(
+  requestId: number,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/rescrape-requests/${requestId}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to delete rescrape request");
+  }
+  return res.json();
+}
+
+export async function deleteMissingReport(
+  reportId: number,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/missing-reports/${reportId}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to delete missing USN report");
+  }
+  return res.json();
+}
+
+export async function deleteDisputeRecord(
+  disputeId: number,
+  adminKey: string
+): Promise<{ ok: boolean; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/disputes/${disputeId}`, {
+    method: "DELETE",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to delete dispute record");
+  }
+  return res.json();
+}
+
+export interface CreditSyncStudent {
+  usn: string;
+  name: string;
+  branch: string;
+  comparison_credits: number;
+  is_claimed: boolean;
+  is_hidden: boolean;
+}
+
+export interface CreditSyncResponse {
+  ok: boolean;
+  total_students: number;
+  synced_at: string;
+  credits: CreditSyncStudent[];
+}
+
+export async function fetchLiveCreditsSync(adminKey: string): Promise<CreditSyncResponse> {
+  const res = await fetch(`${API_BASE}/api/admin/credits-sync`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to sync student credits in real-time");
+  }
+  return res.json();
+}
+
 // -------------------------------------------------------------
 // Comparison Gate & Captcha API Methods
 // -------------------------------------------------------------

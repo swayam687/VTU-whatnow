@@ -137,6 +137,7 @@ export default function Dashboard() {
   // Compare state
   const [compareUsns, setCompareUsns] = useState<string[]>([]);
   const [isCompareOpen, setIsCompareOpen] = useState(false);
+  const [isComparingLoading, setIsComparingLoading] = useState(false);
   const [compareStudent1, setCompareStudent1] = useState<Student | null>(null);
   const [compareStudent2, setCompareStudent2] = useState<Student | null>(null);
   const [allCollegeStudents, setAllCollegeStudents] = useState<Student[]>([]);
@@ -416,13 +417,14 @@ export default function Dashboard() {
 
   // Launch compare modal
   const handleOpenCompare = async () => {
-    if (compareUsns.length < 2) return;
+    if (isComparingLoading || compareUsns.length < 2) return;
     if (!studentSession?.usn && !myUsn) {
       sfx.playMechanicalClick();
       setIsAuthModalOpen(true);
       return;
     }
     sfx.playSonarChime();
+    setIsComparingLoading(true);
     try {
       const [s1, s2] = await Promise.all([
         fetchStudent(compareUsns[0]),
@@ -433,6 +435,8 @@ export default function Dashboard() {
       setIsCompareOpen(true);
     } catch (err) {
       console.error("Failed to fetch students for comparison", err);
+    } finally {
+      setIsComparingLoading(false);
     }
   };
 
@@ -1193,16 +1197,27 @@ export default function Dashboard() {
                 Clear
               </button>
               <button
-                disabled={compareUsns.length < 2}
+                disabled={compareUsns.length < 2 || isComparingLoading}
                 onClick={handleOpenCompare}
-                className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-                  compareUsns.length === 2
-                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm"
+                className={`px-3 py-1.5 text-xs font-bold rounded-xl flex items-center gap-1.5 transition-all shrink-0 ${
+                  isComparingLoading
+                    ? "bg-blue-600/80 text-white cursor-wait pointer-events-none opacity-90 shadow-sm"
+                    : compareUsns.length === 2
+                    ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm cursor-pointer active:scale-95"
                     : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
                 }`}
               >
-                <IconCompare className="w-3.5 h-3.5" />
-                <span>Compare</span>
+                {isComparingLoading ? (
+                  <>
+                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                    <span>Loading...</span>
+                  </>
+                ) : (
+                  <>
+                    <IconCompare className="w-3.5 h-3.5" />
+                    <span>Compare</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

@@ -43,6 +43,12 @@ import {
   deleteScrapeTarget,
   ScrapeTarget,
   updateStudentCredits,
+  deleteCompareLog,
+  deleteLoginLog,
+  deleteRescrapeRequest,
+  deleteMissingReport,
+  deleteDisputeRecord,
+  fetchLiveCreditsSync,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -370,6 +376,123 @@ export default function AdminPanel() {
       await loadScrapeTargets(adminKey);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to delete target");
+    }
+  };
+
+  // Delete individual comparison log
+  const handleDeleteCompareLog = async (id: number) => {
+    if (!adminKey) return;
+    sfx.playMechanicalClick();
+    try {
+      await deleteCompareLog(id, adminKey);
+      setComparisonLogsData((prev) => {
+        if (!prev) return prev;
+        const filtered = prev.recent_logs.filter((l) => l.id !== id);
+        return {
+          ...prev,
+          total_comparisons: Math.max(0, prev.total_comparisons - 1),
+          recent_logs: filtered,
+        };
+      });
+      sfx.playClick();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete comparison log");
+    }
+  };
+
+  // Delete individual login audit log
+  const handleDeleteLoginLog = async (id: number) => {
+    if (!adminKey) return;
+    sfx.playMechanicalClick();
+    try {
+      await deleteLoginLog(id, adminKey);
+      setLoginLogsData((prev) => {
+        if (!prev) return prev;
+        const filtered = prev.recent_logs.filter((l) => l.id !== id);
+        return {
+          ...prev,
+          total_logins: Math.max(0, prev.total_logins - 1),
+          recent_logs: filtered,
+        };
+      });
+      sfx.playClick();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete login log");
+    }
+  };
+
+  // Delete individual rescrape request
+  const handleDeleteRescrapeRequest = async (id: number) => {
+    if (!adminKey) return;
+    if (!confirm("Permanently delete this student scrape request?")) return;
+    sfx.playMechanicalClick();
+    try {
+      await deleteRescrapeRequest(id, adminKey);
+      setRescrapeRequests((prev) => prev.filter((r) => r.id !== id));
+      sfx.playClick();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete rescrape request");
+    }
+  };
+
+  // Delete individual missing report
+  const handleDeleteMissingReport = async (id: number) => {
+    if (!adminKey) return;
+    if (!confirm("Permanently delete this missing USN report?")) return;
+    sfx.playMechanicalClick();
+    try {
+      await deleteMissingReport(id, adminKey);
+      setMissingReports((prev) => prev.filter((m) => m.id !== id));
+      sfx.playClick();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete missing report");
+    }
+  };
+
+  // Delete individual dispute / claim
+  const handleDeleteDispute = async (id: number) => {
+    if (!adminKey) return;
+    if (!confirm("Permanently delete this student ownership claim?")) return;
+    sfx.playMechanicalClick();
+    try {
+      await deleteDisputeRecord(id, adminKey);
+      setDisputes((prev) => prev.filter((d) => d.id !== id));
+      sfx.playClick();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to delete dispute record");
+    }
+  };
+
+  // Real-time credit sync
+  const [syncingCredits, setSyncingCredits] = useState(false);
+  const [lastCreditsSyncTime, setLastCreditsSyncTime] = useState<string | null>(null);
+
+  const handleSyncCreditsRealtime = async () => {
+    if (!adminKey) return;
+    setSyncingCredits(true);
+    sfx.playMechanicalClick();
+    try {
+      const res = await fetchLiveCreditsSync(adminKey);
+      if (res.ok && res.credits) {
+        const creditMap = new Map(res.credits.map((c) => [c.usn, c.comparison_credits]));
+        setAllStudents((prev) =>
+          prev.map((s) => {
+            if (creditMap.has(s.usn)) {
+              return { ...s, comparison_credits: creditMap.get(s.usn) };
+            }
+            return s;
+          })
+        );
+        const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        setLastCreditsSyncTime(timeStr);
+        sfx.playSonar();
+        setActionSuccessMsg(`⚖️ Synced live credits for ${res.total_students} students!`);
+        setTimeout(() => setActionSuccessMsg(""), 3500);
+      }
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to sync credits");
+    } finally {
+      setSyncingCredits(false);
     }
   };
 
@@ -2196,6 +2319,23 @@ export default function AdminPanel() {
                   {f.label}
                 </button>
               ))}
+
+              {/* Real-Time Live Credit Sync Button */}
+              <button
+                type="button"
+                disabled={syncingCredits}
+                onClick={handleSyncCreditsRealtime}
+                title="Fetch live comparison credits for all students in real-time from database"
+                className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                <IconRotateCcw className={`w-3 h-3 ${syncingCredits ? "animate-spin text-cyan-600" : "text-slate-600"}`} />
+                <span>{syncingCredits ? "Syncing..." : "🔄 Sync Credits Live"}</span>
+                {lastCreditsSyncTime && (
+                  <span className="text-[10px] text-emerald-600 font-mono font-medium hidden md:inline">
+                    • {lastCreditsSyncTime}
+                  </span>
+                )}
+              </button>
             </div>
 
             <div className="relative w-full sm:w-64">
@@ -2273,17 +2413,17 @@ export default function AdminPanel() {
                         {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
                       </span>
 
-                      {/* Comparison Credits Control */}
-                      <div className="flex items-center gap-1 bg-slate-50 dark:bg-slate-800/80 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-700/80">
-                        <span className="text-[10px] font-mono font-semibold text-slate-500 uppercase tracking-tight">
-                          Credits:
+                      {/* Comparison Credits Control (Tactile Mobile-Friendly Pill) */}
+                      <div className="flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700/80 shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-tight">
+                          Credits
                         </span>
                         <button
                           type="button"
                           onClick={() => handleUpdateCredits(s.usn, -1)}
                           disabled={(s.comparison_credits ?? 2) <= 0}
                           title="Decrease credits by 1"
-                          className="w-5 h-5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-30 cursor-pointer transition-colors"
+                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-30 cursor-pointer transition-colors shadow-2xs active:scale-95"
                         >
                           -
                         </button>
@@ -2298,13 +2438,13 @@ export default function AdminPanel() {
                               handleUpdateCredits(s.usn, undefined, val);
                             }
                           }}
-                          className="w-8 text-center text-xs font-mono font-bold bg-transparent border-0 outline-none text-slate-900 dark:text-white"
+                          className="w-7 text-center text-xs font-mono font-bold bg-transparent border-0 outline-none text-slate-900 dark:text-white p-0 tabular-nums"
                         />
                         <button
                           type="button"
                           onClick={() => handleUpdateCredits(s.usn, 1)}
                           title="Increase credits by 1"
-                          className="w-5 h-5 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer transition-colors"
+                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer transition-colors shadow-2xs active:scale-95"
                         >
                           +
                         </button>
@@ -2507,15 +2647,33 @@ export default function AdminPanel() {
                         >
                           ✕ Reject
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteDispute(d.id)}
+                          title="Permanently delete this claim record"
+                          className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                        >
+                          <IconTrash className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     ) : (
                       <div className="text-[11px] text-slate-500 pt-1 border-t border-slate-100 flex items-center justify-between">
                         <span>
                           Reviewed: {d.reviewed_at ? formatDateTime(d.reviewed_at).date : "Done"}
                         </span>
-                        {d.admin_notes && (
-                          <span className="text-slate-400 italic">Note: {d.admin_notes}</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {d.admin_notes && (
+                            <span className="text-slate-400 italic">Note: {d.admin_notes}</span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDispute(d.id)}
+                            title="Permanently delete this claim record"
+                            className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                          >
+                            <IconTrash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -2851,6 +3009,15 @@ export default function AdminPanel() {
                                         >
                                           ✕
                                         </button>
+
+                                        <button
+                                          type="button"
+                                          onClick={() => handleDeleteRescrapeRequest(r.id)}
+                                          title="Permanently delete this request record"
+                                          className="min-h-[38px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                                        >
+                                          <IconTrash className="w-3.5 h-3.5" />
+                                        </button>
                                       </div>
                                     </div>
                                   ) : (
@@ -2900,6 +3067,15 @@ export default function AdminPanel() {
                                           >
                                             ✕
                                           </button>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => handleDeleteRescrapeRequest(r.id)}
+                                            title="Permanently delete this request record"
+                                            className="min-h-[42px] py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                                          >
+                                            <IconTrash className="w-3.5 h-3.5" />
+                                          </button>
                                         </div>
                                       </div>
                                     </div>
@@ -2914,11 +3090,21 @@ export default function AdminPanel() {
                                   ? (r.request_type === "DATA_DELETION" ? "✓ Hidden" : "✓ Resolved")
                                   : (r.request_type === "DATA_DELETION" ? "✕ Ignored" : "✕ Rejected")}
                               </span>
-                              {r.resolved_at && (
-                                <span className="font-mono text-[10px] text-slate-400">
-                                  {formatDateTime(r.resolved_at).date}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2">
+                                {r.resolved_at && (
+                                  <span className="font-mono text-[10px] text-slate-400">
+                                    {formatDateTime(r.resolved_at).date}
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteRescrapeRequest(r.id)}
+                                  title="Permanently delete this request record"
+                                  className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                                >
+                                  <IconTrash className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3056,11 +3242,29 @@ export default function AdminPanel() {
                               >
                                 ✓ Mark Done
                               </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMissingReport(r.id)}
+                                title="Delete missing report"
+                                className="py-2 px-2.5 text-xs font-medium rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors text-center cursor-pointer"
+                              >
+                                <IconTrash className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           ) : (
-                            <div className="text-[11px] text-emerald-600 font-semibold pt-1 border-t border-slate-100 flex items-center gap-1">
-                              <span>✓</span>
-                              <span>Resolved</span>
+                            <div className="text-[11px] text-emerald-600 font-semibold pt-1 border-t border-slate-100 flex items-center justify-between">
+                              <div className="flex items-center gap-1">
+                                <span>✓</span>
+                                <span>Resolved</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteMissingReport(r.id)}
+                                title="Delete missing report"
+                                className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                              >
+                                <IconTrash className="w-3.5 h-3.5" />
+                              </button>
                             </div>
                           )}
                         </div>
@@ -3507,6 +3711,14 @@ export default function AdminPanel() {
                                 IP: {log.ip_address}
                               </span>
                             )}
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteCompareLog(log.id)}
+                              title="Delete this comparison log entry"
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer"
+                            >
+                              <IconTrash className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       ))}
@@ -3614,6 +3826,14 @@ export default function AdminPanel() {
                             <span className="text-slate-400 font-mono text-[10px]">
                               {formatDateTime(log.login_at).time} • {formatDateTime(log.login_at).date}
                             </span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteLoginLog(log.id)}
+                              title="Delete this login record"
+                              className="p-1 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 border border-transparent hover:border-rose-200 transition-colors cursor-pointer shrink-0"
+                            >
+                              <IconTrash className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
                       ))

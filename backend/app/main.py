@@ -2071,6 +2071,86 @@ def get_admin_compare_logs(db: Session = Depends(get_db)):
     }
 
 
+@app.delete("/api/admin/compare-logs/{log_id}", dependencies=[Depends(require_admin)])
+def delete_admin_compare_log(log_id: int, db: Session = Depends(get_db)):
+    log = db.query(ComparisonLog).filter(ComparisonLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Comparison log not found.")
+    db.delete(log)
+    db.commit()
+    return {"ok": True, "message": f"Comparison log #{log_id} deleted"}
+
+
+@app.delete("/api/admin/login-logs/{log_id}", dependencies=[Depends(require_admin)])
+def delete_admin_login_log(log_id: int, db: Session = Depends(get_db)):
+    log = db.query(LoginLog).filter(LoginLog.id == log_id).first()
+    if not log:
+        raise HTTPException(status_code=404, detail="Login log not found.")
+    db.delete(log)
+    db.commit()
+    return {"ok": True, "message": f"Login log #{log_id} deleted"}
+
+
+@app.delete("/api/admin/rescrape-requests/{request_id}", dependencies=[Depends(require_admin)])
+def delete_admin_rescrape_request(request_id: int, db: Session = Depends(get_db)):
+    req = db.query(RescrapeRequest).filter(RescrapeRequest.id == request_id).first()
+    if not req:
+        raise HTTPException(status_code=404, detail="Rescrape request not found.")
+    db.delete(req)
+    db.commit()
+    return {"ok": True, "message": f"Rescrape request #{request_id} deleted"}
+
+
+@app.delete("/api/admin/missing-reports/{report_id}", dependencies=[Depends(require_admin)])
+def delete_admin_missing_report(report_id: int, db: Session = Depends(get_db)):
+    rep = db.query(MissingUSNReport).filter(MissingUSNReport.id == report_id).first()
+    if not rep:
+        raise HTTPException(status_code=404, detail="Missing USN report not found.")
+    db.delete(rep)
+    db.commit()
+    return {"ok": True, "message": f"Missing report #{report_id} deleted"}
+
+
+@app.delete("/api/admin/disputes/{dispute_id}", dependencies=[Depends(require_admin)])
+def delete_admin_dispute(dispute_id: int, db: Session = Depends(get_db)):
+    disp = db.query(USNDispute).filter(USNDispute.id == dispute_id).first()
+    if not disp:
+        raise HTTPException(status_code=404, detail="Dispute claim not found.")
+    db.delete(disp)
+    db.commit()
+    return {"ok": True, "message": f"Dispute #{dispute_id} deleted"}
+
+
+@app.get("/api/admin/credits-sync", dependencies=[Depends(require_admin)])
+def sync_student_credits_realtime(db: Session = Depends(get_db)):
+    """Fast, lightweight endpoint returning real-time credit balance and status for all students."""
+    rows = db.query(
+        Student.usn,
+        Student.name,
+        Student.branch,
+        Student.comparison_credits,
+        Student.is_claimed,
+        Student.is_hidden,
+    ).all()
+    credits_list = [
+        {
+            "usn": r.usn,
+            "name": r.name,
+            "branch": r.branch,
+            "comparison_credits": r.comparison_credits if r.comparison_credits is not None else 2,
+            "is_claimed": bool(r.is_claimed),
+            "is_hidden": bool(r.is_hidden),
+        }
+        for r in rows
+    ]
+    return {
+        "ok": True,
+        "total_students": len(credits_list),
+        "synced_at": to_utc_iso(datetime.utcnow()),
+        "credits": credits_list,
+    }
+
+
 @app.get("/api/students/{usn}", response_model=StudentOut)
 def get_student(
     usn: str,
