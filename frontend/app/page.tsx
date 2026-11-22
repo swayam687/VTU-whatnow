@@ -235,27 +235,33 @@ export default function Dashboard() {
   };
 
   const handleCompareWithMe = async (targetStudent: Student) => {
+    if (isComparingLoading) return;
     sfx.playMechanicalClick();
     if (!studentSession?.usn && !myUsn) {
       setIsAuthModalOpen(true);
       return;
     }
-    const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
-    let myProfile = pool.find((s) => s.usn.toUpperCase() === myUsn.toUpperCase());
-    if (!myProfile && myUsn) {
-      try {
-        myProfile = await fetchStudent(myUsn);
-      } catch {
-        // Fallback
+    setIsComparingLoading(true);
+    try {
+      const pool = allCollegeStudents.length > 0 ? allCollegeStudents : students;
+      let myProfile = pool.find((s) => s.usn.toUpperCase() === myUsn.toUpperCase());
+      if (!myProfile && myUsn) {
+        try {
+          myProfile = await fetchStudent(myUsn);
+        } catch {
+          // Fallback
+        }
       }
-    }
-    if (myProfile) {
-      setCompareStudent1(myProfile);
-      setCompareStudent2(targetStudent);
-      setSelectedUsn(null);
-      setIsCompareOpen(true);
-    } else {
-      alert(`Could not find profile for ${myUsn}. Please ensure your marks have been scraped.`);
+      if (myProfile) {
+        setCompareStudent1(myProfile);
+        setCompareStudent2(targetStudent);
+        setSelectedUsn(null);
+        setIsCompareOpen(true);
+      } else {
+        alert(`Could not find profile for ${myUsn}. Please ensure your marks have been scraped.`);
+      }
+    } finally {
+      setIsComparingLoading(false);
     }
   };
 
@@ -1260,6 +1266,7 @@ export default function Dashboard() {
             originRect={modalOriginRect}
             compareUsns={compareUsns}
             isObsidian={isObsidian}
+            isComparingLoading={isComparingLoading}
             onClose={handleCloseDetail}
             onToggleCompare={handleToggleCompare}
             onCompareWithMe={handleCompareWithMe}

@@ -157,6 +157,7 @@ interface StudentDetailModalProps {
   originRect: OriginRect | null;
   compareUsns: string[];
   isObsidian?: boolean;
+  isComparingLoading?: boolean;
   onClose: () => void;
   onToggleCompare: (usn: string) => void;
   onCompareWithMe: (student: Student) => void;
@@ -183,6 +184,7 @@ export default function StudentDetailModal({
   originRect,
   compareUsns,
   isObsidian = false,
+  isComparingLoading = false,
   onClose,
   onToggleCompare,
   onCompareWithMe,
@@ -701,7 +703,7 @@ export default function StudentDetailModal({
                       </p>
                       <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                         {isHidden
-                          ? "Protected"
+                          ? "Hidden"
                           : hasBacklogs
                             ? `${student.total_backlogs} Pending`
                             : "All Clear"}
@@ -740,11 +742,25 @@ export default function StudentDetailModal({
                     </span>
                   ) : myUsn ? (
                     <button
+                      disabled={isComparingLoading}
                       onClick={() => onCompareWithMe(student)}
-                      className="w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
+                      className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${
+                        isComparingLoading
+                          ? "bg-blue-600/80 text-white cursor-wait opacity-90"
+                          : "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 cursor-pointer"
+                      }`}
                     >
-                      <IconCompare className="w-3.5 h-3.5" />
-                      <span>Compare with Me</span>
+                      {isComparingLoading ? (
+                        <>
+                          <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                          <span>Loading...</span>
+                        </>
+                      ) : (
+                        <>
+                          <IconCompare className="w-3.5 h-3.5" />
+                          <span>Compare with Me</span>
+                        </>
+                      )}
                     </button>
                   ) : (
                     <button

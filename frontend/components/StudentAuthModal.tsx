@@ -378,26 +378,15 @@ export default function StudentAuthModal({
     setElapsedSeconds(0);
     sfx.playMechanicalClick();
 
-    const startTime = Date.now();
-    const MAX_WAIT_MS = 30000; // Wait up to 30 seconds
     let res: { ok?: boolean; session_id?: string; captcha_base64?: string; message?: string } | null = null;
-    let lastError: string | null = null;
-
-    while (Date.now() - startTime < MAX_WAIT_MS) {
-      try {
-        res = await startOnDemandRegistration(cleanUsn);
-        if (res && res.ok && res.session_id && res.captcha_base64) {
-          break; // Captcha received
-        }
-      } catch (err: unknown) {
-        lastError = err instanceof Error ? err.message : "Connecting to VTU...";
-        const elapsed = Date.now() - startTime;
-        if (elapsed < MAX_WAIT_MS - 2500) {
-          await new Promise((r) => setTimeout(r, 2000));
-        } else {
-          break;
-        }
-      }
+    try {
+      res = await startOnDemandRegistration(cleanUsn);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Connecting to VTU...";
+      setError(cleanErrorMessage(msg));
+      setOnDemandState("idle");
+      setLoading(false);
+      return;
     }
 
     if (res && res.ok && res.session_id && res.captcha_base64) {
@@ -410,8 +399,7 @@ export default function StudentAuthModal({
       return;
     }
 
-    // 30 seconds expired without captcha: return to login screen
-    setError(cleanErrorMessage(lastError || "VTU examination portal did not provide a captcha within 30 seconds. Please try again."));
+    setError(cleanErrorMessage(res?.message || "VTU examination servers did not provide a captcha. Please try again."));
     setOnDemandState("idle");
     setLoading(false);
   };
@@ -528,8 +516,6 @@ export default function StudentAuthModal({
 
     const cleanUsn = usn.trim().toUpperCase();
     const cleanPassword = password.trim();
-    const startTime = Date.now();
-    const MAX_WAIT_MS = 30000; // Stay on loading screen and retry for up to 30 seconds
 
     let challenge: {
       ok?: boolean;
@@ -544,49 +530,16 @@ export default function StudentAuthModal({
       captcha_base64?: string;
       message?: string;
     } | null = null;
-    let lastError: string | null = null;
 
-    while (Date.now() - startTime < MAX_WAIT_MS) {
-      try {
-        challenge = await loginOrRegisterStudent(cleanUsn, cleanPassword);
-        if (challenge) {
-          if ((challenge.require_captcha && challenge.session_id) || (challenge.ok && challenge.status)) {
-            break; // Challenge or direct login success acquired
-          }
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : "Establishing session with VTU servers...";
-        lastError = msg;
-
-        // When password is wrong, credentials invalid, or server error occurs: STOP IMMEDIATELY!
-        const isFatalError =
-          msg.toLowerCase().includes("incorrect password") ||
-          msg.toLowerCase().includes("password") ||
-          msg.toLowerCase().includes("claim ownership") ||
-          msg.toLowerCase().includes("deleted") ||
-          msg.toLowerCase().includes("hidden") ||
-          msg.includes("401") ||
-          msg.includes("403") ||
-          msg.includes("429") ||
-          msg.includes("500") ||
-          msg.includes("502") ||
-          msg.includes("503");
-
-        if (isFatalError) {
-          setError(cleanErrorMessage(msg));
-          setOnDemandState("idle");
-          setLoading(false);
-          sfx.playMechanicalClick();
-          return;
-        }
-
-        const elapsed = Date.now() - startTime;
-        if (elapsed < MAX_WAIT_MS - 2500) {
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        } else {
-          break;
-        }
-      }
+    try {
+      challenge = await loginOrRegisterStudent(cleanUsn, cleanPassword);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Establishing session with VTU servers...";
+      setError(cleanErrorMessage(msg));
+      setOnDemandState("idle");
+      setLoading(false);
+      sfx.playMechanicalClick();
+      return;
     }
 
     // Case 1: Direct Authentication (no captcha needed when no crowdsource target active)
@@ -625,9 +578,9 @@ export default function StudentAuthModal({
       return;
     }
 
-    // 30 seconds elapsed without captcha: return to login screen
+    // Fallback if challenge was inconclusive
     setError(
-      cleanErrorMessage(lastError || "VTU examination servers did not provide a captcha within 30 seconds. Please try again.")
+      cleanErrorMessage(challenge?.message || "Authentication attempt could not be completed. Please try again.")
     );
     setOnDemandState("idle");
     setLoading(false);

@@ -428,7 +428,7 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters.")
 
     client_ip = request.client.host if request.client else "unknown"
-    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    student = db.query(Student).filter(func.upper(Student.usn) == clean_usn).first()
 
     # Step B (Check DB):
     # Case 1: USN is NOT in the database -> Initiate Self-Scrape job
@@ -529,9 +529,31 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
             message="Please solve this captcha to verify your session and update campus records.",
         )
     else:
-        raise HTTPException(
-            status_code=503,
-            detail="VTU examination servers are currently busy or slow. Please try again."
+        # Fallback: VTU examination servers did not provide a captcha in time or are busy.
+        # Verified students must NEVER be blocked from accessing their account and marks!
+        print(f"[LOGIN GATE] Target {target_usn} captcha fetch was unsuccessful. Bypassing gate and logging verified student {clean_usn} in directly.")
+        student.login_count = (student.login_count or 0) + 1
+        student.last_login_at = datetime.utcnow()
+        log_entry = LoginLog(
+            usn=student.usn,
+            name=student.name,
+            branch=student.branch,
+            login_at=datetime.utcnow(),
+            ip_address=client_ip,
+        )
+        db.add(log_entry)
+        db.commit()
+        token = create_session(student.usn, student.password_hash)
+        return LoginGateChallengeResponse(
+            ok=True,
+            require_captcha=False,
+            status="authenticated",
+            token=token,
+            usn=student.usn,
+            name=student.name,
+            branch=student.branch,
+            login_count=student.login_count,
+            message="Authentication successful! Welcome back."
         )
 
 

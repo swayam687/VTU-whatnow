@@ -41,9 +41,9 @@ export default function StudentCard({
             ? "bg-slate-900 text-slate-400 border-slate-800"
             : "bg-slate-100 text-slate-600 border-slate-200"
         }`}
-        title="Student opted to hide pending subjects status (Protected)"
+        title="Student opted to hide pending subjects status (Hidden)"
       >
-        Protected
+        Hidden
       </span>
     );
   } else if (hasBacklogs) {

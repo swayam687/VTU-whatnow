@@ -185,13 +185,13 @@ export default function PrivacySettingsModal({
                             : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                         }`}
                       >
-                        {settings.show_my_backlogs ? "Public (Default)" : "Protected (Opted Out)"}
+                        {settings.show_my_backlogs ? "Public (Default)" : "Hidden (Opted Out)"}
                       </span>
                     </div>
                     <p className="text-[11px] opacity-65 mt-1 leading-snug">
                       {settings.show_my_backlogs
                         ? "Default is ON. Anyone and everyone can see your backlog number and backlog subjects in your marksheet."
-                        : "Opted out (OFF). Public badge shows \"Protected\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
+                        : "Opted out (OFF). Public badge shows \"Hidden\" and failed subjects are hidden from public view. You will always see all your original scores when logged in."}
                     </p>
                   </div>
                   {/* Switch */}

@@ -552,7 +552,7 @@ export default function CompareModal({
                     ? s1.has_pending_subjects === "Yes"
                       ? "Pending: Yes"
                       : "All Clear"
-                    : "Protected"}
+                    : "Hidden"}
                 </span>
               </div>
             </div>
@@ -641,7 +641,7 @@ export default function CompareModal({
                     ? s2.has_pending_subjects === "Yes"
                       ? "Pending: Yes"
                       : "All Clear"
-                    : "Protected"}
+                    : "Hidden"}
                 </span>
               </div>
             </div>

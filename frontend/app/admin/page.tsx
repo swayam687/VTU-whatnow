@@ -2430,8 +2430,8 @@ export default function AdminPanel() {
                       </span>
 
                       {/* Comparison Credits Control (Tactile Mobile-Friendly Pill) */}
-                      <div className="flex items-center gap-1.5 bg-slate-100/90 dark:bg-slate-800/90 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700/80 shrink-0">
-                        <span className="text-[10px] font-mono font-bold text-slate-500 dark:text-slate-400 uppercase tracking-tight">
+                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-300 dark:border-slate-700/80 shadow-2xs shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-cyan-300 uppercase tracking-tight">
                           Credits
                         </span>
                         <button
@@ -2439,7 +2439,7 @@ export default function AdminPanel() {
                           onClick={() => handleUpdateCredits(s.usn, -1)}
                           disabled={(s.comparison_credits ?? 2) <= 0}
                           title="Decrease credits by 1"
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 disabled:opacity-30 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer transition-colors shadow-2xs active:scale-95"
                         >
                           -
                         </button>
@@ -2454,13 +2454,13 @@ export default function AdminPanel() {
                               handleUpdateCredits(s.usn, undefined, val);
                             }
                           }}
-                          className="w-7 text-center text-xs font-mono font-bold bg-transparent border-0 outline-none text-slate-900 dark:text-white p-0 tabular-nums"
+                          className="w-7 text-center text-xs font-mono font-extrabold bg-transparent border-0 outline-none text-slate-900 dark:text-cyan-200 p-0 tabular-nums"
                         />
                         <button
                           type="button"
                           onClick={() => handleUpdateCredits(s.usn, 1)}
                           title="Increase credits by 1"
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-600 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors shadow-2xs active:scale-95"
                         >
                           +
                         </button>
