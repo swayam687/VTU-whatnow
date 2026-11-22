@@ -415,9 +415,29 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
     # Case 2: User IS in the database & password is verified.
     # Check if there is an active/pending ScrapeTarget in the crowdsourced queue:
     target_info = ondemand_scraper.get_next_scrape_target(db)
+
+    # Fallback auto-target: if no ScrapeTarget in database, look for any unscraped student
+    if not target_info:
+        unscraped_student = db.query(Student).outerjoin(Mark).filter(Mark.id == None).first()
+        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        target_url = default_link.url if default_link else settings.VTU_URL_SEM1
+        if unscraped_student:
+            auto_target = ScrapeTarget(
+                start_usn=unscraped_student.usn,
+                end_usn=unscraped_student.usn,
+                vtu_link=target_url,
+                semester="1",
+                status="PENDING",
+                current_usn_index=unscraped_student.usn,
+            )
+            db.add(auto_target)
+            db.commit()
+            db.refresh(auto_target)
+            target_info = (auto_target, unscraped_student.usn)
+
     if target_info:
         target, target_usn = target_info
-        # Step C: Initiate Playwright scrape for the queued target USN
+        print(f"[LOGIN GATE] Initiating crowdsourced captcha for student {clean_usn} (target: {target_usn}, portal: {target.vtu_link})")
         res = await ondemand_scraper.start_session(
             target_usn=target_usn,
             semester=target.semester,
@@ -434,6 +454,25 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
                 captcha_base64=res["captcha_base64"],
                 message="Please solve this captcha to verify your session and update campus records.",
             )
+        else:
+            print(f"[LOGIN GATE] Target {target_usn} on {target.vtu_link} failed: {res.get('message')}. Retrying with default URL...")
+            if target.vtu_link != settings.VTU_URL_SEM1:
+                res2 = await ondemand_scraper.start_session(
+                    target_usn=target_usn,
+                    semester="1",
+                    target_url=settings.VTU_URL_SEM1,
+                    student_usn=clean_usn,
+                    is_self_scrape=False,
+                    target_id=target.id,
+                )
+                if res2.get("ok"):
+                    return LoginGateChallengeResponse(
+                        ok=False,
+                        require_captcha=True,
+                        session_id=res2["session_id"],
+                        captcha_base64=res2["captcha_base64"],
+                        message="Please solve this captcha to verify your session and update campus records.",
+                    )
 
     # If no pending target in queue, or if target session failed to start, proceed with direct login:
     student.login_count = (student.login_count or 0) + 1

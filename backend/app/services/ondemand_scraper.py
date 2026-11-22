@@ -161,7 +161,7 @@ class OnDemandScraperManager:
         try:
             p = await async_playwright().start()
 
-            # Launch Chromium with anti-detection flags
+            # Launch Chromium with anti-detection flags & SSL cert bypass
             try:
                 browser = await p.chromium.launch(
                     headless=True,
@@ -169,6 +169,8 @@ class OnDemandScraperManager:
                         "--no-sandbox",
                         "--disable-setuid-sandbox",
                         "--disable-blink-features=AutomationControlled",
+                        "--ignore-certificate-errors",
+                        "--ignore-certificate-errors-spki-list",
                     ],
                 )
             except Exception as launch_err:
@@ -182,13 +184,16 @@ class OnDemandScraperManager:
                             "--no-sandbox",
                             "--disable-setuid-sandbox",
                             "--disable-blink-features=AutomationControlled",
+                            "--ignore-certificate-errors",
+                            "--ignore-certificate-errors-spki-list",
                         ],
                     )
                 else:
                     raise launch_err
 
             context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                ignore_https_errors=True,
             )
             page = await context.new_page()
 

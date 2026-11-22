@@ -27,6 +27,118 @@ interface StudentAuthModalProps {
 
 type OnDemandState = "idle" | "connecting" | "captcha_ready" | "extracting" | "success";
 
+interface CharScramble {
+  char: string;
+  isLocked: boolean;
+}
+
+/**
+ * Sequential character-by-character scramble animation (same high-tech decrypting as StudentDetailModal):
+ * Staggers locks smoothly with natural character sequence progression.
+ */
+function useSequentialUSNScramble(targetUsn: string | null, isActive: boolean) {
+  const [displayChars, setDisplayChars] = useState<CharScramble[]>([]);
+  const [isScrambleComplete, setIsScrambleComplete] = useState(false);
+
+  useEffect(() => {
+    if (!isActive || !targetUsn) {
+      setDisplayChars([]);
+      setIsScrambleComplete(false);
+      return;
+    }
+
+    const cleanUsn = targetUsn.trim().toUpperCase() || "VTU ACCESS";
+    const len = cleanUsn.length;
+    const TOTAL_MS = 1400;
+
+    const charSequences: string[][] = [];
+    const lockTimes: number[] = [];
+
+    for (let i = 0; i < len; i++) {
+      const ch = cleanUsn[i];
+      let seq: string[] = [];
+
+      if (ch >= "0" && ch <= "9") {
+        const targetDigit = parseInt(ch, 10);
+        if (targetDigit === 0) {
+          seq = ["7", "8", "9", "0"];
+        } else {
+          for (let d = 0; d <= targetDigit; d++) {
+            seq.push(String(d));
+          }
+        }
+      } else if (ch >= "A" && ch <= "Z") {
+        const targetCode = ch.charCodeAt(0);
+        if (ch === "A") {
+          seq = ["Y", "Z", "A"];
+        } else {
+          for (let code = 65; code <= targetCode; code++) {
+            seq.push(String.fromCharCode(code));
+          }
+        }
+      } else {
+        seq = [ch];
+      }
+
+      charSequences.push(seq);
+
+      const minLock = 250;
+      const maxLock = 1300;
+      const lockT = len <= 1 ? TOTAL_MS : minLock + (i / (len - 1)) * (maxLock - minLock);
+      lockTimes.push(lockT);
+    }
+
+    setDisplayChars(charSequences.map((seq) => ({ char: seq[0], isLocked: false })));
+    setIsScrambleComplete(false);
+
+    const startTime = performance.now();
+    let animId: number;
+    let lastTick = 0;
+
+    const tick = (now: number) => {
+      const elapsed = now - startTime;
+
+      if (now - lastTick >= 28 || elapsed >= TOTAL_MS) {
+        lastTick = now;
+
+        const nextChars: CharScramble[] = [];
+        let allLocked = true;
+
+        for (let i = 0; i < len; i++) {
+          const isLocked = elapsed >= lockTimes[i];
+          if (isLocked) {
+            nextChars.push({ char: cleanUsn[i], isLocked: true });
+          } else {
+            allLocked = false;
+            const seq = charSequences[i];
+            const progress = Math.max(0, Math.min(1, elapsed / lockTimes[i]));
+            const seqIdx = Math.min(seq.length - 1, Math.floor(progress * seq.length));
+            nextChars.push({ char: seq[seqIdx], isLocked: false });
+          }
+        }
+
+        setDisplayChars(nextChars);
+
+        if (elapsed >= TOTAL_MS || allLocked) {
+          setIsScrambleComplete(true);
+          sfx.playSonarChime();
+          return;
+        }
+      }
+
+      animId = requestAnimationFrame(tick);
+    };
+
+    animId = requestAnimationFrame(tick);
+
+    return () => {
+      cancelAnimationFrame(animId);
+    };
+  }, [targetUsn, isActive]);
+
+  return { displayChars, isScrambleComplete };
+}
+
 export default function StudentAuthModal({
   isOpen,
   onClose,
@@ -64,6 +176,13 @@ export default function StudentAuthModal({
     maxMarks: number;
     percentage: number;
   } | null>(null);
+
+  // Sequential character-by-character decryption scramble animation
+  const isDecryptingActive = onDemandState === "connecting" || onDemandState === "extracting";
+  const { displayChars } = useSequentialUSNScramble(
+    usn.trim().toUpperCase() || "VTU ACCESS",
+    isDecryptingActive
+  );
 
   // Manual admin report toggle
   const [showAdminReport, setShowAdminReport] = useState(false);
@@ -300,6 +419,11 @@ export default function StudentAuthModal({
 
     setLoading(true);
     setError(null);
+    // Instantly transition to decrypting scramble animation so the user is never left waiting on the form
+    setOnDemandState("connecting");
+    setElapsedSeconds(0);
+    sfx.playMechanicalClick();
+
     try {
       const challenge = await loginOrRegisterStudent(usn.trim(), password.trim());
 
@@ -313,7 +437,7 @@ export default function StudentAuthModal({
         setFailCount(0);
         setCaptchaInput("");
         setOnDemandState("captcha_ready");
-        sfx.playMechanicalClick();
+        sfx.playSonar();
         return;
       }
 
@@ -324,10 +448,13 @@ export default function StudentAuthModal({
         onSuccess(challenge.auth_response);
         resetForm();
         onClose();
+      } else {
+        setOnDemandState("idle");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to authenticate";
       setError(msg);
+      setOnDemandState("idle");
     } finally {
       setLoading(false);
     }
@@ -535,64 +662,71 @@ export default function StudentAuthModal({
           )}
 
           {/* ========================================================================= */}
-          {/* STAGE 1: CONNECTING & GENERATING CAPTCHA LOADING SCREEN (15-30s wait)    */}
+          {/* STAGE 1: CONNECTING & GENERATING CAPTCHA (DECRYPTING SCRAMBLE)            */}
           {/* ========================================================================= */}
           {onDemandState === "connecting" ? (
             <div className="py-6 px-1 space-y-5 text-center animate-in fade-in duration-200">
-              {/* Radar pulse animation */}
-              <div className="relative w-20 h-20 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-ping opacity-75" />
-                <div className="absolute inset-2 rounded-full bg-cyan-500/30 animate-pulse" />
-                <div className="relative w-12 h-12 rounded-full bg-slate-900 border border-cyan-400/50 flex items-center justify-center text-xl shadow-lg shadow-cyan-500/20">
-                  🌐
+              {/* Rotating beacon */}
+              <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border border-cyan-500/30 animate-spin border-t-cyan-400" />
+                <div className="w-10 h-10 rounded-full bg-slate-900 border border-cyan-500/40 flex items-center justify-center font-mono font-bold text-xs text-cyan-300 shadow-lg shadow-cyan-950/40">
+                  VTU
                 </div>
               </div>
 
-              {/* Slow VTU Portal Warning Box (Critical Requirement) */}
-              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-left space-y-2">
-                <div className="flex items-center gap-2 text-amber-400 font-semibold text-xs sm:text-sm">
-                  <span>⏱️</span>
-                  <span>VTU examination servers take 15–30 seconds</span>
+              {/* Status Header */}
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 font-mono text-[11px] font-medium tracking-wide">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-cyan-400 animate-ping" />
+                  <span>DECRYPTING VTU GATEWAY & SECURITY RECORD</span>
                 </div>
-                <p className={`text-xs leading-relaxed ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                  Please keep this window open and do not reload. We are launching a secure session to connect to the VTU portal and generate your verification captcha.
-                </p>
-                <div className="pt-1 flex items-center justify-between text-[11px] font-mono text-amber-400/90">
-                  <span>Target USN: {usn.trim().toUpperCase()}</span>
-                  <span className="font-semibold bg-amber-500/20 px-2 py-0.5 rounded-md">
+                <h3 className="font-semibold text-base sm:text-lg tracking-tight text-white">
+                  Verifying Campus Records...
+                </h3>
+              </div>
+
+              {/* The Sequential Scramble Box */}
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <div className="inline-flex items-center gap-1 sm:gap-1.5 px-4 py-2 rounded-xl bg-slate-950/90 border border-cyan-500/40 shadow-xl shadow-cyan-950/50 max-w-fit">
+                  {displayChars.map((item, idx) => (
+                    <span
+                      key={idx}
+                      className={`inline-block w-5 sm:w-6 text-center font-mono font-bold text-base sm:text-lg tabular-nums tracking-wider transition-colors duration-100 ${
+                        item.isLocked
+                          ? "text-cyan-300 font-extrabold"
+                          : "text-amber-400 font-medium animate-pulse"
+                      }`}
+                    >
+                      {item.char}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  Handshaking official examination portal
+                </span>
+              </div>
+
+              {/* Slow VTU Portal Notice */}
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 text-left space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-zinc-400">Connection Latency</span>
+                  <span className="font-semibold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded border border-cyan-500/20">
                     {elapsedSeconds}s elapsed
                   </span>
                 </div>
+                <p className="text-xs leading-relaxed text-zinc-400">
+                  VTU examination servers take 15–30 seconds to connect and stream the verification challenge. Please keep this window open.
+                </p>
               </div>
 
-              {/* Progress steps checklist */}
-              <div className={`p-3.5 rounded-xl border text-xs text-left space-y-2 ${
-                isObsidian ? "bg-white/[0.02] border-white/10" : "bg-zinc-50 border-zinc-200"
-              }`}>
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <span>✓</span>
-                  <span>USN format validated: <code className="font-mono">{usn}</code></span>
-                </div>
-                <div className="flex items-center gap-2 text-cyan-400">
-                  <span className="inline-block w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
-                  <span>Connecting to official VTU results portal...</span>
-                </div>
-                <div className="flex items-center gap-2 text-zinc-500">
-                  <span>○</span>
-                  <span>Generating live security captcha image</span>
-                </div>
-              </div>
-
-              <div className="pt-2">
+              <div className="pt-1">
                 <button
                   type="button"
                   onClick={() => {
                     setOnDemandState("idle");
                     setError(null);
                   }}
-                  className={`text-xs transition-colors cursor-pointer ${
-                    isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"
-                  }`}
+                  className="text-xs text-zinc-500 hover:text-zinc-300 transition-colors cursor-pointer"
                 >
                   Cancel Connection
                 </button>
@@ -672,7 +806,7 @@ export default function StudentAuthModal({
                 disabled={!captchaInput.trim()}
                 className="w-full py-3.5 px-4 rounded-xl text-sm font-semibold tracking-wide bg-emerald-500 hover:bg-emerald-600 active:scale-[0.99] text-white shadow-lg shadow-emerald-500/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
               >
-                Verify Captcha & Save Marksheet →
+                Verify Captcha & Continue →
               </button>
 
               <div className="text-center">
@@ -693,40 +827,57 @@ export default function StudentAuthModal({
 
           ) : onDemandState === "extracting" ? (
             /* ========================================================================= */
-            /* STAGE 3: EXTRACTING & SECURING ACCOUNT LOADING SCREEN                     */
+            /* STAGE 3: EXTRACTING & SECURING ACCOUNT (DECRYPTING SCRAMBLE)              */
             /* ========================================================================= */
             <div className="py-6 px-1 space-y-5 text-center animate-in fade-in duration-200">
-              <div className="relative w-18 h-18 mx-auto flex items-center justify-center">
-                <div className="absolute inset-0 rounded-full border-2 border-emerald-400/20 animate-spin border-t-emerald-400" />
-                <span className="text-2xl">📊</span>
+              <div className="relative w-16 h-16 mx-auto flex items-center justify-center">
+                <div className="absolute inset-0 rounded-full border border-emerald-500/30 animate-spin border-t-emerald-400" />
+                <div className="w-10 h-10 rounded-full bg-slate-900 border border-emerald-500/40 flex items-center justify-center font-mono font-bold text-xs text-emerald-300 shadow-lg shadow-emerald-950/40">
+                  VTU
+                </div>
               </div>
 
-              <div className="space-y-1">
-                <h3 className="font-semibold text-base">Verifying & Extracting Marksheet</h3>
-                <p className={`text-xs leading-relaxed px-2 ${isObsidian ? "text-zinc-400" : "text-zinc-600"}`}>
-                  Submitting your captcha to VTU servers, extracting marks and SGPA, and locking your account.
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-mono text-[11px] font-medium tracking-wide">
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
+                  <span>PARSING OFFICIAL RESULT LEDGER</span>
+                </div>
+                <h3 className="font-semibold text-base sm:text-lg tracking-tight text-white">
+                  Verifying Captcha & Extracting Marksheet
+                </h3>
+              </div>
+
+              {/* The Sequential Scramble Box */}
+              <div className="flex flex-col items-center justify-center space-y-2">
+                <div className="inline-flex items-center gap-1 sm:gap-1.5 px-4 py-2 rounded-xl bg-slate-950/90 border border-emerald-500/40 shadow-xl shadow-emerald-950/50 max-w-fit">
+                  {displayChars.map((item, idx) => (
+                    <span
+                      key={idx}
+                      className={`inline-block w-5 sm:w-6 text-center font-mono font-bold text-base sm:text-lg tabular-nums tracking-wider transition-colors duration-100 ${
+                        item.isLocked
+                          ? "text-emerald-300 font-extrabold"
+                          : "text-amber-400 font-medium animate-pulse"
+                      }`}
+                    >
+                      {item.char}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-[11px] font-mono text-zinc-400">
+                  Computing SGPA credits and authenticating profile
+                </span>
+              </div>
+
+              <div className="p-4 rounded-xl bg-slate-900/60 border border-white/10 text-left space-y-2">
+                <div className="flex items-center justify-between text-xs font-mono">
+                  <span className="text-zinc-400">Processing Stage</span>
+                  <span className="font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                    {elapsedSeconds}s elapsed
+                  </span>
+                </div>
+                <p className="text-xs leading-relaxed text-zinc-400">
+                  Submitting solution to VTU examination server and verifying security checksum.
                 </p>
-              </div>
-
-              <div className={`p-3.5 rounded-xl border text-xs text-left space-y-2 ${
-                isObsidian ? "bg-white/[0.02] border-white/10" : "bg-zinc-50 border-zinc-200"
-              }`}>
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <span>✓</span>
-                  <span>Captcha submitted to VTU</span>
-                </div>
-                <div className="flex items-center gap-2 text-emerald-400">
-                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                  <span>Parsing marks table, subject credits & SGPA...</span>
-                </div>
-                <div className="flex items-center gap-2 text-zinc-500">
-                  <span>○</span>
-                  <span>Hashing password and creating session</span>
-                </div>
-              </div>
-
-              <div className="text-[11px] font-mono text-zinc-400">
-                ⏱️ {elapsedSeconds}s elapsed • Please do not close
               </div>
             </div>
 
