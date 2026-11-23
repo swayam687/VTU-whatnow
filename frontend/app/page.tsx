@@ -10,6 +10,7 @@ import CampusGraph from "../components/CampusGraph";
 import BacklogMatrix from "../components/BacklogMatrix";
 import Identicon from "../components/Identicon";
 import Navbar from "../components/Navbar";
+import StudyBreakHub from "../components/StudyBreakHub";
 import {
   Student,
   BranchStat,
@@ -1151,6 +1152,9 @@ export default function Dashboard() {
             </div>
           </>
         )}
+
+        {/* Study Break Hub: Student-Built Tools & Break Zone */}
+        <StudyBreakHub isObsidian={isObsidian} />
 
         {/* Global Footer */}
         <footer className="pt-8 pb-12 border-t border-slate-200/60 dark:border-white/5 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs opacity-60">
