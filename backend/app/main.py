@@ -323,6 +323,20 @@ def init_db():
         except Exception as e:
             print(f"⚠️ user_captcha_logs init notice: {e}")
 
+        # Auto-seed and auto-heal subjects catalog
+        try:
+            from .services.subject_catalog import VTU_SUBJECT_NAMES
+            with Session(bind=engine) as db:
+                for code, name in VTU_SUBJECT_NAMES.items():
+                    subj = db.query(models.Subject).filter(models.Subject.code == code).first()
+                    if not subj:
+                        db.add(models.Subject(code=code, name=name))
+                    elif not subj.name or subj.name.strip().upper() == code.strip().upper():
+                        subj.name = name
+                db.commit()
+        except Exception as subj_err:
+            print(f"⚠️ Subject catalog auto-heal notice: {subj_err}")
+
         print("✅ Database schema initialized and verified.")
     except Exception as e:
         print(f"⚠️ Notice: DB connection check ({e}). Web service remains live.")
@@ -2288,12 +2302,14 @@ def upsert_student_marks(
 
     for m in req.marks:
         code = m.subject_code.strip().upper()
+        from .services.subject_catalog import get_catalog_subject_name
+        resolved_name = get_catalog_subject_name(code, m.subject_name)
         subj = db.query(Subject).filter(Subject.code == code).first()
         if not subj:
-            subj = Subject(code=code, name=m.subject_name or code)
+            subj = Subject(code=code, name=resolved_name)
             db.add(subj)
-        elif m.subject_name and not subj.name:
-            subj.name = m.subject_name
+        elif resolved_name and (not subj.name or subj.name.strip().upper() == code):
+            subj.name = resolved_name
 
         existing = db.query(Mark).filter(Mark.usn == clean_usn, Mark.subject_code == code).first()
         if existing:

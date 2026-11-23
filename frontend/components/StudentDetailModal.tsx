@@ -19,6 +19,7 @@ import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";
 import PrivacySettingsModal from "./PrivacySettingsModal";
 import { sfx } from "../lib/sfx";
+import { getSubjectName } from "../lib/subjects";
 
 export interface OriginRect {
   left: number;
@@ -886,7 +887,7 @@ export default function StudentDetailModal({
                               S{m.semester || "1"}
                             </td>
                             <td className="py-2 px-3 font-medium max-w-[180px] sm:max-w-[220px] truncate">
-                              {m.subject_name || m.subject_code}
+                              {getSubjectName(m.subject_code, m.subject_name)}
                             </td>
                             <td className="py-2 px-2 text-center opacity-60 font-mono">
                               {m.internal_marks}

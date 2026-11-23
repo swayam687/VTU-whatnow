@@ -14,6 +14,7 @@ import {
 import { IconClose, IconCompare, IconShield, IconRotateCcw } from "./Icons";
 import Identicon from "./Identicon";
 import { sfx } from "../lib/sfx";
+import { getSubjectName } from "../lib/subjects";
 
 interface CompareModalProps {
   student1: Student;
@@ -706,7 +707,8 @@ export default function CompareModal({
                 {allSubjectCodes.map((code) => {
                   const m1 = s1MarksMap.get(code);
                   const m2 = s2MarksMap.get(code);
-                  const subjectName = m1?.subject_name || m2?.subject_name || code;
+                  const rawName = m1?.subject_name || m2?.subject_name;
+                  const subjectName = getSubjectName(code, rawName);
                   const score1 = m1 ? m1.total : null;
                   const score2 = m2 ? m2.total : null;
                   const lead = score1 !== null && score2 !== null ? score1 - score2 : null;
@@ -732,7 +734,15 @@ export default function CompareModal({
                             </span>
                           )}
                         </div>
-                        <p className="text-[11px] opacity-70 line-clamp-1">{subjectName}</p>
+                        {subjectName && subjectName.toUpperCase() !== code.toUpperCase() ? (
+                          <p className="text-[11px] opacity-75 line-clamp-1 mt-0.5 font-medium" title={subjectName}>
+                            {subjectName}
+                          </p>
+                        ) : (
+                          <p className="text-[11px] opacity-60 line-clamp-1 mt-0.5 italic">
+                            Course {code}
+                          </p>
+                        )}
                       </div>
 
                       {/* Student 1 Marks */}

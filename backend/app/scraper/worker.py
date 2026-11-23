@@ -407,12 +407,14 @@ class ScraperWorker:
 
             for m in parsed["marks"]:
                 code = m["subject_code"].strip().upper()
+                from ..services.subject_catalog import get_catalog_subject_name
+                resolved_name = get_catalog_subject_name(code, m.get("subject_name"))
                 subj = db.query(Subject).filter(Subject.code == code).first()
                 if not subj:
-                    subj = Subject(code=code, name=m["subject_name"])
+                    subj = Subject(code=code, name=resolved_name)
                     db.add(subj)
-                elif m["subject_name"] and not subj.name:
-                    subj.name = m["subject_name"]
+                elif resolved_name and (not subj.name or subj.name.strip().upper() == code):
+                    subj.name = resolved_name
 
                 mark_sem = str(m.get("semester") or semester or "1").strip()
 

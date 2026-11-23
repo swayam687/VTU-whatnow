@@ -65,7 +65,10 @@ class Mark(Base):
 
     @property
     def subject_name(self) -> str:
-        return self.subject.name if self.subject else ""
+        if self.subject and self.subject.name and self.subject.name.strip().upper() != (self.subject_code or "").strip().upper():
+            return self.subject.name
+        from .services.subject_catalog import get_catalog_subject_name
+        return get_catalog_subject_name(self.subject_code or "", self.subject.name if self.subject else None)
 
 
 class SemesterLink(Base):

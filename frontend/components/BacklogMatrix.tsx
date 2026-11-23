@@ -8,6 +8,7 @@ import {
   Student,
 } from "../lib/api";
 import { sfx } from "../lib/sfx";
+import { getSubjectName } from "../lib/subjects";
 
 interface BacklogMatrixProps {
   students: Student[];
@@ -286,7 +287,7 @@ export default function BacklogMatrix({
                             )}
                           </div>
                           <p className="text-xs opacity-70 truncate max-w-sm sm:max-w-md">
-                            {subj.subject_name || subj.subject_code}
+                            {getSubjectName(subj.subject_code, subj.subject_name)}
                           </p>
                         </div>
                       </div>
