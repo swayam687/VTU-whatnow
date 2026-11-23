@@ -29,6 +29,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, desc, func, distinct, inspect
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+from .security import sanitize_text, sanitize_url, validate_and_sanitize_vtu_url
 from .config import settings
 from .database import engine, get_db
 from . import models
@@ -354,6 +359,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 
+# Rate Limiter setup (SlowAPI)
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 # CORS setup - dynamically allows localhost, 127.0.0.1, LAN IPs, and production origins with credentials
 origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
 if "https://vtu-whatnow.vercel.app" not in origins and "*" not in origins:
@@ -391,8 +401,8 @@ async def health():
 def require_admin(x_admin_key: str = Header(default="", alias="X-Admin-Key")):
     if not x_admin_key or x_admin_key != settings.ADMIN_PASSWORD:
         raise HTTPException(
-            status_code=401,
-            detail="Admin authorization required. Please provide a valid admin password."
+            status_code=403,
+            detail="Forbidden: Admin authorization required. Please provide a valid admin password."
         )
 
 
@@ -400,7 +410,7 @@ def require_admin(x_admin_key: str = Header(default="", alias="X-Admin-Key")):
 def verify_admin(req: AdminVerifyRequest):
     if req.password == settings.ADMIN_PASSWORD:
         return {"ok": True, "message": "Authenticated"}
-    raise HTTPException(status_code=401, detail="Incorrect admin password.")
+    raise HTTPException(status_code=403, detail="Forbidden: Incorrect admin password.")
 
 
 # -------------------------------------------------------------
@@ -431,6 +441,7 @@ def get_auth_status(usn: str = Query(..., description="USN to check"), db: Sessi
 
 @app.post("/api/auth/login", response_model=LoginGateChallengeResponse)
 @app.post("/api/auth/login-or-register", response_model=LoginGateChallengeResponse)
+@limiter.limit("5/minute")
 async def login_or_register(req: AuthLoginRequest, request: Request, db: Session = Depends(get_db)):
     clean_usn = req.usn.strip().upper()
     password = req.password.strip()
@@ -572,6 +583,7 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
 
 
 @app.post("/api/auth/gate/submit", response_model=LoginGateSubmitResponse)
+@limiter.limit("5/minute")
 async def submit_login_gate_captcha(
     req: LoginGateSubmitRequest,
     request: Request,
@@ -772,7 +784,8 @@ def verify_student_session(
 
 
 @app.post("/api/auth/dispute")
-def submit_usn_dispute(req: DisputeCreateRequest, db: Session = Depends(get_db)):
+@limiter.limit("5/minute")
+def submit_usn_dispute(req: DisputeCreateRequest, request: Request, db: Session = Depends(get_db)):
     clean_usn = req.usn.strip().upper()
     new_password = req.new_password.strip()
 
@@ -781,6 +794,9 @@ def submit_usn_dispute(req: DisputeCreateRequest, db: Session = Depends(get_db))
 
     if len(new_password) < 4:
         raise HTTPException(status_code=400, detail="Password must be at least 4 characters.")
+
+    if len(req.selfie_base64) > 7_000_000:
+        raise HTTPException(status_code=400, detail="Selfie photo payload exceeds maximum size limit (5MB).")
 
     student = db.query(Student).filter(Student.usn == clean_usn).first()
     student_name = student.name if student else "Pending Scrape"
@@ -810,6 +826,7 @@ def submit_usn_dispute(req: DisputeCreateRequest, db: Session = Depends(get_db))
 # -------------------------------------------------------------
 
 @app.post("/api/missing-usn/report")
+@limiter.limit("5/minute")
 def report_missing_usn(
     req: MissingUSNReportCreate,
     request: Request,
@@ -827,9 +844,9 @@ def report_missing_usn(
 
     entry = MissingUSNReport(
         usn=clean_usn,
-        name=req.name.strip() if req.name else "",
-        branch=req.branch.strip().upper() if req.branch else "",
-        message=req.message.strip() if req.message else "Student reported USN not found in database.",
+        name=sanitize_text(req.name, max_length=100) if req.name else "",
+        branch=sanitize_text(req.branch, max_length=20).upper() if req.branch else "",
+        message=sanitize_text(req.message, max_length=1000, allow_multiline=True) if req.message else "Student reported USN not found in database.",
         status="pending",
         reported_at=datetime.utcnow(),
         ip_address=client_ip,
@@ -898,6 +915,7 @@ def format_rescrape_out(r: RescrapeRequest) -> dict:
 
 
 @app.post("/api/rescrape/request")
+@limiter.limit("5/minute")
 def create_rescrape_request(
     req: RescrapeRequestCreate,
     request: Request,
@@ -935,7 +953,7 @@ def create_rescrape_request(
                 existing_active.request_type = "DATA_DELETION"
                 existing_active.status = "pending"
                 existing_active.target_semester = "all"
-                existing_active.message = req.message.strip() if req.message else "Data deletion requested."
+                existing_active.message = sanitize_text(req.message, max_length=1000, allow_multiline=True) if req.message else "Data deletion requested."
                 existing_active.created_at = datetime.utcnow()
                 db.commit()
                 db.refresh(existing_active)
@@ -973,17 +991,21 @@ def create_rescrape_request(
 
     # Lookup student record to autofill name & branch if not provided
     student = db.query(Student).filter(Student.usn == clean_usn).first()
-    student_name = req.name.strip() if req.name else (student.name if student else clean_usn)
-    student_branch = req.branch.strip().upper() if req.branch else (student.branch if student else "")
+    student_name = sanitize_text(req.name, max_length=100) if req.name else (student.name if student else clean_usn)
+    student_branch = sanitize_text(req.branch, max_length=20).upper() if req.branch else (student.branch if student else "")
+    clean_msg = sanitize_text(req.message, max_length=1000, allow_multiline=True) if req.message else ""
+    clean_codes = sanitize_text(req.subject_codes, max_length=200) if req.subject_codes else ""
 
-    vtu_link_val = (req.vtu_link or req.custom_url or "").strip()
+    vtu_link_raw = (req.vtu_link or req.custom_url or "").strip()
+    vtu_link_val = validate_and_sanitize_vtu_url(vtu_link_raw)
+
     entry = RescrapeRequest(
         usn=clean_usn,
         name=student_name,
         branch=student_branch,
         request_type=req.request_type,
         target_semester=req.target_semester or "1",
-        subject_codes=req.subject_codes.strip() if req.subject_codes else "",
+        subject_codes=clean_codes,
         custom_url=vtu_link_val,
         vtu_link=vtu_link_val,
         message=req.message.strip() if req.message else "",
@@ -1457,10 +1479,10 @@ def get_semester_links(db: Session = Depends(get_db)):
 
 @app.post("/api/semester-links", response_model=SemesterLinkOut, dependencies=[Depends(require_admin)])
 def create_semester_link(data: SemesterLinkCreate, db: Session = Depends(get_db)):
-    clean_title = data.title.strip()
-    clean_url = data.url.strip()
+    clean_title = sanitize_text(data.title, max_length=150)
+    clean_url = validate_and_sanitize_vtu_url(data.url)
     if not clean_title or not clean_url:
-        raise HTTPException(status_code=400, detail="Title and URL are required.")
+        raise HTTPException(status_code=400, detail="Title and valid VTU results URL are required.")
     
     # VTU form entry is always index.php
     if "resultpage.php" in clean_url:
@@ -1519,6 +1541,8 @@ def create_scrape_target(req: ScrapeTargetCreate, db: Session = Depends(get_db))
         target_url = default_link.url if default_link else settings.VTU_URL_SEM1
         if default_link and default_link.semester:
             target_sem = default_link.semester
+
+    target_url = validate_and_sanitize_vtu_url(target_url)
 
     new_target = ScrapeTarget(
         start_usn=clean_start,
@@ -1778,6 +1802,7 @@ def compare_students(
 
 
 @app.post("/api/compare/solve-captcha", response_model=CompareCaptchaChallengeResponse)
+@limiter.limit("10/minute")
 async def solve_compare_captcha(
     request: Request,
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
@@ -1847,6 +1872,7 @@ async def solve_compare_captcha(
 
 
 @app.post("/api/compare/submit-captcha")
+@limiter.limit("10/minute")
 async def submit_compare_captcha(
     req: CompareCaptchaSubmitRequest,
     request: Request,
@@ -2272,7 +2298,7 @@ def update_student_socials(usn: str, data: StudentUpdate, db: Session = Depends(
                 raw_github = f"https://{raw_github}"
             else:
                 raw_github = f"https://github.com/{raw_github.lstrip('@')}"
-        student.github_url = raw_github
+        student.github_url = sanitize_url(raw_github)
 
     if data.linkedin_url is not None:
         raw_linkedin = data.linkedin_url.strip()
@@ -2281,7 +2307,7 @@ def update_student_socials(usn: str, data: StudentUpdate, db: Session = Depends(
                 raw_linkedin = f"https://{raw_linkedin}"
             else:
                 raw_linkedin = f"https://linkedin.com/in/{raw_linkedin.lstrip('@')}"
-        student.linkedin_url = raw_linkedin
+        student.linkedin_url = sanitize_url(raw_linkedin)
     
     db.commit()
     return {"message": "Social profiles updated successfully.", "student": student}
@@ -2390,7 +2416,10 @@ def update_student_avatar(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
 
-    student.avatar_pixel_art = req.pixel_art.strip()
+    raw_art = req.pixel_art.strip()
+    if len(raw_art) > 10000:
+        raise HTTPException(status_code=400, detail="Avatar data exceeds maximum permitted size (10KB).")
+    student.avatar_pixel_art = sanitize_text(raw_art, max_length=10000, allow_multiline=True)
     db.commit()
     return {"ok": True, "message": "Custom avatar pixel art saved successfully!", "pixel_art": student.avatar_pixel_art}
 

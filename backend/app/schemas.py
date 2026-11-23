@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 
 class MarkBase(BaseModel):
     subject_code: str
@@ -150,6 +150,7 @@ class AuthStatusResponse(BaseModel):
     is_hidden: Optional[bool] = False
 
 class AuthLoginRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
     usn: str
     password: str
 
@@ -432,8 +433,8 @@ class CompareCaptchaSubmitRequest(BaseModel):
 
 
 class AdminCreditUpdateRequest(BaseModel):
-    amount: Optional[int] = None
-    set: Optional[int] = None
+    amount: Optional[int] = Field(default=None, ge=0)
+    set: Optional[int] = Field(default=None, ge=0)
 
 
 class SessionCancelRequest(BaseModel):
