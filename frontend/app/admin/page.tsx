@@ -2880,7 +2880,7 @@ export default function AdminPanel() {
                             <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/90 space-y-2 text-xs">
                               <div>
                                 <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
-                                  Student Provided VTU Result Link:
+                                  Student Provided VTU Result Link / Note:
                                 </span>
                                 <span className="text-[11px] font-mono text-slate-800 break-all select-all block bg-white px-2.5 py-1.5 rounded-xl border border-slate-200 font-medium">
                                   {r.vtu_link || r.custom_url}

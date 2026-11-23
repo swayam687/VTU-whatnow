@@ -356,13 +356,14 @@ export default function RescrapeRequestModal({
                     Paste VTU Result Link{" "}
                     <span className="text-[10px] font-normal opacity-60">
                       (Optional but recommended)
-                    </span>
+                    </span>{" "}
+                    or write a note to admin
                   </label>
                   <input
-                    type="url"
+                    type="text"
                     value={vtuLink}
                     onChange={(e) => setVtuLink(e.target.value)}
-                    placeholder="https://results.vtu.ac.in/.../index.php"
+                    placeholder="https://results.vtu.ac.in/.../index.php or e.g. sem-1 reval and sem-2 make up reval"
                     className={`w-full px-3 py-2 text-xs rounded-xl border outline-none font-mono transition-all ${
                       isObsidian
                         ? "bg-slate-950/60 border-slate-700 text-white focus:border-cyan-400"
@@ -370,7 +371,7 @@ export default function RescrapeRequestModal({
                     }`}
                   />
                   <p className="text-[11px] opacity-65 leading-relaxed">
-                    If you have a specific revaluation, makeup, or results portal link, paste it here. Admins can route it directly to the Crowdsourced Scraping Gate.
+                    If you have a specific revaluation, makeup, or results portal link, paste it here. Admins will read the note and take action accordingly.
                   </p>
                 </div>
               )}
