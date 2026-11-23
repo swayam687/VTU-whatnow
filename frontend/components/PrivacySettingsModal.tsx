@@ -84,25 +84,22 @@ export default function PrivacySettingsModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
       <div
-        className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden transition-all flex flex-col max-h-[90vh] ${
-          isObsidian
-            ? "bg-[#0b0d11] border-slate-800 text-slate-100"
-            : "bg-white border-slate-200 text-slate-900"
-        }`}
+        className={`w-full max-w-lg rounded-3xl border shadow-2xl overflow-hidden transition-all flex flex-col max-h-[90vh] ${isObsidian
+          ? "bg-[#0b0d11] border-slate-800 text-slate-100"
+          : "bg-white border-slate-200 text-slate-900"
+          }`}
       >
         {/* Header */}
         <div
-          className={`p-4 sm:p-5 border-b flex items-center justify-between ${
-            isObsidian ? "border-slate-800 bg-[#0f1117]" : "border-slate-100 bg-slate-50"
-          }`}
+          className={`p-4 sm:p-5 border-b flex items-center justify-between ${isObsidian ? "border-slate-800 bg-[#0f1117]" : "border-slate-100 bg-slate-50"
+            }`}
         >
           <div className="flex items-center gap-2.5">
             <div
-              className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
-                isObsidian
-                  ? "bg-cyan-950/40 border-cyan-800/40 text-cyan-400"
-                  : "bg-blue-50 border-blue-200 text-blue-600"
-              }`}
+              className={`w-8 h-8 rounded-xl flex items-center justify-center border ${isObsidian
+                ? "bg-cyan-950/40 border-cyan-800/40 text-cyan-400"
+                : "bg-blue-50 border-blue-200 text-blue-600"
+                }`}
             >
               <IconShield className="w-4 h-4" />
             </div>
@@ -141,9 +138,8 @@ export default function PrivacySettingsModal({
 
               {/* Standard Public Metrics (Read-only badges) */}
               <div
-                className={`p-3.5 rounded-2xl border space-y-2.5 ${
-                  isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
-                }`}
+                className={`p-3.5 rounded-2xl border space-y-2.5 ${isObsidian ? "bg-white/[0.02] border-white/5" : "bg-slate-50 border-slate-200"
+                  }`}
               >
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-semibold opacity-80">Student Name &amp; Identity</span>
@@ -169,21 +165,19 @@ export default function PrivacySettingsModal({
               <div className="space-y-3 pt-1">
                 <div
                   onClick={() => handleToggle("show_my_backlogs")}
-                  className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${
-                    isObsidian
-                      ? "bg-white/[0.03] border-white/10 hover:border-white/20"
-                      : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
-                  }`}
+                  className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 ${isObsidian
+                    ? "bg-white/[0.03] border-white/10 hover:border-white/20"
+                    : "bg-white border-slate-200 hover:border-slate-300 shadow-sm"
+                    }`}
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-bold text-xs tracking-tight">Show backlogs to everyone?</span>
                       <span
-                        className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${
-                          settings.show_my_backlogs
-                            ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
-                            : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                        }`}
+                        className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${settings.show_my_backlogs
+                          ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                          : "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          }`}
                       >
                         {settings.show_my_backlogs ? "Public (Default)" : "Hidden (Opted Out)"}
                       </span>
@@ -196,18 +190,16 @@ export default function PrivacySettingsModal({
                   </div>
                   {/* Switch */}
                   <div
-                    className={`w-11 h-6 rounded-full transition-colors p-0.5 shrink-0 ${
-                      settings.show_my_backlogs
-                        ? "bg-cyan-500"
-                        : isObsidian
+                    className={`w-11 h-6 rounded-full transition-colors p-0.5 shrink-0 ${settings.show_my_backlogs
+                      ? "bg-cyan-500"
+                      : isObsidian
                         ? "bg-slate-800"
                         : "bg-slate-300"
-                    }`}
+                      }`}
                   >
                     <div
-                      className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${
-                        settings.show_my_backlogs ? "translate-x-5" : "translate-x-0"
-                      }`}
+                      className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform ${settings.show_my_backlogs ? "translate-x-5" : "translate-x-0"
+                        }`}
                     />
                   </div>
                 </div>
@@ -216,11 +208,10 @@ export default function PrivacySettingsModal({
               {/* Status Message */}
               {statusMessage && (
                 <div
-                  className={`p-3 rounded-xl text-xs font-medium border flex items-center gap-2 ${
-                    statusMessage.type === "success"
-                      ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
-                      : "bg-rose-950/40 border-rose-500/40 text-rose-300"
-                  }`}
+                  className={`p-3 rounded-xl text-xs font-medium border flex items-center gap-2 ${statusMessage.type === "success"
+                    ? "bg-emerald-950/40 border-emerald-500/40 text-emerald-300"
+                    : "bg-rose-950/40 border-rose-500/40 text-rose-300"
+                    }`}
                 >
                   <IconCheck className="w-3.5 h-3.5 shrink-0" />
                   <span>{statusMessage.text}</span>
@@ -232,9 +223,8 @@ export default function PrivacySettingsModal({
 
         {/* Footer */}
         <div
-          className={`p-4 sm:p-5 border-t flex items-center justify-between gap-3 ${
-            isObsidian ? "border-slate-800 bg-[#0f1117]" : "border-slate-100 bg-slate-50"
-          }`}
+          className={`p-4 sm:p-5 border-t flex items-center justify-between gap-3 ${isObsidian ? "border-slate-800 bg-[#0f1117]" : "border-slate-100 bg-slate-50"
+            }`}
         >
           <a
             href="/privacy"
@@ -252,11 +242,10 @@ export default function PrivacySettingsModal({
                 sfx.playMechanicalClick();
                 onClose();
               }}
-              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-colors ${
-                isObsidian
-                  ? "border-slate-800 hover:bg-white/5 text-slate-300"
-                  : "border-slate-200 hover:bg-slate-100 text-slate-700"
-              }`}
+              className={`px-3.5 py-2 rounded-xl text-xs font-medium border transition-colors ${isObsidian
+                ? "border-slate-800 hover:bg-white/5 text-slate-300"
+                : "border-slate-200 hover:bg-slate-100 text-slate-700"
+                }`}
             >
               Cancel
             </button>

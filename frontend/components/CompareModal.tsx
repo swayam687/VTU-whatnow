@@ -269,19 +269,17 @@ export default function CompareModal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-slate-950/75 backdrop-blur-sm overflow-y-auto">
       <div
-        className={`relative rounded-t-3xl sm:rounded-3xl border shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 ${
-          isObsidian
-            ? "bg-[#0b0d11] border-slate-800 text-white"
-            : "bg-white border-slate-200 text-slate-900"
-        }`}
+        className={`relative rounded-t-3xl sm:rounded-3xl border shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-150 ${isObsidian
+          ? "bg-[#0b0d11] border-slate-800 text-white"
+          : "bg-white border-slate-200 text-slate-900"
+          }`}
       >
         {/* Security Verification Required (Comparison Gate) */}
         {isVerificationRequired && (
           <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-200">
             <div
-              className={`w-full max-w-md rounded-2xl border shadow-2xl p-5 sm:p-6 space-y-4 ${
-                isObsidian ? "bg-[#0f1115] border-white/10 text-white" : "bg-white border-zinc-200 text-zinc-900"
-              }`}
+              className={`w-full max-w-md rounded-2xl border shadow-2xl p-5 sm:p-6 space-y-4 ${isObsidian ? "bg-[#0f1115] border-white/10 text-white" : "bg-white border-zinc-200 text-zinc-900"
+                }`}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -440,9 +438,8 @@ export default function CompareModal({
         )}
         {/* Header */}
         <div
-          className={`px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between ${
-            isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
-          }`}
+          className={`px-4 sm:px-6 py-3.5 sm:py-4 border-b flex items-center justify-between ${isObsidian ? "border-slate-800 bg-slate-950/40" : "border-slate-100 bg-slate-50/50"
+            }`}
         >
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-slate-900 border border-white/10 text-white flex items-center justify-center shadow-xs font-bold">
@@ -470,11 +467,10 @@ export default function CompareModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {/* Student 1 Card */}
             <div
-              className={`p-3.5 sm:p-4 rounded-2xl border ${
-                isObsidian
-                  ? "bg-cyan-950/15 border-cyan-800/40"
-                  : "bg-blue-50/40 border-blue-200"
-              }`}
+              className={`p-3.5 sm:p-4 rounded-2xl border ${isObsidian
+                ? "bg-cyan-950/15 border-cyan-800/40"
+                : "bg-blue-50/40 border-blue-200"
+                }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <Identicon
@@ -486,11 +482,10 @@ export default function CompareModal({
                 />
                 <div className="min-w-0 flex-1">
                   <span
-                    className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                      isObsidian
-                        ? "bg-cyan-500/20 text-cyan-300"
-                        : "bg-blue-100 text-blue-700"
-                    }`}
+                    className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isObsidian
+                      ? "bg-cyan-500/20 text-cyan-300"
+                      : "bg-blue-100 text-blue-700"
+                      }`}
                   >
                     Student A
                   </span>
@@ -498,11 +493,10 @@ export default function CompareModal({
                     <select
                       value={s1.usn}
                       onChange={(e) => handleSelectS1(e.target.value)}
-                      className={`mt-1.5 block w-full text-xs font-bold rounded-xl p-2 border font-mono transition-colors ${
-                        isObsidian
-                          ? "bg-slate-900 border-slate-700 text-white"
-                          : "bg-white border-slate-200 text-slate-900"
-                      }`}
+                      className={`mt-1.5 block w-full text-xs font-bold rounded-xl p-2 border font-mono transition-colors ${isObsidian
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-white border-slate-200 text-slate-900"
+                        }`}
                     >
                       {selectableStudents.map((st) => (
                         <option key={st.usn} value={st.usn}>
@@ -526,44 +520,42 @@ export default function CompareModal({
               <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-800/40">
                 <span className="opacity-70 text-[11px]">Pending Subjects:</span>
                 <span
-                  className={`font-bold text-[10px] px-2 py-0.5 rounded-full border ${
-                    viewer?.usn?.toUpperCase() === s1.usn?.toUpperCase()
-                      ? s1.total_backlogs > 0
-                        ? isObsidian
-                          ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-                          : "bg-rose-50 text-rose-700 border-rose-200"
-                        : isObsidian
+                  className={`font-bold text-[10px] px-2 py-0.5 rounded-full border ${viewer?.usn?.toUpperCase() === s1.usn?.toUpperCase()
+                    ? s1.total_backlogs > 0
+                      ? isObsidian
+                        ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
+                        : "bg-rose-50 text-rose-700 border-rose-200"
+                      : isObsidian
                         ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
                         : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : s1.has_pending_subjects === "Yes"
+                    : s1.has_pending_subjects === "Yes"
                       ? isObsidian
                         ? "bg-amber-950/30 text-amber-400 border-amber-800/40"
                         : "bg-amber-50 text-amber-700 border-amber-200"
                       : isObsidian
-                      ? "bg-slate-900 text-slate-400 border-slate-800"
-                      : "bg-slate-100 text-slate-600 border-slate-200"
-                  }`}
+                        ? "bg-slate-900 text-slate-400 border-slate-800"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
                 >
                   {viewer?.usn?.toUpperCase() === s1.usn?.toUpperCase()
                     ? s1.total_backlogs === 0
                       ? "All Clear"
                       : `${s1.total_backlogs} Pending`
                     : s1.has_pending_subjects
-                    ? s1.has_pending_subjects === "Yes"
-                      ? "Pending: Yes"
-                      : "All Clear"
-                    : "Hidden"}
+                      ? s1.has_pending_subjects === "Yes"
+                        ? "Pending: Yes"
+                        : "All Clear"
+                      : "Hidden"}
                 </span>
               </div>
             </div>
 
             {/* Student 2 Card */}
             <div
-              className={`p-3.5 sm:p-4 rounded-2xl border ${
-                isObsidian
-                  ? "bg-indigo-950/15 border-indigo-800/40"
-                  : "bg-indigo-50/40 border-indigo-200"
-              }`}
+              className={`p-3.5 sm:p-4 rounded-2xl border ${isObsidian
+                ? "bg-indigo-950/15 border-indigo-800/40"
+                : "bg-indigo-50/40 border-indigo-200"
+                }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <Identicon
@@ -575,11 +567,10 @@ export default function CompareModal({
                 />
                 <div className="min-w-0 flex-1">
                   <span
-                    className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${
-                      isObsidian
-                        ? "bg-indigo-500/20 text-indigo-300"
-                        : "bg-indigo-100 text-indigo-700"
-                    }`}
+                    className={`text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full ${isObsidian
+                      ? "bg-indigo-500/20 text-indigo-300"
+                      : "bg-indigo-100 text-indigo-700"
+                      }`}
                   >
                     Student B
                   </span>
@@ -587,11 +578,10 @@ export default function CompareModal({
                     <select
                       value={s2.usn}
                       onChange={(e) => handleSelectS2(e.target.value)}
-                      className={`mt-1.5 block w-full text-xs font-bold rounded-xl p-2 border font-mono transition-colors ${
-                        isObsidian
-                          ? "bg-slate-900 border-slate-700 text-white"
-                          : "bg-white border-slate-200 text-slate-900"
-                      }`}
+                      className={`mt-1.5 block w-full text-xs font-bold rounded-xl p-2 border font-mono transition-colors ${isObsidian
+                        ? "bg-slate-900 border-slate-700 text-white"
+                        : "bg-white border-slate-200 text-slate-900"
+                        }`}
                     >
                       {selectableStudents.map((st) => (
                         <option key={st.usn} value={st.usn}>
@@ -615,33 +605,32 @@ export default function CompareModal({
               <div className="mt-2.5 flex items-center justify-between text-xs pt-2 border-t border-slate-800/40">
                 <span className="opacity-70 text-[11px]">Pending Subjects:</span>
                 <span
-                  className={`font-bold text-[10px] px-2 py-0.5 rounded-full border ${
-                    viewer?.usn?.toUpperCase() === s2.usn?.toUpperCase()
-                      ? s2.total_backlogs > 0
-                        ? isObsidian
-                          ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
-                          : "bg-rose-50 text-rose-700 border-rose-200"
-                        : isObsidian
+                  className={`font-bold text-[10px] px-2 py-0.5 rounded-full border ${viewer?.usn?.toUpperCase() === s2.usn?.toUpperCase()
+                    ? s2.total_backlogs > 0
+                      ? isObsidian
+                        ? "bg-rose-950/30 text-rose-400 border-rose-800/40"
+                        : "bg-rose-50 text-rose-700 border-rose-200"
+                      : isObsidian
                         ? "bg-emerald-950/30 text-emerald-400 border-emerald-800/40"
                         : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                      : s2.has_pending_subjects === "Yes"
+                    : s2.has_pending_subjects === "Yes"
                       ? isObsidian
                         ? "bg-amber-950/30 text-amber-400 border-amber-800/40"
                         : "bg-amber-50 text-amber-700 border-amber-200"
                       : isObsidian
-                      ? "bg-slate-900 text-slate-400 border-slate-800"
-                      : "bg-slate-100 text-slate-600 border-slate-200"
-                  }`}
+                        ? "bg-slate-900 text-slate-400 border-slate-800"
+                        : "bg-slate-100 text-slate-600 border-slate-200"
+                    }`}
                 >
                   {viewer?.usn?.toUpperCase() === s2.usn?.toUpperCase()
                     ? s2.total_backlogs === 0
                       ? "All Clear"
                       : `${s2.total_backlogs} Pending`
                     : s2.has_pending_subjects
-                    ? s2.has_pending_subjects === "Yes"
-                      ? "Pending: Yes"
-                      : "All Clear"
-                    : "Hidden"}
+                      ? s2.has_pending_subjects === "Yes"
+                        ? "Pending: Yes"
+                        : "All Clear"
+                      : "Hidden"}
                 </span>
               </div>
             </div>
@@ -649,11 +638,10 @@ export default function CompareModal({
 
           {/* Key Difference Overview Banner */}
           <div
-            className={`p-3 rounded-2xl border flex flex-wrap items-center justify-around gap-2 text-center text-xs ${
-              isObsidian
-                ? "bg-slate-900/60 border-slate-800/80"
-                : "bg-slate-50 border-slate-200"
-            }`}
+            className={`p-3 rounded-2xl border flex flex-wrap items-center justify-around gap-2 text-center text-xs ${isObsidian
+              ? "bg-slate-900/60 border-slate-800/80"
+              : "bg-slate-50 border-slate-200"
+              }`}
           >
             <div>
               <p className="opacity-50 font-semibold uppercase tracking-wider text-[9px]">Percentage Delta</p>
@@ -690,27 +678,24 @@ export default function CompareModal({
 
             {allSubjectCodes.length === 0 ? (
               <div
-                className={`p-6 text-center text-xs border rounded-2xl ${
-                  isObsidian ? "bg-slate-900/40 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
-                }`}
+                className={`p-6 text-center text-xs border rounded-2xl ${isObsidian ? "bg-slate-900/40 border-slate-800 text-slate-400" : "bg-slate-50 border-slate-200 text-slate-500"
+                  }`}
               >
                 No subject marks records found for these students. Make sure both have results scraped.
               </div>
             ) : (
               <div
-                className={`border rounded-2xl overflow-hidden divide-y ${
-                  isObsidian
-                    ? "border-slate-800 divide-slate-800/80"
-                    : "border-slate-200 divide-slate-100"
-                }`}
+                className={`border rounded-2xl overflow-hidden divide-y ${isObsidian
+                  ? "border-slate-800 divide-slate-800/80"
+                  : "border-slate-200 divide-slate-100"
+                  }`}
               >
                 {/* Desktop Table Header */}
                 <div
-                  className={`hidden sm:grid grid-cols-12 gap-2 p-2.5 text-[10px] font-bold uppercase tracking-wider ${
-                    isObsidian
-                      ? "bg-slate-900/80 text-slate-400"
-                      : "bg-slate-100/70 text-slate-500"
-                  }`}
+                  className={`hidden sm:grid grid-cols-12 gap-2 p-2.5 text-[10px] font-bold uppercase tracking-wider ${isObsidian
+                    ? "bg-slate-900/80 text-slate-400"
+                    : "bg-slate-100/70 text-slate-500"
+                    }`}
                 >
                   <div className="col-span-5">Subject</div>
                   <div className="col-span-3 text-center text-cyan-400">{s1.name} (A)</div>
@@ -729,9 +714,8 @@ export default function CompareModal({
                   return (
                     <div
                       key={code}
-                      className={`p-3 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center transition-colors ${
-                        isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"
-                      }`}
+                      className={`p-3 sm:grid sm:grid-cols-12 sm:gap-2 sm:items-center transition-colors ${isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"
+                        }`}
                     >
                       {/* Subject Name & Code */}
                       <div className="col-span-5 mb-2 sm:mb-0">
@@ -739,11 +723,10 @@ export default function CompareModal({
                           <span className="font-mono text-xs font-bold">{code}</span>
                           {(m1?.semester || m2?.semester) && (
                             <span
-                              className={`text-[9px] px-1.5 py-0.5 rounded border ${
-                                isObsidian
-                                  ? "bg-slate-800 text-slate-400 border-slate-700"
-                                  : "bg-slate-100 text-slate-500 border-slate-200"
-                              }`}
+                              className={`text-[9px] px-1.5 py-0.5 rounded border ${isObsidian
+                                ? "bg-slate-800 text-slate-400 border-slate-700"
+                                : "bg-slate-100 text-slate-500 border-slate-200"
+                                }`}
                             >
                               Sem {m1?.semester || m2?.semester}
                             </span>
@@ -754,11 +737,10 @@ export default function CompareModal({
 
                       {/* Student 1 Marks */}
                       <div
-                        className={`col-span-3 flex sm:flex-col items-center justify-between sm:justify-center p-2 sm:p-0 rounded-xl mb-1 sm:mb-0 ${
-                          isObsidian
-                            ? "bg-cyan-950/20 sm:bg-transparent"
-                            : "bg-blue-50/50 sm:bg-transparent"
-                        }`}
+                        className={`col-span-3 flex sm:flex-col items-center justify-between sm:justify-center p-2 sm:p-0 rounded-xl mb-1 sm:mb-0 ${isObsidian
+                          ? "bg-cyan-950/20 sm:bg-transparent"
+                          : "bg-blue-50/50 sm:bg-transparent"
+                          }`}
                       >
                         <span className="text-[10px] font-bold text-cyan-400 sm:hidden">Student A:</span>
                         {m1 ? (
@@ -768,11 +750,10 @@ export default function CompareModal({
                               (Int: {m1.internal_marks}, Ext: {m1.external_marks})
                             </span>
                             <span
-                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                m1.status === "P"
-                                  ? isObsidian ? "text-emerald-400 bg-emerald-950/40" : "text-emerald-700 bg-emerald-50"
-                                  : isObsidian ? "text-rose-400 bg-rose-950/40" : "text-rose-700 bg-rose-50"
-                              }`}
+                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${m1.status === "P"
+                                ? isObsidian ? "text-emerald-400 bg-emerald-950/40" : "text-emerald-700 bg-emerald-50"
+                                : isObsidian ? "text-rose-400 bg-rose-950/40" : "text-rose-700 bg-rose-50"
+                                }`}
                             >
                               {m1.status}
                             </span>
@@ -784,11 +765,10 @@ export default function CompareModal({
 
                       {/* Student 2 Marks */}
                       <div
-                        className={`col-span-3 flex sm:flex-col items-center justify-between sm:justify-center p-2 sm:p-0 rounded-xl mb-1 sm:mb-0 ${
-                          isObsidian
-                            ? "bg-indigo-950/20 sm:bg-transparent"
-                            : "bg-indigo-50/50 sm:bg-transparent"
-                        }`}
+                        className={`col-span-3 flex sm:flex-col items-center justify-between sm:justify-center p-2 sm:p-0 rounded-xl mb-1 sm:mb-0 ${isObsidian
+                          ? "bg-indigo-950/20 sm:bg-transparent"
+                          : "bg-indigo-50/50 sm:bg-transparent"
+                          }`}
                       >
                         <span className="text-[10px] font-bold text-indigo-400 sm:hidden">Student B:</span>
                         {m2 ? (
@@ -798,11 +778,10 @@ export default function CompareModal({
                               (Int: {m2.internal_marks}, Ext: {m2.external_marks})
                             </span>
                             <span
-                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                m2.status === "P"
-                                  ? isObsidian ? "text-emerald-400 bg-emerald-950/40" : "text-emerald-700 bg-emerald-50"
-                                  : isObsidian ? "text-rose-400 bg-rose-950/40" : "text-rose-700 bg-rose-50"
-                              }`}
+                              className={`ml-1 text-[9px] font-bold px-1.5 py-0.5 rounded ${m2.status === "P"
+                                ? isObsidian ? "text-emerald-400 bg-emerald-950/40" : "text-emerald-700 bg-emerald-50"
+                                : isObsidian ? "text-rose-400 bg-rose-950/40" : "text-rose-700 bg-rose-50"
+                                }`}
                             >
                               {m2.status}
                             </span>
@@ -817,21 +796,19 @@ export default function CompareModal({
                         {lead !== null ? (
                           lead > 0 ? (
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                isObsidian
-                                  ? "text-cyan-300 bg-cyan-950/40 border-cyan-800/40"
-                                  : "text-blue-700 bg-blue-100 border-blue-200"
-                              }`}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isObsidian
+                                ? "text-cyan-300 bg-cyan-950/40 border-cyan-800/40"
+                                : "text-blue-700 bg-blue-100 border-blue-200"
+                                }`}
                             >
                               +{lead} A
                             </span>
                           ) : lead < 0 ? (
                             <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                                isObsidian
-                                  ? "text-indigo-300 bg-indigo-950/40 border-indigo-800/40"
-                                  : "text-indigo-700 bg-indigo-100 border-indigo-200"
-                              }`}
+                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isObsidian
+                                ? "text-indigo-300 bg-indigo-950/40 border-indigo-800/40"
+                                : "text-indigo-700 bg-indigo-100 border-indigo-200"
+                                }`}
                             >
                               +{Math.abs(lead)} B
                             </span>
@@ -852,9 +829,8 @@ export default function CompareModal({
 
         {/* Modal Footer */}
         <div
-          className={`px-4 sm:px-6 py-3 border-t flex justify-end ${
-            isObsidian ? "bg-slate-950/40 border-slate-800" : "bg-slate-50 border-slate-100"
-          }`}
+          className={`px-4 sm:px-6 py-3 border-t flex justify-end ${isObsidian ? "bg-slate-950/40 border-slate-800" : "bg-slate-50 border-slate-100"
+            }`}
         >
           <button
             onClick={() => {
