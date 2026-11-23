@@ -31,11 +31,14 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
     - student info: USN, name
     - marks list: subject_code, subject_name, semester, internal, external, total, max_marks, status
     - aggregate stats: total_marks, max_marks, percentage, backlogs
-    Supports multi-semester results (Summer/Makeup examinations like SME26cbcs and Revaluation).
+    Supports regular semester results, multi-semester makeup exams (SME), and Revaluation results (rvcbcs).
     """
     soup = BeautifulSoup(html, "html.parser")
     student: Dict[str, Any] = {"usn": "", "name": ""}
     marks = []
+
+    page_text_lower = soup.get_text().lower()
+    page_is_reval = "revaluation" in page_text_lower or "rvcbcs" in page_text_lower or "reval" in page_text_lower
 
     # VTU uses CSS div tables (.divTableRow, .divTableCell) as well as traditional HTML tables
     all_rows = soup.find_all(
@@ -45,6 +48,8 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
     )
 
     current_semester = None
+    active_col_map = {}
+    table_is_reval = False
 
     for row in all_rows:
         cells = [
@@ -58,6 +63,7 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
             continue
 
         row_str = " ".join(cells)
+        row_str_lower = row_str.lower()
 
         # 1. Track Semester section header if present in row text
         sem_match = re.search(r"Semester\s*:\s*([1-8])", row_str, re.I) or re.search(r"\bSem(?:ester)?\s+([1-8])\b", row_str, re.I)
@@ -82,14 +88,74 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
 
         if "Student Name" in row_str:
             for cell in cells:
+                if "Student Name" in cell:
+                    after = re.sub(r"^.*?Student\s+Name\s*[:\s]*", "", cell, flags=re.I).strip()
+                    if after and after.upper() not in ["STUDENT NAME", "NAME"]:
+                        student["name"] = after
+                        break
                 clean = cell.replace(":", "").strip()
                 if clean and clean.upper() not in ["STUDENT NAME", "NAME", ""]:
                     student["name"] = clean
                     break
 
-        # 3. Extract Marks row
+        # 3. Detect Table Headers (Revaluation vs Regular)
+        is_reval_hdr = any(h in row_str_lower for h in ["old marks", "rv marks", "rv result", "reval marks", "final marks", "old result"])
+        is_regular_hdr = any(h in row_str_lower for h in ["subject code", "sub code"]) and any(h in row_str_lower for h in ["total", "result"])
+
+        if is_reval_hdr:
+            table_is_reval = True
+            active_col_map = {}
+            for i, cell in enumerate(cells):
+                cl = cell.lower().strip()
+                if "sub" in cl and "code" in cl:
+                    active_col_map["code"] = i
+                elif "sub" in cl and "name" in cl:
+                    active_col_map["name"] = i
+                elif "internal" in cl or "cie" in cl:
+                    active_col_map["internal"] = i
+                elif "old" in cl and "mark" in cl:
+                    active_col_map["old_marks"] = i
+                elif "old" in cl and ("res" in cl or "grade" in cl):
+                    active_col_map["old_result"] = i
+                elif ("rv" in cl or "reval" in cl) and "mark" in cl:
+                    active_col_map["rv_marks"] = i
+                elif ("rv" in cl or "reval" in cl) and ("res" in cl or "grade" in cl):
+                    active_col_map["rv_result"] = i
+                elif "final" in cl and "mark" in cl:
+                    active_col_map["final_marks"] = i
+                elif "final" in cl and ("res" in cl or "grade" in cl):
+                    active_col_map["final_result"] = i
+                elif "external" in cl or "see" in cl:
+                    active_col_map["external"] = i
+                elif "total" in cl:
+                    active_col_map["total"] = i
+                elif "result" in cl and not any(k in cl for k in ["old", "rv", "reval", "final"]):
+                    active_col_map["result"] = i
+            continue
+
+        if is_regular_hdr and not is_reval_hdr:
+            table_is_reval = False
+            active_col_map = {}
+            for i, cell in enumerate(cells):
+                cl = cell.lower().strip()
+                if "sub" in cl and "code" in cl:
+                    active_col_map["code"] = i
+                elif "sub" in cl and "name" in cl:
+                    active_col_map["name"] = i
+                elif "internal" in cl or "cie" in cl:
+                    active_col_map["internal"] = i
+                elif "external" in cl or "see" in cl:
+                    active_col_map["external"] = i
+                elif "total" in cl:
+                    active_col_map["total"] = i
+                elif "result" in cl:
+                    active_col_map["result"] = i
+            continue
+
+        # 4. Extract Marks row
         # Layout 1: [Code, Name, Int, Ext, Total, Result, Date...]
         # Layout 2: [Sl No, Code, Name, Int, Ext, Total, Result, Date...]
+        # Layout 3 (Reval): [Code, Name, Int, Old Marks, Old Res, RV Marks, RV Res, Final Marks]
         if len(cells) >= 5:
             subj_idx = -1
             clean_c0 = re.sub(r"[\s\xa0\.\-]+", "", cells[0].upper())
@@ -107,10 +173,95 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
                     
                     rem = cells[subj_idx + 2:]
                     nums = [int(x) for x in rem if x.strip().isdigit()]
-                    status = "P"
-                    for x in rem:
-                        cu = x.strip().upper()
-                        if cu in ["P", "F", "A", "W", "PASS", "FAIL", "ABSENT", "WITHHELD"]:
+                    res_tokens = [
+                        x.strip().upper() for x in rem
+                        if x.strip().upper() in ["P", "F", "A", "W", "PASS", "FAIL", "ABSENT", "WITHHELD"]
+                    ]
+
+                    # Check if this row is a Revaluation result
+                    row_is_reval = (
+                        table_is_reval
+                        or page_is_reval
+                        or len(res_tokens) >= 2
+                        or ("rv_result" in active_col_map)
+                        or (len(nums) >= 4 and len(res_tokens) >= 1)
+                    )
+
+                    if row_is_reval:
+                        def get_num_by_col(col_name: str, fallback_idx: int) -> Optional[int]:
+                            if col_name in active_col_map and len(cells) > active_col_map[col_name]:
+                                val = cells[active_col_map[col_name]].strip()
+                                if val.isdigit():
+                                    return int(val)
+                            if 0 <= fallback_idx < len(nums):
+                                return nums[fallback_idx]
+                            return None
+
+                        def get_str_by_col(col_name: str, fallback_idx: int) -> str:
+                            if col_name in active_col_map and len(cells) > active_col_map[col_name]:
+                                return cells[active_col_map[col_name]].strip().upper()
+                            if 0 <= fallback_idx < len(res_tokens):
+                                return res_tokens[fallback_idx]
+                            return ""
+
+                        internal = get_num_by_col("internal", 0) or 0
+                        old_marks = get_num_by_col("old_marks", 1 if len(nums) >= 4 else -1)
+                        rv_marks = get_num_by_col("rv_marks", 2 if len(nums) >= 4 else -1)
+                        final_marks = get_num_by_col("final_marks", -1 if len(nums) >= 3 else -1)
+
+                        old_res = get_str_by_col("old_result", 0)
+                        rv_res = get_str_by_col("rv_result", 1 if len(res_tokens) >= 2 else 0)
+                        final_res = get_str_by_col("final_result", -1)
+
+                        # Determine final pass/fail status:
+                        # Priority 1: RV Result or Final Result is P -> Candidate passed in revaluation!
+                        # Priority 2: Old Result was P -> Candidate was already passed
+                        # Priority 3: RV Result / Final Result is F -> Failed in revaluation
+                        # Priority 4: Old Result is F
+                        status = "P"
+                        if any(r in ["P", "PASS"] for r in [rv_res, final_res]):
+                            status = "P"
+                        elif any(r in ["P", "PASS"] for r in [old_res]):
+                            status = "P"
+                        elif any(r in ["F", "FAIL"] for r in [rv_res, final_res]):
+                            status = "F"
+                        elif any(r in ["A", "ABSENT"] for r in [rv_res, final_res]):
+                            status = "A"
+                        elif any(r in ["W", "WITHHELD"] for r in [rv_res, final_res]):
+                            status = "W"
+                        elif old_res in ["F", "FAIL"]:
+                            status = "F"
+                        elif old_res in ["A", "ABSENT"]:
+                            status = "A"
+                        elif old_res in ["W", "WITHHELD"]:
+                            status = "W"
+                        else:
+                            status = "P"
+
+                        # In VTU reval tables, Final Marks represents the accepted external SEE marks
+                        if final_marks is not None:
+                            external = final_marks
+                        elif rv_marks is not None:
+                            external = rv_marks
+                        elif old_marks is not None:
+                            external = old_marks
+                        elif nums:
+                            external = nums[-1]
+                        else:
+                            external = 0
+
+                        # Total marks: Internal (CIE) + External (SEE)
+                        # Avoid double-counting only in the rare case where Final Marks was already CIE+SEE
+                        if final_marks is not None and internal > 0 and final_marks == internal + (rv_marks or 0):
+                            total = final_marks
+                        else:
+                            total = internal + external
+
+                    else:
+                        # Regular Exam Extraction
+                        status = "P"
+                        if res_tokens:
+                            cu = res_tokens[0]
                             if "PASS" in cu or cu == "P":
                                 status = "P"
                             elif "FAIL" in cu or cu == "F":
@@ -119,16 +270,15 @@ def parse_vtu_html(html: str) -> Dict[str, Any]:
                                 status = "A"
                             else:
                                 status = "W"
-                            break
 
-                    if len(nums) >= 3:
-                        internal, external, total = nums[-3], nums[-2], nums[-1]
-                    elif len(nums) == 2:
-                        internal, external, total = nums[0], nums[1], nums[0] + nums[1]
-                    elif len(nums) == 1:
-                        internal, external, total = 0, 0, nums[0]
-                    else:
-                        internal, external, total = 0, 0, 0
+                        if len(nums) >= 3:
+                            internal, external, total = nums[-3], nums[-2], nums[-1]
+                        elif len(nums) == 2:
+                            internal, external, total = nums[0], nums[1], nums[0] + nums[1]
+                        elif len(nums) == 1:
+                            internal, external, total = 0, 0, nums[0]
+                        else:
+                            internal, external, total = 0, 0, 0
 
                     # Semester resolution: DOM header > subject code pattern > default '1'
                     inferred_sem = infer_semester_from_code(code)
