@@ -24,7 +24,7 @@ const APPS: StudyBreakApp[] = [
     description:
       "A multiplayer UNO-inspired card game. Share the link with friends and ruin your productivity between lectures.",
     buttonText: "I Warned You",
-    url: "https://example.com", // Replace with actual UNO game URL
+    url: "https://cardverse-v2.onrender.com",
     accent: "amber",
   },
   {
@@ -34,7 +34,7 @@ const APPS: StudyBreakApp[] = [
     description:
       "Free music with synced lyrics and offline download. The ultimate focus hack for late-night coding sessions.",
     buttonText: "Tune In",
-    url: "https://example.com", // Replace with actual Music App URL
+    url: "https://velune.cc",
     accent: "indigo",
   },
   {
@@ -44,7 +44,7 @@ const APPS: StudyBreakApp[] = [
     description:
       "A 3D animated journaling experience. Each tooth holds a daily question. Answer it privately. No one else can see it.",
     buttonText: "Unlock Vault",
-    url: "https://example.com", // Replace with actual 3D Journal URL
+    url: "https://teethparty.vercel.app/",
     accent: "emerald",
   },
 ];
