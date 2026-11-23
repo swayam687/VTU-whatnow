@@ -1669,7 +1669,7 @@ def get_students(
     branch: Optional[str] = Query(None, description="Filter by branch code, e.g. CSE, DS, ALL"),
     search: Optional[str] = Query("", description="Search by name or USN"),
     sort: Optional[str] = Query("percentage", description="Sort by: percentage, total_marks, usn, backlogs"),
-    limit: Optional[int] = Query(100, ge=1, le=500),
+    limit: Optional[int] = Query(None, ge=1, le=5000, description="Optional limit. If omitted, returns all students"),
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
     x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
     response: Response = None,
@@ -1721,7 +1721,9 @@ def get_students(
 
     if response:
         response.headers["X-Is-Authenticated"] = "true"
-    students = query.limit(limit).all()
+    if limit is not None and limit > 0:
+        query = query.limit(limit)
+    students = query.all()
     return [sanitize_student_record(s, current_usn) for s in students]
 
 

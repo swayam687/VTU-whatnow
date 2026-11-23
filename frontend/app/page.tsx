@@ -348,15 +348,41 @@ export default function Dashboard() {
 
   // Aggregate metrics for hero counter cards
   const heroStats = useMemo(() => {
-    const count = students.length;
-    const avg = count > 0 ? students.reduce((sum, s) => sum + s.percentage, 0) / count : 0;
-    const max = count > 0 ? Math.max(...students.map((s) => s.percentage)) : 0;
+    // Total students and average from branch stats
+    const branchCount = activeBranch === "ALL"
+      ? Object.values(branchStats).reduce((sum, b) => sum + b.total_students, 0)
+      : (branchStats[activeBranch]?.total_students || 0);
+
+    // If students list is fully populated (e.g. authenticated user with all records), calculate exact metrics
+    if (students.length > 5 || (branchCount === 0 && students.length > 0)) {
+      const count = students.length;
+      const avg = count > 0 ? students.reduce((sum, s) => sum + s.percentage, 0) / count : 0;
+      const max = count > 0 ? Math.max(...students.map((s) => s.percentage)) : 0;
+      return {
+        count,
+        avg: Math.round(avg * 10) / 10,
+        max: Math.round(max * 10) / 10,
+      };
+    }
+
+    // Otherwise (public view before login or while loading), use aggregate data from /api/branches
+    const count = branchCount > 0 ? branchCount : students.length;
+    let avg = 0;
+    if (activeBranch === "ALL" && branchCount > 0) {
+      avg = Object.values(branchStats).reduce((sum, b) => sum + (b.avg_percentage * b.total_students), 0) / branchCount;
+    } else if (branchStats[activeBranch]) {
+      avg = branchStats[activeBranch].avg_percentage;
+    } else if (students.length > 0) {
+      avg = students.reduce((sum, s) => sum + s.percentage, 0) / students.length;
+    }
+    const max = students.length > 0 ? Math.max(...students.map((s) => s.percentage)) : 0;
+
     return {
       count,
       avg: Math.round(avg * 10) / 10,
       max: Math.round(max * 10) / 10,
     };
-  }, [students]);
+  }, [students, branchStats, activeBranch]);
 
   // Open detail modal and fetch full marks (with 0ms instant cached load & FLIP shared element transition)
   const handleOpenDetail = async (usn: string, e?: React.MouseEvent) => {
@@ -1441,7 +1467,7 @@ export default function Dashboard() {
           studentToken={studentSession.token}
           isObsidian={isObsidian}
           onUpdated={() => {
-            fetchStudents({ branch: activeBranch, search, sort: sortBy }).then((res) => setStudents(res));
+            fetchStudents({ branch: activeBranch, search, sort: sortBy, token: studentSession.token }).then((res) => setStudents(res));
           }}
         />
       )}

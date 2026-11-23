@@ -262,6 +262,7 @@ export async function fetchStudents(params?: {
   branch?: string;
   search?: string;
   sort?: string;
+  limit?: number;
   token?: string;
   adminKey?: string;
 }): Promise<Student[]> {
@@ -270,6 +271,7 @@ export async function fetchStudents(params?: {
     if (params?.branch && params.branch !== "ALL") query.set("branch", params.branch);
     if (params?.search) query.set("search", params.search);
     if (params?.sort) query.set("sort", params.sort);
+    if (params?.limit !== undefined && params.limit > 0) query.set("limit", params.limit.toString());
 
     const headers: Record<string, string> = {};
     if (params?.adminKey) {
