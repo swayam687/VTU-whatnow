@@ -171,8 +171,10 @@ class OnDemandScraperManager:
             except Exception as launch_err:
                 err_msg = str(launch_err)
                 if "Executable doesn't exist" in err_msg or "playwright install" in err_msg:
-                    import subprocess
-                    subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
+                    proc = await asyncio.create_subprocess_exec(
+                        sys.executable, "-m", "playwright", "install", "chromium"
+                    )
+                    await proc.wait()
                     self._browser = await self._playwright.chromium.launch(
                         headless=True,
                         args=launch_args,
@@ -486,6 +488,173 @@ class OnDemandScraperManager:
                 return {"ok": False, "message": "Could not refresh captcha image from VTU."}
         except Exception as e:
             return {"ok": False, "message": f"Failed to refresh captcha: {str(e)}"}
+
+    async def submit_update_captcha(
+        self,
+        session_id: str,
+        captcha_code: str,
+        client_ip: str = "unknown"
+    ) -> dict:
+        return await self._worker_loop.run(
+            self._submit_update_captcha_internal(
+                session_id=session_id,
+                captcha_code=captcha_code,
+                client_ip=client_ip,
+            )
+        )
+
+    async def _submit_update_captcha_internal(
+        self,
+        session_id: str,
+        captcha_code: str,
+        client_ip: str = "unknown"
+    ) -> dict:
+        """
+        Submits solved captcha for an authenticated student's self-service record update.
+        Upserts marks into DB without modifying the student's password or account credentials.
+        """
+        with self._lock:
+            session = self._sessions.get(session_id)
+
+        if not session:
+            return {
+                "ok": False,
+                "reason": "session_expired",
+                "message": "Verification session expired. Please start again.",
+            }
+
+        clean_captcha = captcha_code.strip()
+        if not clean_captcha:
+            return {
+                "ok": False,
+                "reason": "invalid_captcha",
+                "message": "Please enter the verification code.",
+            }
+
+        page = session.page
+        context = session.context
+        session.last_alert_msg["text"] = ""
+        active_page = page
+
+        try:
+            # Fill captcha field
+            captcha_input = await page.query_selector(
+                'input[name="captchacode"], input[name="captcha"], input[name*="code" i], input[id="captchacode"], input[id="captcha"], input[placeholder*="captcha" i]'
+            )
+            if captcha_input:
+                await captcha_input.fill("")
+                await captcha_input.type(clean_captcha, delay=35)
+
+            # Locate submit button
+            submit_btn = await page.query_selector(
+                'input[type="submit"], button[type="submit"], #submit, input[value*="SUBMIT" i], button:has-text("Submit"), input[id="submit"]'
+            )
+            if submit_btn:
+                await submit_btn.click()
+            else:
+                await page.keyboard.press("Enter")
+
+            # Wait for response / load
+            try:
+                await page.wait_for_load_state("load", timeout=15000)
+            except Exception:
+                pass
+
+            await asyncio.sleep(1.5)
+
+            # Check if popup tab opened
+            if len(context.pages) > 1:
+                active_page = context.pages[-1]
+
+            # Wait up to 6s for the result table or marks section to render
+            try:
+                await active_page.wait_for_selector(
+                    "table, .divTable, .divTableRow, b:has-text('Semester'), text='University Seat Number'",
+                    timeout=6000,
+                )
+            except Exception:
+                pass
+
+            alert_text = session.last_alert_msg["text"].strip()
+            alert_lower = alert_text.lower()
+            content = await active_page.content()
+            text_lower = content.lower()
+
+            is_captcha_fail = (
+                "captcha" in alert_lower
+                or "invalid captcha" in text_lower
+                or "captcha code is not matching" in text_lower
+            )
+
+            if is_captcha_fail:
+                session.fail_count += 1
+                new_b64 = None
+                try:
+                    c_el = await page.query_selector('img[src*="captcha" i], img[src*="code" i], #captchaimg, form img')
+                    if c_el:
+                        new_bytes = await c_el.screenshot()
+                        new_b64 = base64.b64encode(new_bytes).decode("utf-8")
+                except Exception:
+                    pass
+
+                return {
+                    "ok": False,
+                    "reason": "invalid_captcha",
+                    "fail_count": session.fail_count,
+                    "message": "Incorrect verification code. Please try again.",
+                    "new_captcha_base64": new_b64,
+                }
+
+            # Check if results not available / seat number not found
+            if "not available" in alert_lower or "not found" in alert_lower or "check the usn" in alert_lower or "not yet available" in text_lower:
+                with self._lock:
+                    self._sessions.pop(session_id, None)
+                await session.close()
+                return {
+                    "ok": False,
+                    "reason": "not_found",
+                    "message": "No updated records found on this examination portal for your USN.",
+                }
+
+            # Marksheet Extracted Successfully!
+            parsed = parse_vtu_html(content)
+            if parsed and parsed.get("marks"):
+                if not parsed["student"].get("usn"):
+                    parsed["student"]["usn"] = session.usn
+
+                # Save extracted marksheet into database (intelligent upsert)
+                scraper_worker._save_result(parsed, session.semester)
+
+                with self._lock:
+                    self._sessions.pop(session_id, None)
+                await session.close()
+
+                return {
+                    "ok": True,
+                    "message": "Academic records updated successfully.",
+                    "usn": session.usn,
+                }
+            else:
+                session.fail_count += 1
+                with self._lock:
+                    self._sessions.pop(session_id, None)
+                await session.close()
+                return {
+                    "ok": False,
+                    "reason": "parsing_failed",
+                    "message": "Could not read result table from examination portal. Please verify if results are published.",
+                }
+
+        except Exception as e:
+            traceback.print_exc()
+            with self._lock:
+                self._sessions.pop(session_id, None)
+            await session.close()
+            return {
+                "ok": False,
+                "reason": "error",
+                "message": f"Connection error: {str(e)}",
+            }
 
     async def submit_captcha(
         self,

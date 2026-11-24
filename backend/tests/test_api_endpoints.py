@@ -1,0 +1,187 @@
+"""
+Integration & route logic tests for VTU WhatNow API endpoints.
+Tests auth status, admin verification, faculty JWT authentication,
+and student listing privacy gates.
+"""
+
+import sys
+import unittest
+from pathlib import Path
+
+# Add backend directory to sys.path
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
+from fastapi import HTTPException, Response
+from starlette.requests import Request
+from app.config import settings
+from app.database import SessionLocal
+from app.models import Faculty, Student
+from app.schemas import AdminVerifyRequest
+from app.main import get_auth_status, verify_admin, require_admin, get_students
+from app.auth import create_faculty_jwt, verify_faculty_jwt
+
+
+def make_mock_request(path: str = "/", client_host: str = "127.0.0.1") -> Request:
+    return Request({
+        "type": "http",
+        "client": (client_host, 12345),
+        "headers": [],
+        "method": "POST",
+        "path": path,
+    })
+
+
+class TestAPIEndpoints(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.db = SessionLocal()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.db.close()
+
+    def test_auth_status_nonexistent_usn(self):
+        res = get_auth_status(usn="9ZZ99ZZ999", db=self.db)
+        self.assertFalse(res.exists)
+        self.assertEqual(res.usn, "9ZZ99ZZ999")
+        self.assertEqual(res.name, "")
+
+    def test_auth_status_existing_or_schema(self):
+        student = self.db.query(Student).first()
+        if student:
+            res = get_auth_status(usn=student.usn, db=self.db)
+            self.assertTrue(res.exists)
+            self.assertEqual(res.usn, student.usn)
+            self.assertIsInstance(res.is_claimed, bool)
+
+    def test_admin_verify_incorrect_password(self):
+        req = make_mock_request("/api/admin/verify")
+        with self.assertRaises(HTTPException) as ctx:
+            verify_admin(AdminVerifyRequest(password="definitely_wrong_pwd_999"), req)
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_admin_verify_correct_password(self):
+        req = make_mock_request("/api/admin/verify")
+        res = verify_admin(AdminVerifyRequest(password=settings.ADMIN_PASSWORD), req)
+        self.assertTrue(res.get("ok"))
+        self.assertEqual(res.get("message"), "Authenticated")
+
+    def test_require_admin_header_rejection(self):
+        with self.assertRaises(HTTPException) as ctx:
+            require_admin(x_admin_key="invalid_admin_secret_key")
+        self.assertEqual(ctx.exception.status_code, 403)
+
+        with self.assertRaises(HTTPException) as ctx:
+            require_admin(x_admin_key="")
+        self.assertEqual(ctx.exception.status_code, 403)
+
+    def test_faculty_jwt_lifecycle_and_validation(self):
+        faculty = self.db.query(Faculty).first()
+        if not faculty:
+            faculty = Faculty(username="test_prof", name="Prof Test", department="CSE", password_hash="dummy")
+
+        token = create_faculty_jwt(faculty=faculty)
+        authenticated_fac = verify_faculty_jwt(token, self.db)
+        if faculty.id:
+            self.assertIsNotNone(authenticated_fac)
+            self.assertEqual(authenticated_fac.username, faculty.username)
+
+        # Tampered token rejection
+        tampered_token = token[:-4] + "abcd"
+        self.assertIsNone(verify_faculty_jwt(tampered_token, self.db))
+
+        # Malformed token rejection
+        self.assertIsNone(verify_faculty_jwt("", self.db))
+        self.assertIsNone(verify_faculty_jwt("not.a.valid.jwt.token", self.db))
+
+    def test_students_public_unauthenticated_gate(self):
+        resp = Response()
+        students = get_students(
+            branch=None,
+            search="",
+            sort="percentage",
+            limit=None,
+            x_student_token=None,
+            x_admin_key=None,
+            x_faculty_token=None,
+            authorization=None,
+            response=resp,
+            db=self.db,
+        )
+        self.assertIsInstance(students, list)
+        self.assertEqual(resp.headers.get("x-is-authenticated"), "false")
+        # Public campus-wide view is capped to at most 5 records
+        self.assertLessEqual(len(students), 5)
+
+    def test_students_admin_authorized_access(self):
+        resp = Response()
+        students = get_students(
+            branch=None,
+            search="",
+            sort="percentage",
+            limit=None,
+            x_student_token=None,
+            x_admin_key=settings.ADMIN_PASSWORD,
+            x_faculty_token=None,
+            authorization=None,
+            response=resp,
+            db=self.db,
+        )
+        self.assertIsInstance(students, list)
+        self.assertEqual(resp.headers.get("x-is-authenticated"), "true")
+
+    def test_student_available_portals_hides_urls(self):
+        from app.main import get_student_available_portals
+        portals = get_student_available_portals(db=self.db)
+        self.assertIsInstance(portals, list)
+        if portals:
+            for p in portals:
+                self.assertIsNotNone(p.id)
+                self.assertIsNotNone(p.title)
+                self.assertIsNotNone(p.semester)
+                # Sensitive URL must NOT be exposed in student portal schema
+                self.assertFalse(hasattr(p, "url"))
+
+    def test_student_record_update_requires_auth(self):
+        from app.main import start_student_record_update, submit_student_record_update_captcha
+        from app.schemas import StudentUpdateStartRequest, StudentUpdateSubmitRequest
+
+        # Start update without token raises 401
+        coro1 = start_student_record_update(
+            req=StudentUpdateStartRequest(semester_link_id=1),
+            x_student_token=None,
+            db=self.db
+        )
+        try:
+            coro1.send(None)
+            self.fail("Should have raised HTTPException(401)")
+        except HTTPException as e:
+            self.assertEqual(e.status_code, 401)
+        except StopIteration:
+            pass
+
+        # Submit captcha without token raises 401
+        class DummyRequest:
+            client = None
+
+        coro2 = submit_student_record_update_captcha(
+            req=StudentUpdateSubmitRequest(session_id="dummy", captcha="12345"),
+            request=DummyRequest(),
+            x_student_token=None,
+            db=self.db
+        )
+        try:
+            coro2.send(None)
+            self.fail("Should have raised HTTPException(401)")
+        except HTTPException as e:
+            self.assertEqual(e.status_code, 401)
+        except StopIteration:
+            pass
+
+
+
+
+if __name__ == "__main__":
+    unittest.main()

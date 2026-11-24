@@ -28,6 +28,8 @@ id_ed25519
 *.sqlite
 *.sqlite3
 *.db
+*.db-shm
+*.db-wal
 # Allow pre-seeded database to be deployed to Render
 !backend/vtuwhatnow.db
 

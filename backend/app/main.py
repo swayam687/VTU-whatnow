@@ -1,6 +1,7 @@
 import sys
 import os
 import time
+import secrets
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -40,6 +41,7 @@ from slowapi.errors import RateLimitExceeded
 from .security import sanitize_text, sanitize_url, validate_and_sanitize_vtu_url
 from .config import settings
 from .database import engine, get_db
+from .services.vtu_credits import calculate_student_credits_and_gpa
 from . import models
 from .models import (
     Student,
@@ -112,6 +114,13 @@ from .schemas import (
     FacultyAuditsResponse,
     FacultyLoginLogItem,
     FacultyComparisonLogItem,
+    StudentPortalOption,
+    StudentUpdateStartRequest,
+    StudentUpdateStartResponse,
+    StudentUpdateSubmitRequest,
+    StudentUpdateSubmitResponse,
+    StudentUpdateRefreshRequest,
+    StudentUpdateRefreshResponse,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -126,7 +135,6 @@ from .auth import (
     extract_token_from_header,
     get_current_faculty,
     get_optional_faculty,
-    AUTH_SESSIONS,
 )
 
 from contextlib import asynccontextmanager
@@ -432,14 +440,19 @@ limiter = Limiter(key_func=get_remote_address)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS setup - dynamically allows localhost, 127.0.0.1, LAN IPs, and production origins with credentials
-origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
-if "https://vtu-whatnow.vercel.app" not in origins and "*" not in origins:
-    origins.append("https://vtu-whatnow.vercel.app")
+# CORS setup - safely allows localhost, 127.0.0.1, LAN IPs, and Vercel/production domains with credentials
+raw_origins = [o.strip() for o in settings.ALLOWED_ORIGINS.split(",") if o.strip()]
+explicit_origins = [o for o in raw_origins if o != "*"]
+if "https://vtu-whatnow.vercel.app" not in explicit_origins:
+    explicit_origins.append("https://vtu-whatnow.vercel.app")
+
+# Secure regex: allows any port on localhost, 127.0.0.1, private LAN IPs, and Vercel preview/production deployments
+safe_origin_regex = r"^(https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?|https://.*\.vercel\.app)$"
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins if (origins and "*" not in origins) else [],
-    allow_origin_regex=r"^https?://.*",
+    allow_origins=explicit_origins,
+    allow_origin_regex=safe_origin_regex,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -448,6 +461,13 @@ app.add_middleware(
 
 # In-memory single-use verified captcha sessions for secure analytics (expires in 5 minutes)
 verified_secure_stats_sessions: Dict[str, Dict[str, Any]] = {}
+
+def _prune_expired_captcha_sessions():
+    """Removes unconsumed captcha verification sessions older than 5 minutes to prevent memory leaks."""
+    now = time.time()
+    expired = [k for k, v in list(verified_secure_stats_sessions.items()) if now - v.get("solved_at", 0) > 300]
+    for k in expired:
+        verified_secure_stats_sessions.pop(k, None)
 
 
 @app.get("/")
@@ -470,7 +490,7 @@ async def health():
 # -------------------------------------------------------------
 
 def require_admin(x_admin_key: str = Header(default="", alias="X-Admin-Key")):
-    if not x_admin_key or x_admin_key != settings.ADMIN_PASSWORD:
+    if not x_admin_key or not secrets.compare_digest(x_admin_key, settings.ADMIN_PASSWORD):
         raise HTTPException(
             status_code=403,
             detail="Forbidden: Admin authorization required. Please provide a valid admin password."
@@ -478,8 +498,9 @@ def require_admin(x_admin_key: str = Header(default="", alias="X-Admin-Key")):
 
 
 @app.post("/api/admin/verify")
-def verify_admin(req: AdminVerifyRequest):
-    if req.password == settings.ADMIN_PASSWORD:
+@limiter.limit("5/minute")
+def verify_admin(req: AdminVerifyRequest, request: Request):
+    if req.password and secrets.compare_digest(req.password, settings.ADMIN_PASSWORD):
         return {"ok": True, "message": "Authenticated"}
     raise HTTPException(status_code=403, detail="Forbidden: Incorrect admin password.")
 
@@ -1344,10 +1365,6 @@ def handle_admin_rescrape_action(
         student = db.query(Student).filter(Student.usn == item.usn).first()
         if student:
             student.is_hidden = True
-            # Invalidate all active sessions for this USN to immediately throw them out
-            tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u.strip().upper() == item.usn.strip().upper()]
-            for t in tokens_to_evict:
-                AUTH_SESSIONS.pop(t, None)
         item.status = "resolved"
         item.resolved_at = datetime.utcnow()
         item.admin_notes = req.admin_notes or "Profile hidden from public view per data deletion request."
@@ -1376,11 +1393,6 @@ def toggle_student_visibility(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
     student.is_hidden = hidden
-    if hidden:
-        # Throw them out: Invalidate any active sessions immediately
-        tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u.strip().upper() == clean_usn]
-        for t in tokens_to_evict:
-            AUTH_SESSIONS.pop(t, None)
     db.commit()
     return {
         "ok": True,
@@ -1518,10 +1530,6 @@ def review_dispute(dispute_id: int, req: DisputeReviewRequest, db: Session = Dep
             student.password_hash = dispute.new_password_hash
             student.is_claimed = True
             student.is_hidden = False  # Restores/unhides the USN data for the verified owner!
-            # Invalidate all active memory sessions for this USN to immediately kick out old user
-            tokens_to_evict = [t for t, u in list(AUTH_SESSIONS.items()) if u == student.usn]
-            for t in tokens_to_evict:
-                AUTH_SESSIONS.pop(t, None)
         dispute.status = "approved"
         dispute.reviewed_at = datetime.utcnow()
         dispute.admin_notes = req.admin_notes or "Approved by admin after selfie verification."
@@ -1540,8 +1548,23 @@ def review_dispute(dispute_id: int, req: DisputeReviewRequest, db: Session = Dep
         raise HTTPException(status_code=400, detail="Invalid action. Use 'approve' or 'reject'.")
 
 
+def _prune_stale_audit_logs(db: Session, max_days: int = 2):
+    """Automatically removes audit and tracking logs older than 2 days to maintain privacy and prevent unbounded DB growth."""
+    try:
+        cutoff = datetime.utcnow() - timedelta(days=max_days)
+        db.query(LoginLog).filter(LoginLog.login_at < cutoff).delete(synchronize_session=False)
+        db.query(ComparisonLog).filter(ComparisonLog.compared_at < cutoff).delete(synchronize_session=False)
+        db.query(UserCaptchaLog).filter(UserCaptchaLog.created_at < cutoff).delete(synchronize_session=False)
+        db.query(FacultyLoginLog).filter(FacultyLoginLog.login_at < cutoff).delete(synchronize_session=False)
+        db.query(FacultyComparisonLog).filter(FacultyComparisonLog.compared_at < cutoff).delete(synchronize_session=False)
+        db.commit()
+    except Exception as e:
+        print(f"⚠️ Notice during stale audit logs cleanup: {e}")
+
+
 @app.get("/api/admin/login-logs", dependencies=[Depends(require_admin)])
 def get_admin_login_logs(db: Session = Depends(get_db)):
+    _prune_stale_audit_logs(db, max_days=2)
     logs = db.query(LoginLog).order_by(desc(LoginLog.login_at)).limit(150).all()
     total_logins = db.query(LoginLog).count()
 
@@ -1671,6 +1694,100 @@ def get_semester_links(db: Session = Depends(get_db)):
     except Exception as e:
         print(f"Error fetching semester links: {e}")
         return []
+
+
+@app.get("/api/student/available-portals", response_model=List[StudentPortalOption])
+def get_student_available_portals(db: Session = Depends(get_db)):
+    """Returns available examination portals with headings and semester tags, keeping raw URLs hidden."""
+    links = get_semester_links(db)
+    return [
+        StudentPortalOption(
+            id=link.id,
+            title=link.title,
+            semester=link.semester or "1",
+            is_default=bool(link.is_default),
+        )
+        for link in links
+    ]
+
+
+@app.post("/api/student/update-record/start", response_model=StudentUpdateStartResponse)
+async def start_student_record_update(
+    req: StudentUpdateStartRequest,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db)
+    if not current_usn:
+        raise HTTPException(status_code=401, detail="Authentication required to update your record.")
+
+    link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
+    if not link:
+        raise HTTPException(status_code=404, detail="Selected examination portal not found.")
+
+    target_url = (link.url if link.url else settings.VTU_URL_SEM1).strip()
+    target_sem = link.semester.strip() if link.semester else "1"
+
+    res = await ondemand_scraper.start_session(
+        target_usn=current_usn,
+        semester=target_sem,
+        target_url=target_url,
+        is_self_scrape=True
+    )
+    if not res.get("ok"):
+        raise HTTPException(status_code=502, detail=res.get("message", "Unable to connect to verification portal. Please try again."))
+
+    return StudentUpdateStartResponse(
+        ok=True,
+        session_id=res["session_id"],
+        captcha_base64=res["captcha_base64"],
+        heading=link.title,
+        message=res.get("message")
+    )
+
+
+@app.post("/api/student/update-record/refresh", response_model=StudentUpdateRefreshResponse)
+async def refresh_student_record_update_captcha(req: StudentUpdateRefreshRequest):
+    if not req.session_id:
+        raise HTTPException(status_code=400, detail="session_id is required.")
+    res = await ondemand_scraper.refresh_captcha(req.session_id)
+    if not res.get("ok"):
+        raise HTTPException(status_code=400, detail=res.get("message", "Failed to refresh verification code."))
+    return StudentUpdateRefreshResponse(
+        ok=True,
+        captcha_base64=res.get("captcha_base64"),
+        message="New verification code loaded."
+    )
+
+
+@app.post("/api/student/update-record/submit", response_model=StudentUpdateSubmitResponse)
+async def submit_student_record_update_captcha(
+    req: StudentUpdateSubmitRequest,
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db)
+    if not current_usn:
+        raise HTTPException(status_code=401, detail="Authentication required to update your record.")
+
+    if not req.session_id or not req.captcha or not req.captcha.strip():
+        raise HTTPException(status_code=400, detail="Session ID and verification code are required.")
+
+    client_ip = request.client.host if request.client else "unknown"
+    res = await ondemand_scraper.submit_update_captcha(
+        session_id=req.session_id,
+        captcha_code=req.captcha.strip(),
+        client_ip=client_ip
+    )
+
+    return StudentUpdateSubmitResponse(
+        ok=bool(res.get("ok")),
+        message=res.get("message", ""),
+        reason=res.get("reason"),
+        new_captcha_base64=res.get("new_captcha_base64")
+    )
+
 
 
 @app.post("/api/semester-links", response_model=SemesterLinkOut, dependencies=[Depends(require_admin)])
@@ -1877,8 +1994,17 @@ def sanitize_student_record(
 
     public_marks.sort(key=lambda m: (_get_sem_order(m), (getattr(m, "subject_code", "") or "").strip().upper()))
 
-    from .services.vtu_credits import calculate_student_credits_and_gpa
-    gpa_info = calculate_student_credits_and_gpa(s.marks or [])
+    gpa_info = calculate_student_credits_and_gpa(s.marks or []) if s.marks else {
+        "cgpa": s.cgpa or 0.0,
+        "sgpa": 0.0,
+        "credits_earned": 0,
+        "total_credits": 0,
+    }
+
+    raw_cgpa = gpa_info.get("cgpa", 0.0)
+    final_cgpa = float(raw_cgpa) if (raw_cgpa and raw_cgpa > 0) else float(s.cgpa or 0.0)
+    raw_sgpa = gpa_info.get("sgpa", 0.0)
+    final_sgpa = float(raw_sgpa) if isinstance(raw_sgpa, (int, float)) else 0.0
 
     return {
         "usn": s.usn,
@@ -1888,10 +2014,10 @@ def sanitize_student_record(
         "total_marks": s.total_marks,
         "max_marks": s.max_marks,
         "percentage": s.percentage,
-        "cgpa": gpa_info["cgpa"] if gpa_info["cgpa"] > 0 else s.cgpa,
-        "sgpa": gpa_info["sgpa"],
-        "credits_earned": gpa_info["credits_earned"],
-        "total_credits": gpa_info["total_credits"],
+        "cgpa": final_cgpa,
+        "sgpa": final_sgpa,
+        "credits_earned": int(gpa_info.get("credits_earned") or 0),
+        "total_credits": int(gpa_info.get("total_credits") or 0),
         "total_backlogs": public_backlogs,
         "github_url": s.github_url or "",
         "linkedin_url": s.linkedin_url or "",
@@ -2043,17 +2169,34 @@ def compare_students(
     if not user_student or user_student.is_hidden:
         raise HTTPException(status_code=401, detail="Session expired or invalid.")
 
-    # Step 1: Check comparison credits
-    if (user_student.comparison_credits or 0) <= 0:
-        # Step 3: Out of credits -> Return 403 CAPTCHA_REQUIRED
+    # Privacy Protection: Check if either profile is hidden or disabled direct comparisons
+    is_owner_1 = (clean_a == current_usn)
+    is_owner_2 = (clean_b == current_usn)
+    if (st1.is_hidden and not is_owner_1) or (st2.is_hidden and not is_owner_2):
+        raise HTTPException(status_code=403, detail="One or both student profiles are hidden by privacy request.")
+
+    allow_comp_1 = st1.allow_comparison if st1.allow_comparison is not None else True
+    allow_comp_2 = st2.allow_comparison if st2.allow_comparison is not None else True
+    if (not allow_comp_1 and not is_owner_1) or (not allow_comp_2 and not is_owner_2):
+        raise HTTPException(status_code=403, detail="One or both students have opted out of direct comparisons.")
+
+    # Atomic credit deduction: prevents check-then-write race condition across multiple tabs
+    rows_affected = db.query(Student).filter(
+        Student.usn == current_usn,
+        Student.comparison_credits > 0
+    ).update(
+        {Student.comparison_credits: Student.comparison_credits - 1},
+        synchronize_session="fetch"
+    )
+    db.commit()
+
+    if rows_affected == 0:
         raise HTTPException(
             status_code=403,
             detail="CAPTCHA_REQUIRED"
         )
 
-    # Step 2: Deduct 1 credit
-    user_student.comparison_credits = max(0, user_student.comparison_credits - 1)
-    db.commit()
+    db.refresh(user_student)
 
     return {
         "ok": True,
@@ -2163,6 +2306,7 @@ async def submit_compare_captcha(
     )
 
     if res.get("ok"):
+        _prune_expired_captcha_sessions()
         verified_secure_stats_sessions[req.session_id] = {
             "solved_at": time.time(),
             "consumed": False,
@@ -2291,6 +2435,7 @@ async def submit_analytics_captcha(
     )
 
     if res.get("ok"):
+        _prune_expired_captcha_sessions()
         verified_secure_stats_sessions[req.session_id] = {
             "solved_at": time.time(),
             "consumed": False,
@@ -2498,6 +2643,7 @@ def log_student_comparison(
 
 @app.get("/api/admin/compare-logs", dependencies=[Depends(require_admin)])
 def get_admin_compare_logs(db: Session = Depends(get_db)):
+    _prune_stale_audit_logs(db, max_days=2)
     base_query = db.query(ComparisonLog).filter(
         ComparisonLog.viewer_usn.isnot(None),
         ComparisonLog.viewer_usn != ""
@@ -2612,6 +2758,26 @@ def delete_admin_login_log(log_id: int, db: Session = Depends(get_db)):
     db.delete(log)
     db.commit()
     return {"ok": True, "message": f"Login log #{log_id} deleted"}
+
+
+@app.post("/api/admin/clear-logs", dependencies=[Depends(require_admin)])
+def clear_all_admin_logs(
+    log_type: str = Query("all", description="Type of logs to clear: 'all', 'login', or 'compare'"),
+    db: Session = Depends(get_db)
+):
+    """Allows admin to purge logs on demand."""
+    deleted_counts = {}
+    if log_type in ("all", "login"):
+        c1 = db.query(LoginLog).delete(synchronize_session=False)
+        c2 = db.query(FacultyLoginLog).delete(synchronize_session=False)
+        deleted_counts["login_logs"] = c1 + c2
+    if log_type in ("all", "compare"):
+        c3 = db.query(ComparisonLog).delete(synchronize_session=False)
+        c4 = db.query(FacultyComparisonLog).delete(synchronize_session=False)
+        deleted_counts["comparison_logs"] = c3 + c4
+    db.commit()
+    return {"ok": True, "message": "Logs cleared successfully", "deleted": deleted_counts}
+
 
 
 @app.delete("/api/admin/rescrape-requests/{request_id}", dependencies=[Depends(require_admin)])

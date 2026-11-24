@@ -1278,6 +1278,22 @@ export async function deleteLoginLog(
   return res.json();
 }
 
+export async function clearAllAdminLogs(
+  logType: "all" | "login" | "compare" = "all",
+  adminKey: string
+): Promise<{ ok: boolean; message: string; deleted?: Record<string, number> }> {
+  const res = await fetch(`${API_BASE}/api/admin/clear-logs?log_type=${logType}`, {
+    method: "POST",
+    headers: { "X-Admin-Key": adminKey },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to clear logs");
+  }
+  return res.json();
+}
+
+
 export async function deleteRescrapeRequest(
   requestId: number,
   adminKey: string
@@ -1609,7 +1625,7 @@ export interface FacultyAuditsData {
 export function getStoredFacultySession(): FacultySession | null {
   if (typeof window === "undefined") return null;
   try {
-    const raw = sessionStorage.getItem("vtu_faculty_session") || localStorage.getItem("vtu_faculty_session");
+    const raw = sessionStorage.getItem("vtu_faculty_session");
     if (raw) return JSON.parse(raw) as FacultySession;
     return null;
   } catch {
@@ -1626,7 +1642,7 @@ export function setStoredFacultySession(session: FacultySession): void {
   if (typeof window === "undefined") return;
   try {
     sessionStorage.setItem("vtu_faculty_session", JSON.stringify(session));
-    localStorage.setItem("vtu_faculty_session", JSON.stringify(session));
+    localStorage.removeItem("vtu_faculty_session");
   } catch {
     // ignore
   }
@@ -1724,5 +1740,98 @@ export async function fetchAdminFacultyAudits(adminKey: string): Promise<Faculty
   }
   return res.json();
 }
+
+export interface StudentPortalOption {
+  id: number;
+  title: string;
+  semester: string;
+  is_default: boolean;
+}
+
+export interface StudentUpdateStartResult {
+  ok: boolean;
+  session_id: string;
+  captcha_base64: string;
+  heading: string;
+  message?: string;
+}
+
+export interface StudentUpdateSubmitResult {
+  ok: boolean;
+  message: string;
+  reason?: string;
+  new_captcha_base64?: string;
+}
+
+export async function fetchAvailablePortals(): Promise<StudentPortalOption[]> {
+  const baseUrl = getApiBase();
+  try {
+    const res = await fetch(`${baseUrl}/api/student/available-portals`, {
+      cache: "no-store",
+    });
+    if (!res.ok) return [];
+    return await res.json();
+  } catch {
+    return [];
+  }
+}
+
+export async function startStudentUpdate(
+  semesterLinkId: number,
+  token?: string
+): Promise<StudentUpdateStartResult> {
+  const baseUrl = getApiBase();
+  const effectiveToken = token || getStoredStudentToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (effectiveToken) {
+    headers["X-Student-Token"] = effectiveToken;
+  }
+  const res = await fetch(`${baseUrl}/api/student/update-record/start`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ semester_link_id: semesterLinkId }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || "Unable to connect to verification portal.");
+  }
+  return data;
+}
+
+export async function refreshStudentUpdateCaptcha(
+  sessionId: string
+): Promise<{ ok: boolean; captcha_base64?: string; message?: string }> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/student/update-record/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ session_id: sessionId }),
+  });
+  return await res.json();
+}
+
+export async function submitStudentUpdateCaptcha(
+  sessionId: string,
+  captcha: string,
+  token?: string
+): Promise<StudentUpdateSubmitResult> {
+  const baseUrl = getApiBase();
+  const effectiveToken = token || getStoredStudentToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (effectiveToken) {
+    headers["X-Student-Token"] = effectiveToken;
+  }
+  const res = await fetch(`${baseUrl}/api/student/update-record/submit`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ session_id: sessionId, captcha }),
+  });
+  return await res.json();
+}
+
 
 

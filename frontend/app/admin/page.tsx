@@ -45,6 +45,7 @@ import {
   updateStudentCredits,
   deleteCompareLog,
   deleteLoginLog,
+  clearAllAdminLogs,
   deleteRescrapeRequest,
   deleteMissingReport,
   deleteDisputeRecord,
@@ -472,6 +473,28 @@ export default function AdminPanel() {
       sfx.playClick();
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to delete login log");
+    }
+  };
+
+  const [clearingLogs, setClearingLogs] = useState(false);
+  const handleClearAllLogs = async () => {
+    if (!adminKey || clearingLogs) return;
+    const logLabel = logsSubTab === "logins" ? "login audit logs" : "comparison tracker logs";
+    if (!window.confirm(`Are you sure you want to delete all ${logLabel}? This cannot be undone.`)) return;
+    setClearingLogs(true);
+    sfx.playMechanicalClick();
+    try {
+      await clearAllAdminLogs(logsSubTab === "logins" ? "login" : "compare", adminKey);
+      if (logsSubTab === "logins") {
+        await loadLoginLogs();
+      } else {
+        await loadComparisonLogs();
+      }
+      sfx.playClick();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to clear logs");
+    } finally {
+      setClearingLogs(false);
     }
   };
 
@@ -3572,22 +3595,34 @@ export default function AdminPanel() {
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {logsSubTab === "logins"
-                    ? "Real-time record of students who logged in, how many times, with timestamps and network IPs."
-                    : "Real-time record of which students compared themselves or their peers to whom."}
+                    ? "Real-time record of students who logged in, how many times, with timestamps and network IPs. (Logs older than 2 days are automatically purged)"
+                    : "Real-time record of which students compared themselves or their peers to whom. (Logs older than 2 days are automatically purged)"}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  sfx.playClick();
-                  if (logsSubTab === "logins") loadLoginLogs();
-                  else loadComparisonLogs();
-                }}
-                className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition-colors self-start sm:self-auto flex items-center gap-1.5 cursor-pointer"
-              >
-                <IconRotateCcw className="w-3 h-3" />
-                <span>Refresh</span>
-              </button>
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <button
+                  type="button"
+                  disabled={clearingLogs}
+                  onClick={handleClearAllLogs}
+                  className="px-3 py-1.5 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-400 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  title="Delete all logs in this view"
+                >
+                  <IconTrash className="w-3 h-3" />
+                  <span>{clearingLogs ? "Clearing..." : "Clear Logs"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playClick();
+                    if (logsSubTab === "logins") loadLoginLogs();
+                    else loadComparisonLogs();
+                  }}
+                  className="px-3 py-1.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-xs font-medium rounded-xl transition-colors flex items-center gap-1.5 cursor-pointer"
+                >
+                  <IconRotateCcw className="w-3 h-3" />
+                  <span>Refresh</span>
+                </button>
+              </div>
             </div>
 
             {/* Sub-tab switcher: Logins vs Comparisons */}

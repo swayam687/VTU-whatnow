@@ -1,6 +1,7 @@
+import os
 import hashlib
 import secrets
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 import jwt
 from fastapi import Header, Depends, HTTPException
@@ -9,10 +10,12 @@ from .config import settings
 from .models import Student, Faculty
 from .database import get_db
 
-# In-memory session store (token -> usn)
-AUTH_SESSIONS: dict[str, str] = {}
-
-FACULTY_JWT_SECRET = getattr(settings, "SECRET_KEY", None) or f"vtu_whatnow_faculty_secure_jwt_secret_token_2026_{settings.ADMIN_PASSWORD}"
+# Cryptographically secure JWT secret: loads SECRET_KEY from settings/env or generates 32-byte secret on startup
+FACULTY_JWT_SECRET = (
+    settings.SECRET_KEY.strip()
+    if getattr(settings, "SECRET_KEY", None) and settings.SECRET_KEY.strip()
+    else os.environ.get("SECRET_KEY", "").strip() or secrets.token_hex(32)
+)
 FACULTY_JWT_ALGORITHM = "HS256"
 
 def hash_password(password: str, salt: Optional[str] = None) -> str:
@@ -50,7 +53,6 @@ def create_session(usn: str, password_hash: str) -> str:
     clean_usn = usn.strip().upper()
     pw_sig = compute_pw_sig(clean_usn, password_hash)
     token = f"{clean_usn}:{pw_sig}:{secrets.token_hex(16)}"
-    AUTH_SESSIONS[token] = clean_usn
     return token
 
 def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
@@ -70,16 +72,13 @@ def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
     # Verify student exists and has claimed password and is not hidden/deleted
     student = db.query(Student).filter(Student.usn == usn).first()
     if not student or not student.password_hash or not student.is_claimed or student.is_hidden:
-        AUTH_SESSIONS.pop(token, None)
         return None
 
     expected_sig = compute_pw_sig(usn, student.password_hash)
     if token_sig != expected_sig:
         # Password was changed or ownership transferred! Old user session is REVOKED.
-        AUTH_SESSIONS.pop(token, None)
         return None
 
-    AUTH_SESSIONS[token] = usn
     return usn
 
 def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"), db: Session = Depends(get_db)) -> Optional[str]:
@@ -88,7 +87,7 @@ def get_current_student_usn(x_student_token: Optional[str] = Header(default=None
 
 def create_faculty_jwt(faculty: Faculty, expires_in_days: int = 7) -> str:
     """Creates a signed JWT token for an authenticated faculty member."""
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     payload = {
         "sub": faculty.username,
         "username": faculty.username,

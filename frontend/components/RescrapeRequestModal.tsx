@@ -1,14 +1,16 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Student,
   AuthSession,
-  RescrapeRequestRecord,
-  submitRescrapeRequest,
-  fetchRescrapeStatus,
+  StudentPortalOption,
+  fetchAvailablePortals,
+  startStudentUpdate,
+  refreshStudentUpdateCaptcha,
+  submitStudentUpdateCaptcha,
 } from "../lib/api";
-import { IconClose, IconRotateCcw, IconShield } from "./Icons";
+import { IconClose, IconRotateCcw, IconShield, IconCheck, IconLock } from "./Icons";
 import { sfx } from "../lib/sfx";
 
 interface RescrapeRequestModalProps {
@@ -20,6 +22,8 @@ interface RescrapeRequestModalProps {
   onClose: () => void;
   onSuccess?: () => void;
 }
+
+type ModalStep = "SELECT" | "CONNECTING" | "CAPTCHA" | "VERIFYING" | "SUCCESS";
 
 export default function RescrapeRequestModal({
   isOpen,
@@ -34,96 +38,155 @@ export default function RescrapeRequestModal({
   const sessionUsn = (studentSession?.usn || "").trim().toUpperCase();
   const isOwner = Boolean(studentSession && targetUsn === sessionUsn);
 
-  const [requestType, setRequestType] = useState<string>("REVALUATION");
-  const [targetSemester, setTargetSemester] = useState<string>("1");
-  const [vtuLink, setVtuLink] = useState<string>("");
+  const [step, setStep] = useState<ModalStep>("SELECT");
+  const [portals, setPortals] = useState<StudentPortalOption[]>([]);
+  const [loadingPortals, setLoadingPortals] = useState<boolean>(true);
+  const [selectedPortalId, setSelectedPortalId] = useState<number | null>(null);
 
-  const [checkingStatus, setCheckingStatus] = useState<boolean>(true);
-  const [pendingRequest, setPendingRequest] = useState<RescrapeRequestRecord | null>(null);
-
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  // Live Verification Session state
+  const [sessionId, setSessionId] = useState<string>("");
+  const [captchaBase64, setCaptchaBase64] = useState<string>("");
+  const [captchaInput, setCaptchaInput] = useState<string>("");
+  const [selectedHeading, setSelectedHeading] = useState<string>("");
+  const [isRefreshingCaptcha, setIsRefreshingCaptcha] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
-  const [successMsg, setSuccessMsg] = useState<string>("");
 
-  // Check if this USN already has a pending or in-progress request (anti-spam)
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Load available portals from backend whenever modal opens
   useEffect(() => {
-    if (!isOpen || !targetUsn || !isOwner) return;
+    if (!isOpen || !isOwner) return;
 
     let isMounted = true;
-    setCheckingStatus(true);
+    setLoadingPortals(true);
+    setStep("SELECT");
     setErrorMsg("");
-    setSuccessMsg("");
+    setCaptchaInput("");
+    setSessionId("");
+    setCaptchaBase64("");
 
-    fetchRescrapeStatus(targetUsn)
-      .then((res) => {
+    fetchAvailablePortals()
+      .then((data) => {
         if (!isMounted) return;
-        setPendingRequest(res.pending_request || null);
-
-        // Preselect intelligent defaults based on student backlogs
-        if (student && student.total_backlogs > 0) {
-          setRequestType("REVALUATION");
-          setTargetSemester("1");
-        } else {
-          setRequestType("MISSING_SEMESTER");
-          setTargetSemester("2");
+        setPortals(data);
+        if (data.length > 0) {
+          const defaultOpt = data.find((p) => p.is_default) || data[0];
+          setSelectedPortalId(defaultOpt.id);
+          setSelectedHeading(defaultOpt.title);
         }
       })
       .catch((err) => {
-        console.error("Could not check rescrape status", err);
+        console.error("Could not load examination portals", err);
       })
       .finally(() => {
-        if (isMounted) setCheckingStatus(false);
+        if (isMounted) setLoadingPortals(false);
       });
 
     return () => {
       isMounted = false;
     };
-  }, [isOpen, targetUsn, student, isOwner]);
+  }, [isOpen, isOwner]);
+
+  // Auto-focus captcha input on transition to CAPTCHA step
+  useEffect(() => {
+    if (step === "CAPTCHA") {
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 150);
+    }
+  }, [step]);
 
   if (!isOpen || !targetUsn) return null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!targetUsn || !isOwner) return;
+  // Step 1 -> Step 2: Start session
+  const handleStartUpdate = async () => {
+    if (!selectedPortalId) {
+      setErrorMsg("Please select an examination heading to update.");
+      return;
+    }
 
     setErrorMsg("");
-    setSuccessMsg("");
-    setIsSubmitting(true);
+    setStep("CONNECTING");
     sfx.playMechanicalClick();
 
     try {
-      const res = await submitRescrapeRequest(
-        {
-          usn: targetUsn,
-          name: student?.name || studentSession?.name || "",
-          branch: student?.branch || studentSession?.branch || "",
-          request_type: requestType,
-          target_semester: requestType === "DATA_DELETION" ? "all" : targetSemester,
-          vtu_link: requestType !== "DATA_DELETION" ? (vtuLink.trim() || undefined) : undefined,
-        },
-        studentSession?.token
-      );
-
-      const finalMsg =
-        requestType === "DATA_DELETION"
-          ? "Deletion request sent to admin. Your data will be deleted in 24 hours."
-          : res.message || "Update request submitted to admin!";
-
-      setSuccessMsg(finalMsg);
-      setPendingRequest(res.request);
-      sfx.playSonarChime();
-      if (onSuccess) onSuccess();
+      const res = await startStudentUpdate(selectedPortalId, studentSession?.token);
+      if (res.ok && res.session_id && res.captcha_base64) {
+        setSessionId(res.session_id);
+        setCaptchaBase64(res.captcha_base64);
+        if (res.heading) setSelectedHeading(res.heading);
+        setCaptchaInput("");
+        setStep("CAPTCHA");
+        sfx.playSonarChime();
+      } else {
+        throw new Error(res.message || "Failed to initialize verification session.");
+      }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to submit request";
+      const msg = err instanceof Error ? err.message : "Unable to reach verification portal.";
       setErrorMsg(msg);
+      setStep("SELECT");
+    }
+  };
+
+  // Refresh captcha button
+  const handleRefreshCaptcha = async () => {
+    if (!sessionId || isRefreshingCaptcha) return;
+    setIsRefreshingCaptcha(true);
+    sfx.playMechanicalClick();
+    try {
+      const res = await refreshStudentUpdateCaptcha(sessionId);
+      if (res.ok && res.captcha_base64) {
+        setCaptchaBase64(res.captcha_base64);
+        setCaptchaInput("");
+        setErrorMsg("");
+        inputRef.current?.focus();
+      }
+    } catch {
+      // ignore
     } finally {
-      setIsSubmitting(false);
+      setIsRefreshingCaptcha(false);
+    }
+  };
+
+  // Step 3 -> Step 4: Submit captcha
+  const handleSubmitCaptcha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanCode = captchaInput.trim();
+    if (!cleanCode || cleanCode.length < 2) {
+      setErrorMsg("Please enter the verification code displayed.");
+      return;
+    }
+
+    setErrorMsg("");
+    setStep("VERIFYING");
+    sfx.playMechanicalClick();
+
+    try {
+      const res = await submitStudentUpdateCaptcha(sessionId, cleanCode, studentSession?.token);
+
+      if (res.ok) {
+        setStep("SUCCESS");
+        sfx.playSonarChime();
+        if (onSuccess) onSuccess();
+      } else {
+        // Wrong captcha or failed validation: reload captcha and ask again
+        if (res.new_captcha_base64) {
+          setCaptchaBase64(res.new_captcha_base64);
+        }
+        setCaptchaInput("");
+        setErrorMsg(res.message || "Incorrect verification code. A new code has been loaded. Please try again.");
+        setStep("CAPTCHA");
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification request failed.";
+      setErrorMsg(msg);
+      setStep("CAPTCHA");
     }
   };
 
   return (
     <div
-      onClick={onClose}
+      onClick={step === "VERIFYING" ? undefined : onClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150"
     >
       <div
@@ -143,47 +206,65 @@ export default function RescrapeRequestModal({
           <div className="flex items-center gap-2.5">
             <div
               className={`w-8 h-8 rounded-xl flex items-center justify-center border ${
-                isObsidian
+                step === "SUCCESS"
+                  ? isObsidian
+                    ? "bg-emerald-950/40 border-emerald-800/40 text-emerald-400"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                  : isObsidian
                   ? "bg-cyan-950/40 border-cyan-800/40 text-cyan-400"
                   : "bg-blue-50 border-blue-200 text-blue-700"
               }`}
             >
-              <IconRotateCcw className="w-4 h-4" />
+              {step === "SUCCESS" ? (
+                <IconCheck className="w-4 h-4" />
+              ) : (
+                <IconRotateCcw className="w-4 h-4" />
+              )}
             </div>
             <div>
-              <h2 className="text-sm font-bold tracking-tight">Request Marksheet Update</h2>
+              <h2 className="text-sm font-bold tracking-tight">
+                {step === "CAPTCHA" || step === "VERIFYING"
+                  ? "Security Verification"
+                  : step === "SUCCESS"
+                  ? "Record Updated"
+                  : "Create Update Ticket"}
+              </h2>
               <p className="text-[11px] opacity-60 font-mono">
                 {targetUsn} {student?.name ? `• ${student.name}` : ""}
               </p>
             </div>
           </div>
 
-          <button
-            onClick={() => {
-              sfx.playMechanicalClick();
-              onClose();
-            }}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
-          >
-            <IconClose className="w-4 h-4" />
-          </button>
+          {step !== "VERIFYING" && (
+            <button
+              onClick={() => {
+                sfx.playMechanicalClick();
+                onClose();
+              }}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
+            >
+              <IconClose className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
-        {/* Content Body */}
+        {/* Modal Body */}
         <div className="p-5 sm:p-6 space-y-4">
           {!isOwner ? (
-            /* Non-Owner Block: Only the verified account owner can request for their own USN */
+            /* Non-Owner Block: Only verified owner can update their record */
             <div className="py-6 text-center space-y-3">
               <div
                 className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto border ${
-                  isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-slate-100 border-slate-200 text-slate-600"
+                  isObsidian
+                    ? "bg-white/5 border-white/10 text-slate-300"
+                    : "bg-slate-100 border-slate-200 text-slate-600"
                 }`}
               >
                 <IconShield className="w-5 h-5" />
               </div>
               <p className="text-sm font-bold">Account Holder Only</p>
               <p className="text-xs opacity-65 max-w-sm mx-auto leading-relaxed">
-                Only the verified owner of <strong>{targetUsn}</strong> can submit re-scrape requests for their marksheet. You cannot submit requests for other students.
+                Only the verified owner of <strong>{targetUsn}</strong> can initiate record updates.
               </p>
               <div className="pt-1">
                 <button
@@ -195,273 +276,277 @@ export default function RescrapeRequestModal({
                 </button>
               </div>
             </div>
-          ) : checkingStatus ? (
-            <div className="py-8 text-center text-xs opacity-60 flex flex-col items-center justify-center gap-2">
-              <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-              <span>Checking queue status for your profile...</span>
-            </div>
-          ) : pendingRequest ? (
-            /* Anti-Spam Active Request State */
-            <div className="space-y-4 py-2">
-              <div
-                className={`p-4 rounded-2xl border ${
-                  isObsidian
-                    ? "bg-amber-950/20 border-amber-800/50 text-amber-200"
-                    : "bg-amber-50/80 border-amber-200 text-amber-900"
-                } space-y-2.5`}
-              >
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-xs font-bold uppercase tracking-wider">
-                    Request Already Pending in Queue
-                  </span>
+          ) : step === "SELECT" ? (
+            /* Step 1: Select Portal Heading */
+            <div className="space-y-4">
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-2">
+                  Select Examination Record to Update
+                </label>
+                <p className="text-xs opacity-65 leading-relaxed mb-3">
+                  Choose the examination portal heading corresponding to your recent results or revaluation:
+                </p>
+
+                {loadingPortals ? (
+                  <div className="py-8 text-center text-xs opacity-60 flex flex-col items-center justify-center gap-2">
+                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                    <span>Loading available examination portals...</span>
+                  </div>
+                ) : portals.length === 0 ? (
+                  <div
+                    className={`p-4 rounded-2xl border text-xs text-center opacity-70 ${
+                      isObsidian ? "bg-slate-900/40 border-slate-800" : "bg-slate-50 border-slate-200"
+                    }`}
+                  >
+                    No examination portal links have been configured by the administrator yet.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
+                    {portals.map((p) => {
+                      const isSelected = selectedPortalId === p.id;
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => {
+                            sfx.playMechanicalClick();
+                            setSelectedPortalId(p.id);
+                            setSelectedHeading(p.title);
+                            setErrorMsg("");
+                          }}
+                          className={`p-3.5 text-left rounded-2xl border transition-all text-xs flex items-center justify-between cursor-pointer ${
+                            isSelected
+                              ? isObsidian
+                                ? "bg-cyan-950/30 border-cyan-500/80 text-white ring-1 ring-cyan-500/50"
+                                : "bg-blue-50/70 border-blue-500 text-slate-900 ring-1 ring-blue-500"
+                              : isObsidian
+                              ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
+                              : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
+                          }`}
+                        >
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-xs sm:text-sm">{p.title}</span>
+                              {p.is_default && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-cyan-400 font-bold">
+                                  Default
+                                </span>
+                              )}
+                            </div>
+                            <span className="inline-block text-[10px] font-mono opacity-60 uppercase">
+                              Semester {p.semester}
+                            </span>
+                          </div>
+
+                          <div
+                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ml-3 ${
+                              isSelected
+                                ? "border-blue-600 bg-blue-600 dark:border-cyan-400 dark:bg-cyan-400"
+                                : "border-slate-300 dark:border-slate-700"
+                            }`}
+                          >
+                            {isSelected && (
+                              <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-900" />
+                            )}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {errorMsg && (
+                <div
+                  className={`p-3 rounded-xl border text-xs ${
+                    isObsidian
+                      ? "bg-rose-950/30 border-rose-800/40 text-rose-300"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
+                >
+                  {errorMsg}
                 </div>
-                <p className="text-xs leading-relaxed opacity-90">
-                  You already submitted an update request for your marksheet. To prevent spamming, only one active request can be pending at a time. The administrator has your request in queue and will re-scrape your updated results.
+              )}
+
+              <div className="pt-2">
+                <button
+                  type="button"
+                  disabled={loadingPortals || !selectedPortalId}
+                  onClick={handleStartUpdate}
+                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
+                >
+                  <IconLock className="w-3.5 h-3.5" />
+                  <span>Verify to create ticket</span>
+                </button>
+              </div>
+            </div>
+          ) : step === "CONNECTING" ? (
+            /* Step 2: Establishing Session Loading State */
+            <div className="py-12 text-center space-y-3">
+              <div className="w-8 h-8 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold">Connecting to verification portal...</p>
+                <p className="text-xs opacity-60">Preparing ticket verification session. Please wait.</p>
+              </div>
+            </div>
+          ) : step === "CAPTCHA" ? (
+            /* Step 3: Interactive Captcha Verification */
+            <form onSubmit={handleSubmitCaptcha} className="space-y-4">
+              <div className="space-y-1">
+                <p className="text-xs opacity-75 leading-relaxed">
+                  Please solve this captcha to verify your identity and create an update ticket for{" "}
+                  <strong>{selectedHeading}</strong>:
                 </p>
               </div>
 
-              {/* Request Metadata Details */}
+              {/* Captcha Image Container */}
               <div
-                className={`p-3.5 rounded-2xl border text-xs space-y-2 font-mono ${
-                  isObsidian ? "bg-slate-900/50 border-slate-800" : "bg-slate-50 border-slate-200"
+                className={`p-4 rounded-2xl border flex flex-col items-center justify-center gap-2.5 ${
+                  isObsidian
+                    ? "bg-slate-950/60 border-slate-800"
+                    : "bg-slate-50 border-slate-200"
                 }`}
               >
-                <div className="flex justify-between items-center text-[11px]">
-                  <span className="opacity-60">Update Reason:</span>
-                  <span className="font-semibold">
-                    {pendingRequest.request_type === "REVALUATION"
-                      ? "Passed in Revaluation"
-                      : pendingRequest.request_type === "MISSING_SEMESTER"
-                      ? "Missing Semester Result"
-                      : pendingRequest.request_type === "RE_EXAM"
-                      ? "Makeup / Re-exam Passed"
-                      : pendingRequest.request_type === "DATA_DELETION"
-                      ? "Request Data Deletion"
-                      : "Marksheet Update"}
+                <div className="relative group">
+                  {captchaBase64 ? (
+                    <img
+                      src={`data:image/png;base64,${captchaBase64}`}
+                      alt="Verification Captcha"
+                      className="h-12 object-contain rounded-lg border border-slate-700/30 shadow-xs"
+                    />
+                  ) : (
+                    <div className="h-12 w-36 bg-slate-200 dark:bg-slate-800 animate-pulse rounded-lg flex items-center justify-center text-xs opacity-60">
+                      Loading code...
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleRefreshCaptcha}
+                    disabled={isRefreshingCaptcha}
+                    title="Refresh verification code"
+                    className="absolute -top-2 -right-2 p-1.5 rounded-full bg-slate-900 border border-slate-700 text-white dark:bg-white dark:text-slate-900 dark:border-slate-300 shadow-md hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                  >
+                    <IconRotateCcw
+                      className={`w-3.5 h-3.5 ${isRefreshingCaptcha ? "animate-spin" : ""}`}
+                    />
+                  </button>
+                </div>
+                <span className="text-[11px] opacity-60 font-mono">
+                  Click refresh icon if code is unreadable
+                </span>
+              </div>
+
+              {/* Captcha Input */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70">
+                    Enter Verification Code
+                  </label>
+                  <span className="text-[10px] font-mono text-cyan-400 font-medium">
+                    Case-Sensitive (a-z & A-Z)
                   </span>
                 </div>
-                {pendingRequest.target_semester && pendingRequest.request_type !== "DATA_DELETION" && (
-                  <div className="flex justify-between items-center text-[11px]">
-                    <span className="opacity-60">Target Semester:</span>
-                    <span className="font-semibold">
-                      {pendingRequest.target_semester === "all" ? "Both Semesters" : `Semester ${pendingRequest.target_semester}`}
-                    </span>
-                  </div>
-                )}
-                {(pendingRequest.vtu_link || pendingRequest.custom_url) && (
-                  <div className="flex justify-between items-center text-[11px] pt-1 border-t border-slate-700/20">
-                    <span className="opacity-60">Result Link:</span>
-                    <a
-                      href={pendingRequest.vtu_link || pendingRequest.custom_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="font-mono text-cyan-400 hover:underline truncate max-w-[200px]"
-                    >
-                      {pendingRequest.vtu_link || pendingRequest.custom_url}
-                    </a>
-                  </div>
-                )}
+                <input
+                  ref={inputRef}
+                  type="text"
+                  maxLength={10}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={captchaInput}
+                  onChange={(e) => {
+                    setCaptchaInput(e.target.value);
+                    setErrorMsg("");
+                  }}
+                  placeholder="e.g. 5k9P2"
+                  className={`w-full px-4 py-2.5 text-sm rounded-xl border outline-none font-mono tracking-widest text-center font-bold transition-all ${
+                    isObsidian
+                      ? "bg-slate-950/60 border-slate-700 text-white focus:border-cyan-400"
+                      : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                  }`}
+                />
+              </div>
+
+              {errorMsg && (
+                <div
+                  className={`p-3 rounded-xl border text-xs leading-snug flex items-center gap-2 ${
+                    isObsidian
+                      ? "bg-rose-950/30 border-rose-800/40 text-rose-300"
+                      : "bg-rose-50 border-rose-200 text-rose-800"
+                  }`}
+                >
+                  <span className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
+              <div className="pt-1 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setStep("SELECT");
+                    setErrorMsg("");
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-semibold border border-slate-700/50 hover:bg-slate-800/40 transition-colors cursor-pointer"
+                >
+                  Back
+                </button>
+                <button
+                  type="submit"
+                  disabled={!captchaInput.trim()}
+                  className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
+                >
+                  <IconCheck className="w-3.5 h-3.5" />
+                  <span>Submit Verification</span>
+                </button>
+              </div>
+            </form>
+          ) : step === "VERIFYING" ? (
+            /* Step 4: Loading State while marks are fetched */
+            <div className="py-12 text-center space-y-3">
+              <div className="w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+              <div className="space-y-1">
+                <p className="text-sm font-bold">Creating a ticket for admin to view and update record...</p>
+                <p className="text-xs opacity-60">Please do not close this window.</p>
+              </div>
+            </div>
+          ) : (
+            /* Step 5: Success Prompt */
+            <div className="py-6 text-center space-y-4">
+              <div
+                className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
+                  isObsidian
+                    ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-400"
+                    : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                }`}
+              >
+                <IconCheck className="w-6 h-6" />
+              </div>
+
+              <div className="space-y-1.5">
+                <h3 className="text-base font-bold">Admin updated your record</h3>
+                <p className="text-xs opacity-75 max-w-sm mx-auto leading-relaxed">
+                  Refresh the website to see the updated results.
+                </p>
               </div>
 
               <div className="pt-2">
                 <button
                   type="button"
-                  onClick={onClose}
-                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-all cursor-pointer shadow-sm active:scale-[0.98]"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    window.location.reload();
+                  }}
+                  className="w-full py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
                 >
-                  Understood, Return to Marksheet
+                  <IconRotateCcw className="w-4 h-4" />
+                  <span>Refresh Website</span>
                 </button>
               </div>
             </div>
-          ) : (
-            /* Clean Questionnaire Form */
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {/* Question 1: What would you like the admin to update? */}
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-2">
-                  What would you like the admin to update?
-                </label>
-                <div className="grid grid-cols-1 gap-2">
-                  {[
-                    {
-                      id: "REVALUATION",
-                      title: "Passed in Revaluation",
-                      desc: "Cleared backlog or improved marks in reval",
-                    },
-                    {
-                      id: "MISSING_SEMESTER",
-                      title: "Missing Semester Result",
-                      desc: "Have Sem 1, need Sem 2 scraped (or vice versa)",
-                    },
-                    {
-                      id: "RE_EXAM",
-                      title: "Makeup / Re-exam Passed",
-                      desc: "Cleared backlog in supplementary exams",
-                    },
-                    {
-                      id: "DATA_DELETION",
-                      title: "Request Data Deletion",
-                      desc: "Request administrator to hide your academic profile from public view",
-                    },
-                  ].map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      onClick={() => {
-                        sfx.playMechanicalClick();
-                        setRequestType(opt.id);
-                        if (opt.id === "MISSING_SEMESTER") {
-                          setTargetSemester("2");
-                        }
-                      }}
-                      className={`p-3 text-left rounded-xl border transition-all text-xs flex items-center justify-between cursor-pointer ${
-                        requestType === opt.id
-                          ? isObsidian
-                            ? "bg-cyan-950/30 border-cyan-500/80 text-white ring-1 ring-cyan-500/50"
-                            : "bg-blue-50/70 border-blue-500 text-slate-900 ring-1 ring-blue-500"
-                          : isObsidian
-                          ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
-                          : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-semibold text-xs sm:text-sm">{opt.title}</p>
-                        <p className="text-[11px] opacity-65 mt-0.5 leading-snug">{opt.desc}</p>
-                      </div>
-                      <div
-                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ml-3 ${
-                          requestType === opt.id
-                            ? "border-blue-600 bg-blue-600 dark:border-cyan-400 dark:bg-cyan-400"
-                            : "border-slate-300 dark:border-slate-700"
-                        }`}
-                      >
-                        {requestType === opt.id && <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-900" />}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Optional VTU Result Link Input for all update requests */}
-              {requestType !== "DATA_DELETION" && (
-                <div
-                  className={`p-3.5 rounded-2xl border space-y-1.5 transition-all ${
-                    isObsidian
-                      ? "bg-slate-900/60 border-slate-800"
-                      : "bg-slate-50 border-slate-200"
-                  }`}
-                >
-                  <label className="block text-xs font-semibold">
-                    Paste VTU Result Link{" "}
-                    <span className="text-[10px] font-normal opacity-60">
-                      (Optional but recommended)
-                    </span>{" "}
-                    or write a note to admin
-                  </label>
-                  <input
-                    type="text"
-                    value={vtuLink}
-                    onChange={(e) => setVtuLink(e.target.value)}
-                    placeholder="https://results.vtu.ac.in/.../index.php or e.g. sem-1 reval and sem-2 make up reval"
-                    className={`w-full px-3 py-2 text-xs rounded-xl border outline-none font-mono transition-all ${
-                      isObsidian
-                        ? "bg-slate-950/60 border-slate-700 text-white focus:border-cyan-400"
-                        : "bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                    }`}
-                  />
-                  <p className="text-[11px] opacity-65 leading-relaxed">
-                    If you have a specific revaluation, makeup, or results portal link, paste it here. Admins will read the note and take action accordingly.
-                  </p>
-                </div>
-              )}
-
-              {/* Question 2: Target Semester to Update or Data Deletion Notice */}
-              {requestType === "DATA_DELETION" ? (
-                <div
-                  className={`p-3.5 rounded-2xl border text-xs leading-relaxed space-y-1 ${
-                    isObsidian
-                      ? "bg-rose-950/20 border-rose-800/40 text-rose-300"
-                      : "bg-rose-50 border-rose-200 text-rose-800"
-                  }`}
-                >
-                  <p className="font-bold flex items-center gap-1.5">
-                    <IconShield className="w-3.5 h-3.5 text-rose-400" />
-                    <span>Profile Removal Notice</span>
-                  </p>
-                  <p className="text-[11px] opacity-85 leading-relaxed">
-                    Submitting this request notifies the administrator to remove your profile from all public search results, campus rankings, and peer comparisons within 24 hours.
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-1.5">
-                    Target Semester to Update
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: "1", label: "Semester 1" },
-                      { id: "2", label: "Semester 2" },
-                      { id: "all", label: "Both Semesters" },
-                    ].map((sem) => (
-                      <button
-                        key={sem.id}
-                        type="button"
-                        onClick={() => {
-                          sfx.playMechanicalClick();
-                          setTargetSemester(sem.id);
-                        }}
-                        className={`py-2 px-3 rounded-xl text-xs font-semibold border transition-all text-center cursor-pointer ${
-                          targetSemester === sem.id
-                            ? "bg-slate-900 text-white dark:bg-white dark:text-slate-950 shadow-sm border-transparent font-bold"
-                            : isObsidian
-                            ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
-                            : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
-                        }`}
-                      >
-                        {sem.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Alert / Error / Success Messages */}
-              {errorMsg && (
-                <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
-                  <span>{errorMsg}</span>
-                </div>
-              )}
-
-              {successMsg && (
-                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="font-medium">{successMsg}</span>
-                </div>
-              )}
-
-              {/* Submit Button */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting || !requestType || (requestType !== "DATA_DELETION" && !targetSemester)}
-                  className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 transition-transform active:scale-[0.99] disabled:opacity-50 cursor-pointer shadow-sm flex items-center justify-center gap-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
-                >
-                  <IconRotateCcw className={`w-3.5 h-3.5 ${isSubmitting ? "animate-spin" : ""}`} />
-                  <span>
-                    {isSubmitting
-                      ? "Submitting Request..."
-                      : requestType === "DATA_DELETION"
-                      ? "Submit Data Deletion Request"
-                      : "Submit Request to Admin"}
-                  </span>
-                </button>
-                <p className="text-[10px] opacity-50 text-center mt-2 leading-relaxed">
-                  Only 1 active request per USN is permitted to protect scraper server resources.
-                </p>
-              </div>
-            </form>
           )}
         </div>
       </div>

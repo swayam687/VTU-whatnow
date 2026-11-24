@@ -51,12 +51,17 @@ export function getCachedStudent(usn: string): { student: Student; timestamp: nu
 
 /**
  * Caches the complete campus directory for 0ms initial dashboard boot.
+ * Strips heavy child marks arrays to keep payload small and prevent browser localStorage quota exhaustion.
  */
 export function cacheStudentsList(students: Student[]): void {
   if (typeof window === "undefined" || !students?.length) return;
   try {
+    const lightweightList: Student[] = students.slice(0, 150).map((s) => ({
+      ...s,
+      marks: [],
+    }));
     const payload: CachedItem<Student[]> = {
-      data: students,
+      data: lightweightList,
       timestamp: Date.now(),
     };
     localStorage.setItem(STUDENTS_LIST_KEY, JSON.stringify(payload));

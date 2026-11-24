@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     # Admin Panel Protection
     ADMIN_PASSWORD: str = "admin"
+    SECRET_KEY: str = ""
 
     # Playwright Concurrency Throttle (active simultaneous browser contexts)
     # Set to 3 for guaranteed safety under Render free tier (512MB RAM cap)

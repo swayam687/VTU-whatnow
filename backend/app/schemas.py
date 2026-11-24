@@ -508,6 +508,48 @@ class FacultyAuditsResponse(BaseModel):
     comparison_logs: List[FacultyComparisonLogItem]
 
 
+class StudentPortalOption(BaseModel):
+    id: int
+    title: str
+    semester: str
+    is_default: bool = False
+
+
+class StudentUpdateStartRequest(BaseModel):
+    semester_link_id: int
+
+
+class StudentUpdateStartResponse(BaseModel):
+    ok: bool
+    session_id: str
+    captcha_base64: str
+    heading: str
+    message: Optional[str] = None
+
+
+class StudentUpdateSubmitRequest(BaseModel):
+    session_id: str
+    captcha: str
+
+
+class StudentUpdateSubmitResponse(BaseModel):
+    ok: bool
+    message: str
+    reason: Optional[str] = None
+    new_captcha_base64: Optional[str] = None
+
+
+class StudentUpdateRefreshRequest(BaseModel):
+    session_id: str
+
+
+class StudentUpdateRefreshResponse(BaseModel):
+    ok: bool
+    captcha_base64: Optional[str] = None
+    message: Optional[str] = None
+
+
+
 
 
 
