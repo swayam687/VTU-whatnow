@@ -205,6 +205,17 @@ export default function StudentDetailModal({
   const [isRescrapeModalOpen, setIsRescrapeModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
 
+  // Sorted marks: Grouped by Semester ascending (Sem 1, Sem 2, Sem 3...), then by subject code
+  const sortedMarks = useMemo(() => {
+    if (!student.marks) return [];
+    return [...student.marks].sort((a, b) => {
+      const semA = parseInt(String(a.semester || "1").replace(/\D/g, ""), 10) || 1;
+      const semB = parseInt(String(b.semester || "1").replace(/\D/g, ""), 10) || 1;
+      if (semA !== semB) return semA - semB;
+      return a.subject_code.localeCompare(b.subject_code);
+    });
+  }, [student.marks]);
+
   // History popstate and hardware back button tracking
   const isClosingViaHistoryRef = useRef(false);
   const isHistoryPushedRef = useRef(false);
@@ -874,8 +885,8 @@ export default function StudentDetailModal({
                       className={`divide-y ${isObsidian ? "divide-slate-800/60" : "divide-slate-100"
                         }`}
                     >
-                      {student.marks && student.marks.length > 0 ? (
-                        student.marks.map((m, i) => (
+                      {sortedMarks && sortedMarks.length > 0 ? (
+                        sortedMarks.map((m, i) => (
                           <tr
                             key={i}
                             className={isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"}

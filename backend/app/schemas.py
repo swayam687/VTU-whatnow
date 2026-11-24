@@ -441,6 +441,51 @@ class SessionCancelRequest(BaseModel):
     session_id: str
 
 
+class FacultyLoginRequest(BaseModel):
+    username: str
+    password: str
+    captcha_solution: Optional[str] = None
+    session_id: Optional[str] = None
+
+
+class FacultyInfo(BaseModel):
+    username: str
+    name: str
+    department: str
+
+
+class FacultyLoginResponse(BaseModel):
+    ok: bool
+    require_captcha: bool = False
+    session_id: Optional[str] = None
+    captcha_base64: Optional[str] = None
+    status: Optional[str] = None
+    token: Optional[str] = None
+    faculty: Optional[FacultyInfo] = None
+    message: Optional[str] = None
+
+
+class FacultyLoginLogItem(BaseModel):
+    id: int
+    faculty_username: str
+    timestamp: str
+    ip_address: Optional[str] = ""
+
+
+class FacultyComparisonLogItem(BaseModel):
+    id: int
+    faculty_username: str
+    usn_a: str
+    usn_b: str
+    timestamp: str
+
+
+class FacultyAuditsResponse(BaseModel):
+    login_logs: List[FacultyLoginLogItem]
+    comparison_logs: List[FacultyComparisonLogItem]
+
+
+
 
 
 

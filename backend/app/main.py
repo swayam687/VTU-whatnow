@@ -24,7 +24,10 @@ def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).isoformat()
+import csv
+import io
 from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, Response
+from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text, desc, func, distinct, inspect
@@ -37,7 +40,23 @@ from .security import sanitize_text, sanitize_url, validate_and_sanitize_vtu_url
 from .config import settings
 from .database import engine, get_db
 from . import models
-from .models import Student, Subject, Mark, SemesterLink, LoginLog, USNDispute, ComparisonLog, MissingUSNReport, RescrapeRequest, ScrapeTarget, UserCaptchaLog
+from .models import (
+    Student,
+    Subject,
+    Mark,
+    SemesterLink,
+    LoginLog,
+    USNDispute,
+    ComparisonLog,
+    MissingUSNReport,
+    RescrapeRequest,
+    ScrapeTarget,
+    UserCaptchaLog,
+    Faculty,
+    FacultyLoginLog,
+    FacultyComparisonLog,
+)
+
 from .schemas import (
     ScrapeRequest,
     CaptchaSubmit,
@@ -84,6 +103,12 @@ from .schemas import (
     CompareCaptchaSubmitRequest,
     AdminCreditUpdateRequest,
     SessionCancelRequest,
+    FacultyLoginRequest,
+    FacultyLoginResponse,
+    FacultyInfo,
+    FacultyAuditsResponse,
+    FacultyLoginLogItem,
+    FacultyComparisonLogItem,
 )
 from .services.job_manager import job_manager
 from .scraper.worker import scraper_worker
@@ -93,6 +118,11 @@ from .auth import (
     verify_password,
     create_session,
     verify_session_token,
+    create_faculty_jwt,
+    verify_faculty_jwt,
+    extract_token_from_header,
+    get_current_faculty,
+    get_optional_faculty,
     AUTH_SESSIONS,
 )
 
@@ -153,6 +183,25 @@ def init_db():
                         print("✅ Added column 'force_update' to scrape_targets table.")
                     except Exception as col_err:
                         print(f"⚠️ Could not add column 'force_update': {col_err}")
+
+            if "faculty" in existing_tables:
+                fac_cols = {c["name"] for c in insp.get_columns("faculty")}
+                if "username" not in fac_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE faculty ADD COLUMN username VARCHAR;"))
+                            if "faculty_id" in fac_cols:
+                                conn.execute(text("UPDATE faculty SET username = faculty_id WHERE username IS NULL OR username = '';"))
+                        print("✅ Added column 'username' to faculty table.")
+                    except Exception as col_err:
+                        print(f"⚠️ Could not add column 'username' to faculty: {col_err}")
+                if "password_hash" not in fac_cols:
+                    try:
+                        with engine.begin() as conn:
+                            conn.execute(text("ALTER TABLE faculty ADD COLUMN password_hash VARCHAR DEFAULT '';"))
+                        print("✅ Added column 'password_hash' to faculty table.")
+                    except Exception as col_err:
+                        print(f"⚠️ Could not add column 'password_hash' to faculty: {col_err}")
 
             # 3. For PostgreSQL (e.g. Supabase on Render), guarantee idempotency with IF NOT EXISTS
             if engine.dialect.name == "postgresql":
@@ -341,6 +390,22 @@ def init_db():
                 db.commit()
         except Exception as subj_err:
             print(f"⚠️ Subject catalog auto-heal notice: {subj_err}")
+
+        # Auto-seed default faculty account if table empty
+        try:
+            with Session(bind=engine) as db:
+                if db.query(models.Faculty).count() == 0:
+                    default_fac = models.Faculty(
+                        username="faculty",
+                        password_hash=hash_password("faculty123"),
+                        name="Prof. Sharma",
+                        department="CSE"
+                    )
+                    db.add(default_fac)
+                    db.commit()
+                    print("✅ Created default faculty account: 'faculty' (pass: faculty123)")
+        except Exception as fac_err:
+            print(f"⚠️ faculty seed notice: {fac_err}")
 
         print("✅ Database schema initialized and verified.")
     except Exception as e:
@@ -633,6 +698,131 @@ async def submit_login_gate_captcha(
         auth_response=res.get("auth_response"),
         message=res.get("message", "Verification successful!"),
     )
+
+
+# -------------------------------------------------------------
+# Faculty Authentication & Elevated Portal Gate
+# -------------------------------------------------------------
+
+@app.post("/api/auth/faculty-login", response_model=FacultyLoginResponse)
+@limiter.limit("5/minute")
+async def faculty_login(
+    req: FacultyLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    clean_username = req.username.strip().lower()
+    password = req.password.strip()
+
+    if not clean_username or not password:
+        raise HTTPException(status_code=400, detail="Faculty username and password are required.")
+
+    faculty = db.query(Faculty).filter(func.lower(Faculty.username) == clean_username).first()
+    if not faculty:
+        raise HTTPException(status_code=401, detail="Invalid faculty username or password.")
+
+    if not verify_password(password, faculty.password_hash):
+        raise HTTPException(status_code=401, detail="Invalid faculty username or password.")
+
+    client_ip = request.client.host if request.client else "unknown"
+
+    # Stage 2: Captcha solution submitted
+    if req.session_id and req.captcha_solution and req.captcha_solution.strip():
+        res = await ondemand_scraper.submit_captcha(
+            session_id=req.session_id,
+            captcha_code=req.captcha_solution.strip(),
+            password=password,
+            client_ip=client_ip,
+        )
+
+        if not res.get("ok") and not res.get("bypassed"):
+            return FacultyLoginResponse(
+                ok=False,
+                require_captcha=True,
+                session_id=req.session_id,
+                captcha_base64=res.get("new_captcha_base64"),
+                message=res.get("message", "Incorrect captcha code. Please try again.")
+            )
+
+        # Captcha verified! Record faculty login log
+        login_log = FacultyLoginLog(
+            faculty_username=faculty.username,
+            timestamp=datetime.utcnow(),
+            ip_address=client_ip,
+        )
+        db.add(login_log)
+        db.commit()
+
+        token = create_faculty_jwt(faculty)
+        return FacultyLoginResponse(
+            ok=True,
+            require_captcha=False,
+            token=token,
+            status="authenticated",
+            faculty=FacultyInfo(
+                username=faculty.username,
+                name=faculty.name,
+                department=faculty.department,
+            ),
+            message="Faculty security verification verified.",
+        )
+
+    # Stage 1: Check credentials and trigger crowdsourced VTU captcha challenge
+    target_info = ondemand_scraper.get_next_scrape_target(db)
+    if target_info:
+        target, target_usn = target_info
+        target_portal = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+        target_sem = target.semester or "1"
+        target_id = target.id
+    else:
+        unscraped = db.query(Student).filter(~Student.marks.any(), Student.is_hidden == False).first()
+        target_usn = unscraped.usn if unscraped else "1RM25CS001"
+        target_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        target_portal = (target_link.url if target_link and target_link.url else settings.VTU_URL_SEM1).strip()
+        target_sem = "1"
+        target_id = None
+
+    res = await ondemand_scraper.start_session(
+        target_usn=target_usn,
+        semester=target_sem,
+        target_url=target_portal,
+        student_usn=faculty.username,
+        is_self_scrape=False,
+        target_id=target_id,
+    )
+
+    if res and res.get("ok"):
+        return FacultyLoginResponse(
+            ok=False,
+            require_captcha=True,
+            session_id=res["session_id"],
+            captcha_base64=res["captcha_base64"],
+            message="Faculty security verification: please solve this VTU captcha to verify session.",
+        )
+    else:
+        # Fallback if VTU unreachable
+        login_log = FacultyLoginLog(
+            faculty_username=faculty.username,
+            timestamp=datetime.utcnow(),
+            ip_address=client_ip,
+        )
+        db.add(login_log)
+        db.commit()
+
+        token = create_faculty_jwt(faculty)
+        return FacultyLoginResponse(
+            ok=True,
+            require_captcha=False,
+            token=token,
+            status="authenticated",
+            faculty=FacultyInfo(
+                username=faculty.username,
+                name=faculty.name,
+                department=faculty.department,
+            ),
+            message="Faculty authenticated successfully.",
+        )
+
 
 
 # -------------------------------------------------------------
@@ -1640,32 +1830,46 @@ async def submit_captcha(req: CaptchaSubmit):
 # Student & Branch Query Endpoints
 # -------------------------------------------------------------
 
-def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_admin: bool = False):
+def sanitize_student_record(
+    s: Student,
+    viewer_usn: Optional[str] = None,
+    is_admin: bool = False,
+    is_faculty: bool = False,
+):
     """
     Applies student privacy preferences:
-    - Name, USN, Marks, Percentile, and Comparison are ALWAYS public for all students.
-    - The ONLY thing a student can control is show_my_backlogs (default: True).
-    - If show_my_backlogs is True (default, or viewer is verified account owner/admin):
+    - If is_faculty is True: completely bypass PrivacySettings. Faculty see marks
+      (including all backlogs) and the true has_pending_subjects string.
+    - If show_my_backlogs is True (default, or viewer is verified account owner/admin/faculty):
       * total_backlogs = s.total_backlogs
       * has_pending_subjects = "Yes" if s.total_backlogs > 0 else "No"
       * marks = s.marks (includes failed subjects with 'F')
-    - If show_my_backlogs is False (opted out):
+    - If show_my_backlogs is False (opted out) and viewer is neither owner nor admin nor faculty:
       * total_backlogs = 0
       * has_pending_subjects = None
       * marks = [m for m in s.marks if m.status == "P"]
     """
     is_owner = bool(viewer_usn and viewer_usn.strip().upper() == s.usn.strip().upper())
     is_backlogs_enabled = s.show_my_backlogs if s.show_my_backlogs is not None else True
-    should_show_backlogs = bool(is_backlogs_enabled or is_owner or is_admin)
+    should_show_backlogs = bool(is_backlogs_enabled or is_owner or is_admin or is_faculty)
 
     if should_show_backlogs:
         pending_str = "Yes" if s.total_backlogs > 0 else "No"
         public_backlogs = s.total_backlogs
-        public_marks = s.marks
+        public_marks = list(s.marks or [])
     else:
         pending_str = None
         public_backlogs = 0
-        public_marks = [m for m in s.marks if m.status == "P"]
+        public_marks = [m for m in (s.marks or []) if m.status == "P"]
+
+    def _get_sem_order(m):
+        try:
+            val = getattr(m, "semester", "1")
+            return int(str(val).strip()) if val is not None else 99
+        except (ValueError, TypeError):
+            return 99
+
+    public_marks.sort(key=lambda m: (_get_sem_order(m), (getattr(m, "subject_code", "") or "").strip().upper()))
 
     return {
         "usn": s.usn,
@@ -1688,6 +1892,19 @@ def sanitize_student_record(s: Student, viewer_usn: Optional[str] = None, is_adm
     }
 
 
+def serialize_student(
+    s: Student,
+    viewer_usn: Optional[str] = None,
+    is_admin: bool = False,
+    is_faculty: bool = False,
+):
+    """Bypasses privacy checks if is_faculty is True."""
+    return sanitize_student_record(
+        s, viewer_usn=viewer_usn, is_admin=is_admin, is_faculty=is_faculty
+    )
+
+
+
 @app.get("/api/students", response_model=List[StudentOut])
 def get_students(
     branch: Optional[str] = Query(None, description="Filter by branch code, e.g. CSE, DS, ALL"),
@@ -1696,12 +1913,20 @@ def get_students(
     limit: Optional[int] = Query(None, ge=1, le=5000, description="Optional limit. If omitted, returns all students"),
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
     x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    x_faculty_token: Optional[str] = Header(default=None, alias="X-Faculty-Token"),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
     response: Response = None,
     db: Session = Depends(get_db)
 ):
     current_usn = verify_session_token(x_student_token, db)
     is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
-    is_authenticated = bool(current_usn or is_admin)
+
+    # Check faculty authentication
+    fac_token = extract_token_from_header(authorization, x_faculty_token)
+    current_faculty = verify_faculty_jwt(fac_token, db) if fac_token else None
+    is_faculty = bool(current_faculty)
+
+    is_authenticated = bool(current_usn or is_admin or is_faculty)
 
     # If client supplied a student token that is no longer valid (e.g. ownership dispute approved)
     if x_student_token and not is_authenticated and response:
@@ -1712,21 +1937,24 @@ def get_students(
 
     # Visibility Rule: Hidden students are excluded from public views.
     # Faculty / Admin dashboards see ALL students (including hidden ones).
-    if not is_admin:
+    if not is_admin and not is_faculty:
         query = query.filter((Student.is_hidden == False) | (Student.is_hidden == None))
 
-    if branch and branch.upper() != "ALL":
-        query = query.filter(Student.branch == branch.upper())
+    clean_branch = branch.strip().upper() if branch and isinstance(branch, str) else None
+    if clean_branch and clean_branch != "ALL":
+        query = query.filter(Student.branch == clean_branch)
 
-    if search and search.strip():
-        term = f"%{search.strip()}%"
+    clean_search = search.strip() if search and isinstance(search, str) else ""
+    if clean_search:
+        term = f"%{clean_search}%"
         query = query.filter((Student.name.ilike(term)) | (Student.usn.ilike(term)))
 
-    if sort == "usn":
+    sort_key = sort.strip().lower() if sort and isinstance(sort, str) else "percentage"
+    if sort_key == "usn":
         query = query.order_by(Student.usn.asc())
-    elif sort == "backlogs":
+    elif sort_key == "backlogs":
         query = query.order_by(Student.total_backlogs.asc(), Student.percentage.desc())
-    elif sort == "recent":
+    elif sort_key == "recent":
         query = query.order_by(Student.updated_at.desc())
     else:
         query = query.order_by(Student.percentage.desc(), Student.total_marks.desc())
@@ -1737,7 +1965,7 @@ def get_students(
     if not is_authenticated:
         if response:
             response.headers["X-Is-Authenticated"] = "false"
-        if branch and branch.upper() != "ALL":
+        if clean_branch and clean_branch != "ALL":
             raw_list = query.limit(3).all()
         else:
             raw_list = query.limit(5).all()
@@ -1745,10 +1973,10 @@ def get_students(
 
     if response:
         response.headers["X-Is-Authenticated"] = "true"
-    if limit is not None and limit > 0:
+    if limit is not None and isinstance(limit, int) and limit > 0:
         query = query.limit(limit)
     students = query.all()
-    return [sanitize_student_record(s, current_usn) for s in students]
+    return [sanitize_student_record(s, current_usn, is_admin=is_admin, is_faculty=is_faculty) for s in students]
 
 
 # -------------------------------------------------------------
@@ -1760,8 +1988,38 @@ def compare_students(
     usn_a: str,
     usn_b: str,
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    x_faculty_token: Optional[str] = Header(default=None, alias="X-Faculty-Token"),
     db: Session = Depends(get_db)
 ):
+    clean_a = usn_a.strip().upper()
+    clean_b = usn_b.strip().upper()
+    st1 = db.query(Student).filter(Student.usn == clean_a).first()
+    st2 = db.query(Student).filter(Student.usn == clean_b).first()
+
+    if not st1 or not st2:
+        raise HTTPException(status_code=404, detail="One or both students not found.")
+
+    # Check if request comes from an authenticated faculty member
+    faculty = get_optional_faculty(authorization, x_faculty_token, db)
+    if faculty:
+        comp_log = FacultyComparisonLog(
+            faculty_username=faculty.username,
+            usn_a=clean_a,
+            usn_b=clean_b,
+            timestamp=datetime.utcnow()
+        )
+        db.add(comp_log)
+        db.commit()
+
+        return {
+            "ok": True,
+            "student1": serialize_student(st1, is_faculty=True),
+            "student2": serialize_student(st2, is_faculty=True),
+            "credits_remaining": 9999,
+            "is_faculty": True,
+        }
+
     current_usn = verify_session_token(x_student_token, db)
     if not current_usn:
         raise HTTPException(
@@ -1785,20 +2043,13 @@ def compare_students(
     user_student.comparison_credits = max(0, user_student.comparison_credits - 1)
     db.commit()
 
-    clean_a = usn_a.strip().upper()
-    clean_b = usn_b.strip().upper()
-    st1 = db.query(Student).filter(Student.usn == clean_a).first()
-    st2 = db.query(Student).filter(Student.usn == clean_b).first()
-
-    if not st1 or not st2:
-        raise HTTPException(status_code=404, detail="One or both students not found.")
-
     return {
         "ok": True,
         "student1": sanitize_student_record(st1, current_usn),
         "student2": sanitize_student_record(st2, current_usn),
         "credits_remaining": user_student.comparison_credits,
     }
+
 
 
 @app.post("/api/compare/solve-captcha", response_model=CompareCaptchaChallengeResponse)
@@ -2220,6 +2471,8 @@ def get_student(
     usn: str,
     x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
     x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    x_faculty_token: Optional[str] = Header(default=None, alias="X-Faculty-Token"),
     db: Session = Depends(get_db)
 ):
     clean_usn = usn.strip().upper()
@@ -2228,10 +2481,13 @@ def get_student(
         raise HTTPException(status_code=404, detail="Student not found.")
     current_usn = verify_session_token(x_student_token, db)
     is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    faculty = get_optional_faculty(authorization, x_faculty_token, db)
+    is_faculty = bool(faculty is not None)
     is_owner = bool(current_usn and current_usn.strip().upper() == clean_usn)
-    if student.is_hidden and not (is_admin or is_owner):
+    if student.is_hidden and not (is_admin or is_owner or is_faculty):
         raise HTTPException(status_code=404, detail="Student profile is hidden from public view.")
-    return sanitize_student_record(student, current_usn, is_admin=is_admin)
+    return serialize_student(student, current_usn, is_admin=is_admin, is_faculty=is_faculty)
+
 
 
 @app.get("/api/students/{usn}/privacy", response_model=PrivacySettingsOut)
@@ -2583,3 +2839,193 @@ def get_backlog_analytics(db: Session = Depends(get_db)):
         overall_deadliest_subjects=overall_deadliest[:15],
         branches=branch_summaries,
     )
+
+
+# -------------------------------------------------------------
+# Faculty Dedicated Endpoints (Analytics, CSV Export, & Audits)
+# -------------------------------------------------------------
+
+@app.get("/api/faculty/analytics", response_model=BacklogAnalytics)
+def get_faculty_analytics(
+    current_faculty: Faculty = Depends(get_current_faculty),
+    db: Session = Depends(get_db)
+):
+    """
+    Returns branch-wise and subject-wise pass/fail data including ALL students
+    (even those hidden by privacy settings). Calculates exact failure rankings.
+    """
+    # Faculty access bypasses all privacy filters: query ALL students including hidden
+    students = db.query(Student).all()
+    marks = db.query(Mark).all()
+    subjects = {s.code: s.name for s in db.query(Subject).all()}
+    student_branch_map = {s.usn: s.branch for s in students}
+
+    total_failed_papers = sum(1 for m in marks if m.status in ("F", "A"))
+
+    # 1. Overall subject statistics across ALL branches
+    overall_subj_counts: dict = {}
+    for m in marks:
+        code = m.subject_code
+        if code not in overall_subj_counts:
+            overall_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
+        overall_subj_counts[code]["total"] += 1
+        if m.status in ("F", "A"):
+            overall_subj_counts[code]["fail"] += 1
+        elif m.status == "P":
+            overall_subj_counts[code]["pass"] += 1
+
+    overall_deadliest: List[SubjectBacklogStat] = []
+    for code, stats in overall_subj_counts.items():
+        if stats["fail"] > 0:
+            rate = round((stats["fail"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
+            overall_deadliest.append(SubjectBacklogStat(
+                subject_code=code,
+                subject_name=subjects.get(code, code),
+                branch="ALL",
+                total_students=stats["total"],
+                fail_count=stats["fail"],
+                pass_count=stats["pass"],
+                fail_rate=rate,
+            ))
+    overall_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
+
+    # 2. Branch-wise statistics
+    branch_students_map: dict = {}
+    for s in students:
+        b = s.branch or "OTHER"
+        if b not in branch_students_map:
+            branch_students_map[b] = []
+        branch_students_map[b].append(s)
+
+    branch_marks_map: dict = {}
+    for m in marks:
+        b = student_branch_map.get(m.usn, "OTHER")
+        if b not in branch_marks_map:
+            branch_marks_map[b] = []
+        branch_marks_map[b].append(m)
+
+    branch_summaries: List[BranchBacklogSummary] = []
+    for branch_name, b_students in branch_students_map.items():
+        b_marks = branch_marks_map.get(branch_name, [])
+        total_students = len(b_students)
+        total_backlogs = sum(s.total_backlogs for s in b_students)
+        avg_backlogs = round(total_backlogs / total_students, 2) if total_students > 0 else 0.0
+        students_with_backlogs = sum(1 for s in b_students if s.total_backlogs > 0)
+        clean_pass = sum(1 for s in b_students if s.total_backlogs == 0)
+
+        # Branch subject stats
+        b_subj_counts: dict = {}
+        for m in b_marks:
+            code = m.subject_code
+            if code not in b_subj_counts:
+                b_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
+            b_subj_counts[code]["total"] += 1
+            if m.status in ("F", "A"):
+                b_subj_counts[code]["fail"] += 1
+            elif m.status == "P":
+                b_subj_counts[code]["pass"] += 1
+
+        b_deadliest: List[SubjectBacklogStat] = []
+        for code, stats in b_subj_counts.items():
+            if stats["fail"] > 0:
+                rate = round((stats["fail"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
+                b_deadliest.append(SubjectBacklogStat(
+                    subject_code=code,
+                    subject_name=subjects.get(code, code),
+                    branch=branch_name,
+                    total_students=stats["total"],
+                    fail_count=stats["fail"],
+                    pass_count=stats["pass"],
+                    fail_rate=rate,
+                ))
+        b_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
+
+        branch_summaries.append(BranchBacklogSummary(
+            branch=branch_name,
+            total_students=total_students,
+            total_backlogs=total_backlogs,
+            avg_backlogs_per_student=avg_backlogs,
+            students_with_backlogs=students_with_backlogs,
+            clean_pass_students=clean_pass,
+            top_failed_subjects=b_deadliest[:5],
+        ))
+
+    branch_summaries.sort(key=lambda b: b.total_backlogs, reverse=True)
+
+    return BacklogAnalytics(
+        total_failed_papers=total_failed_papers,
+        overall_deadliest_subjects=overall_deadliest,
+        branches=branch_summaries,
+    )
+
+
+@app.get("/api/faculty/export")
+def export_faculty_csv(
+    current_faculty: Faculty = Depends(get_current_faculty),
+    db: Session = Depends(get_db)
+):
+    """
+    Exports full student academic records to CSV stream.
+    Strictly restricted to verified Faculty credentials (returns 403 for students).
+    """
+    students = db.query(Student).order_by(Student.branch.asc(), Student.percentage.desc()).all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["USN", "Name", "Branch", "Total Marks", "Percentage", "Pending Subjects"])
+
+    for s in students:
+        failed_marks = [m for m in s.marks if m.status in ("F", "A")]
+        if failed_marks:
+            pending_str = "; ".join(f"{m.subject_code} ({m.subject_name})" for m in failed_marks)
+        else:
+            pending_str = "None (Clean Pass)"
+
+        writer.writerow([
+            s.usn,
+            s.name or s.usn,
+            s.branch or "ENG",
+            s.total_marks or 0,
+            f"{s.percentage:.2f}%" if s.percentage is not None else "0.00%",
+            pending_str,
+        ])
+
+    csv_data = output.getvalue()
+    return StreamingResponse(
+        iter([csv_data]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="vtu_results.csv"',
+            "Cache-Control": "no-cache",
+        }
+    )
+
+
+@app.get("/api/admin/faculty-audits", response_model=FacultyAuditsResponse, dependencies=[Depends(require_admin)])
+def get_admin_faculty_audits(db: Session = Depends(get_db)):
+    """Returns audit logs of all faculty logins and student comparisons."""
+    logins = db.query(FacultyLoginLog).order_by(FacultyLoginLog.timestamp.desc()).limit(150).all()
+    comparisons = db.query(FacultyComparisonLog).order_by(FacultyComparisonLog.timestamp.desc()).limit(150).all()
+
+    return FacultyAuditsResponse(
+        login_logs=[
+            FacultyLoginLogItem(
+                id=l.id,
+                faculty_username=l.faculty_username,
+                timestamp=to_utc_iso(l.timestamp) or "",
+                ip_address=l.ip_address or "",
+            )
+            for l in logins
+        ],
+        comparison_logs=[
+            FacultyComparisonLogItem(
+                id=c.id,
+                faculty_username=c.faculty_username,
+                usn_a=c.usn_a,
+                usn_b=c.usn_b,
+                timestamp=to_utc_iso(c.timestamp) or "",
+            )
+            for c in comparisons
+        ],
+    )
+

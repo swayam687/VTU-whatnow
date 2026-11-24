@@ -35,7 +35,7 @@ class Student(Base):
     is_hidden = Column(Boolean, default=False)  # Soft hide for data deletion requests / admin control
     hidden = synonym("is_hidden")
 
-    marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin")
+    marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin", order_by="[Mark.semester, Mark.subject_code]")
 
 
 class Subject(Base):
@@ -191,6 +191,43 @@ class UserCaptchaLog(Base):
     action = Column(String, default="comparison")  # 'comparison', 'login_gate'
     solved_at = Column(DateTime, default=datetime.utcnow)
     ip_address = Column(String, nullable=True, default="")
+
+
+class Faculty(Base):
+    __tablename__ = "faculty"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    username = Column(String(64), unique=True, index=True, nullable=False)
+    faculty_id = Column(String(64), nullable=True, default="")
+    password_hash = Column(String, nullable=False)
+    name = Column(String, default="")
+    department = Column(String, default="")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    def __init__(self, **kwargs):
+        if "faculty_id" not in kwargs and "username" in kwargs:
+            kwargs["faculty_id"] = kwargs["username"]
+        super().__init__(**kwargs)
+
+
+class FacultyLoginLog(Base):
+    __tablename__ = "faculty_login_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    faculty_username = Column(String, index=True, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+    ip_address = Column(String, nullable=True, default="")
+
+
+class FacultyComparisonLog(Base):
+    __tablename__ = "faculty_comparison_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    faculty_username = Column(String, index=True, nullable=False)
+    usn_a = Column(String, index=True, nullable=False)
+    usn_b = Column(String, index=True, nullable=False)
+    timestamp = Column(DateTime, default=datetime.utcnow)
+
 
 
 

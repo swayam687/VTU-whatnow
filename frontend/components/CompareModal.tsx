@@ -260,9 +260,17 @@ export default function CompareModal({
   const s2MarksMap = new Map<string, Mark>();
   (s2.marks || []).forEach((m) => s2MarksMap.set(m.subject_code.toUpperCase(), m));
 
+  // Sort subjects: Sem 1 at top, then Sem 2, then Sem 3... within same semester by subject code
   const allSubjectCodes = Array.from(
     new Set([...Array.from(s1MarksMap.keys()), ...Array.from(s2MarksMap.keys())])
-  );
+  ).sort((codeA, codeB) => {
+    const mA = s1MarksMap.get(codeA) || s2MarksMap.get(codeA);
+    const mB = s1MarksMap.get(codeB) || s2MarksMap.get(codeB);
+    const semA = parseInt(String(mA?.semester || "1").replace(/\D/g, ""), 10) || 1;
+    const semB = parseInt(String(mB?.semester || "1").replace(/\D/g, ""), 10) || 1;
+    if (semA !== semB) return semA - semB;
+    return codeA.localeCompare(codeB);
+  });
 
   const pctDiff = s1.percentage - s2.percentage;
   const marksDiff = s1.total_marks - s2.total_marks;

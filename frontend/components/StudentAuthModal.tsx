@@ -12,6 +12,8 @@ import {
   refreshOnDemandCaptcha,
   cancelOnDemandCaptcha,
   submitLoginGateCaptcha,
+  loginFaculty,
+  setStoredFacultySession,
   AuthStatus,
   AuthSession,
 } from "../lib/api";
@@ -188,6 +190,10 @@ export default function StudentAuthModal({
   };
 
   const [mode, setMode] = useState<"auth" | "dispute">("auth");
+  const [portalTab, setPortalTab] = useState<"student" | "faculty">("student");
+  const [facultyUsername, setFacultyUsername] = useState("faculty");
+  const [facultyPassword, setFacultyPassword] = useState("");
+  const [showFacultyPassword, setShowFacultyPassword] = useState(false);
   const [usn, setUsn] = useState(getInitialUsn);
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
@@ -201,6 +207,7 @@ export default function StudentAuthModal({
   const [agreedToPrivacy, setAgreedToPrivacy] = useState(false);
   const usnInputRef = useRef<HTMLInputElement | null>(null);
   const passwordInputRef = useRef<HTMLInputElement | null>(null);
+
 
   // Pre-fill USN and place cursor at end on open
   useEffect(() => {
@@ -409,12 +416,22 @@ export default function StudentAuthModal({
     setRefreshingCaptcha(true);
     sfx.playMechanicalClick();
     try {
-      const res = await refreshOnDemandCaptcha(onDemandSessionId);
-      if (res.ok && res.captcha_base64) {
-        setCaptchaBase64(res.captcha_base64);
-        setCaptchaInput("");
+      if (portalTab === "faculty") {
+        const res = await loginFaculty(facultyUsername, facultyPassword);
+        if (res.require_captcha && res.session_id) {
+          setOnDemandSessionId(res.session_id);
+          if (res.captcha_base64) setCaptchaBase64(res.captcha_base64);
+          setCaptchaInput("");
+          setError(null);
+        }
       } else {
-        setError(cleanErrorMessage(res.message || "Could not reload captcha. Please try again."));
+        const res = await refreshOnDemandCaptcha(onDemandSessionId);
+        if (res.ok && res.captcha_base64) {
+          setCaptchaBase64(res.captcha_base64);
+          setCaptchaInput("");
+        } else {
+          setError(cleanErrorMessage(res.message || "Could not reload captcha. Please try again."));
+        }
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to reload captcha";
@@ -440,6 +457,42 @@ export default function StudentAuthModal({
     setOnDemandState("extracting");
     setElapsedSeconds(0);
     sfx.playMechanicalClick();
+
+    if (portalTab === "faculty") {
+      try {
+        const res = await loginFaculty(
+          facultyUsername,
+          facultyPassword,
+          onDemandSessionId,
+          captchaInput.trim()
+        );
+        if (res.ok && res.token) {
+          setStoredFacultySession({
+            token: res.token,
+            username: res.faculty?.username || facultyUsername,
+            name: res.faculty?.name || "Faculty Member",
+            department: res.faculty?.department || "CSE",
+          });
+          sfx.playMechanicalClick();
+          handleClose();
+          window.location.href = "/faculty";
+          return;
+        } else {
+          if (res.captcha_base64) {
+            setCaptchaBase64(res.captcha_base64);
+          }
+          setCaptchaInput("");
+          setError(cleanErrorMessage(res.message || "Incorrect captcha code. Please try again."));
+          setOnDemandState("captcha_ready");
+          return;
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "Faculty verification failed";
+        setError(cleanErrorMessage(msg));
+        setOnDemandState("captcha_ready");
+        return;
+      }
+    }
 
     try {
       const res = await submitLoginGateCaptcha(
@@ -487,6 +540,49 @@ export default function StudentAuthModal({
       setOnDemandState("idle");
     }
   };
+
+  const handleFacultyLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!facultyUsername.trim() || !facultyPassword.trim()) {
+      setError("Faculty username and password are required.");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await loginFaculty(facultyUsername, facultyPassword);
+      if (res.require_captcha && res.session_id) {
+        setOnDemandSessionId(res.session_id);
+        if (res.captcha_base64) setCaptchaBase64(res.captcha_base64);
+        setGateMessage(res.message || "Faculty verification: please solve this VTU captcha to continue.");
+        setFailCount(0);
+        setCaptchaInput("");
+        setOnDemandState("captcha_ready");
+        sfx.playSonar();
+        setLoading(false);
+        return;
+      }
+      if (res.ok && res.token) {
+        setStoredFacultySession({
+          token: res.token,
+          username: res.faculty?.username || facultyUsername,
+          name: res.faculty?.name || "Faculty Member",
+          department: res.faculty?.department || "CSE",
+        });
+        sfx.playMechanicalClick();
+        handleClose();
+        window.location.href = "/faculty";
+        return;
+      }
+      setError(res.message || "Faculty login failed.");
+      setLoading(false);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Faculty authentication failed.";
+      setError(cleanErrorMessage(msg));
+      setLoading(false);
+    }
+  };
+
 
   // -------------------------------------------------------------
   // Standard Auth & Dispute Handlers
@@ -711,6 +807,8 @@ export default function StudentAuthModal({
                 ? "🧩"
                 : onDemandState === "connecting" || onDemandState === "extracting"
                 ? "⚡"
+                : portalTab === "faculty"
+                ? "🏛️"
                 : mode === "auth"
                 ? "🔐"
                 : "🛡️"}
@@ -718,13 +816,17 @@ export default function StudentAuthModal({
             <div>
               <h2 className="font-semibold text-base sm:text-lg tracking-tight">
                 {onDemandState === "captcha_ready"
-                  ? "Solve VTU Security Captcha"
+                  ? portalTab === "faculty"
+                    ? "Faculty Captcha Verification"
+                    : "Solve VTU Security Captcha"
                   : onDemandState === "connecting"
                   ? "Connecting to VTU"
                   : onDemandState === "extracting"
                   ? "Extracting Marksheet"
                   : onDemandState === "success"
                   ? "Registration Complete"
+                  : portalTab === "faculty"
+                  ? "Faculty Portal Access"
                   : mode === "auth"
                   ? "Student Access Portal"
                   : "Verify USN Ownership"}
@@ -738,11 +840,14 @@ export default function StudentAuthModal({
                   ? "Parsing subjects, grades, and computing rankings"
                   : onDemandState === "success"
                   ? "Your marksheet has been saved and secured"
+                  : portalTab === "faculty"
+                  ? "Elevated access for university faculty & academic audits"
                   : mode === "auth"
                   ? "Enter USN & password to unlock full rank and marksheet"
                   : "Submit photo verification for admin review"}
               </p>
             </div>
+
           </div>
           {onDemandState !== "connecting" && onDemandState !== "extracting" && (
             <button
@@ -1124,10 +1229,132 @@ export default function StudentAuthModal({
             </div>
 
           ) : mode === "auth" ? (
-            /* ========================================================================= */
-            /* STREAMLINED SINGLE-VIEW LOGIN / REGISTRATION FORM                         */
-            /* ========================================================================= */
-            <form onSubmit={handleStandardAuthSubmit} className="space-y-4">
+            <div className="space-y-4">
+              {/* Segmented Tab Switcher: Student vs Faculty */}
+              <div className="flex items-center p-1 rounded-xl bg-zinc-900/60 border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setPortalTab("student");
+                    setError(null);
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    portalTab === "student"
+                      ? isObsidian
+                        ? "bg-white/10 text-white shadow-xs"
+                        : "bg-white text-zinc-900 shadow-xs"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  🎓 Student Login
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setPortalTab("faculty");
+                    setError(null);
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                    portalTab === "faculty"
+                      ? isObsidian
+                        ? "bg-cyan-500/20 text-cyan-300 border border-cyan-500/40"
+                        : "bg-cyan-50 text-cyan-900 border border-cyan-200"
+                      : "text-zinc-400 hover:text-zinc-200"
+                  }`}
+                >
+                  🏛️ Faculty Portal
+                </button>
+              </div>
+
+              {portalTab === "faculty" ? (
+                /* ========================================================================= */
+                /* FACULTY LOGIN FORM                                                        */
+                /* ========================================================================= */
+                <form onSubmit={handleFacultyLoginSubmit} className="space-y-4">
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                      Faculty Username
+                    </label>
+                    <input
+                      type="text"
+                      value={facultyUsername}
+                      onChange={(e) => setFacultyUsername(e.target.value)}
+                      placeholder="e.g. faculty"
+                      className={`w-full px-3.5 py-2.5 text-sm font-mono tracking-wider rounded-xl border outline-none transition-all ${
+                        isObsidian
+                          ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                          : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
+                      }`}
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showFacultyPassword ? "text" : "password"}
+                        value={facultyPassword}
+                        onChange={(e) => setFacultyPassword(e.target.value)}
+                        placeholder="Faculty access password"
+                        className={`w-full px-3.5 py-2.5 text-sm rounded-xl border outline-none pr-10 transition-all ${
+                          isObsidian
+                            ? "bg-white/5 border-white/10 text-white focus:border-cyan-400 focus:bg-white/[0.08]"
+                            : "bg-zinc-50 border-zinc-300 text-zinc-900 focus:border-cyan-500 focus:bg-white"
+                        }`}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowFacultyPassword(!showFacultyPassword)}
+                        className={`absolute right-3 top-2.5 p-1 rounded-lg transition-colors cursor-pointer ${
+                          isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"
+                        }`}
+                      >
+                        {showFacultyPassword ? <IconEyeOff className="w-4 h-4" /> : <IconEye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className={`p-3 rounded-xl border text-xs ${
+                    isObsidian
+                      ? "bg-cyan-950/30 border-cyan-500/30 text-cyan-300"
+                      : "bg-cyan-50 border-cyan-200 text-cyan-900"
+                  }`}>
+                    <p className="flex items-center gap-1.5 font-semibold">
+                      <span>ℹ️</span>
+                      <span>Elevated Academic Access</span>
+                    </p>
+                    <p className="text-[11px] opacity-80 mt-1">
+                      Faculty accounts can inspect all student records (including hidden profiles), failure rankings, and stream CSV marksheet exports.
+                    </p>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-cyan-600 hover:bg-cyan-700 active:scale-[0.99] text-white shadow-md shadow-cyan-600/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {loading ? (
+                      <>
+                        <span className="animate-spin text-base">⏳</span>
+                        <span>Connecting to VTU Security Gate...</span>
+                      </>
+                    ) : (
+                      <span>Verify &amp; Enter Faculty Portal →</span>
+                    )}
+                  </button>
+                </form>
+              ) : (
+                /* ========================================================================= */
+                /* STREAMLINED SINGLE-VIEW LOGIN / REGISTRATION FORM                         */
+                /* ========================================================================= */
+                <form onSubmit={handleStandardAuthSubmit} className="space-y-4">
+
               {/* USN Field */}
               <div>
                 <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
@@ -1336,6 +1563,8 @@ export default function StudentAuthModal({
                 </button>
               </div>
             </form>
+              )}
+            </div>
           ) : (
             /* ========================================================================= */
             /* DISPUTE / OWNERSHIP FORM                                                  */

@@ -1,14 +1,19 @@
 import hashlib
 import secrets
+from datetime import datetime, timedelta
 from typing import Optional
-from fastapi import Header, Depends
+import jwt
+from fastapi import Header, Depends, HTTPException
 from sqlalchemy.orm import Session
 from .config import settings
-from .models import Student
+from .models import Student, Faculty
 from .database import get_db
 
 # In-memory session store (token -> usn)
 AUTH_SESSIONS: dict[str, str] = {}
+
+FACULTY_JWT_SECRET = getattr(settings, "SECRET_KEY", None) or f"vtu_whatnow_faculty_secure_jwt_secret_token_2026_{settings.ADMIN_PASSWORD}"
+FACULTY_JWT_ALGORITHM = "HS256"
 
 def hash_password(password: str, salt: Optional[str] = None) -> str:
     if not salt:
@@ -54,7 +59,7 @@ def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
     password_hash in the database. If a genuine owner transfers ownership via dispute approval,
     the old password_hash changes, instantly invalidating any previously issued tokens.
     """
-    if not token or ":" not in token:
+    if not token or not isinstance(token, str) or ":" not in token:
         return None
     parts = token.split(":")
     if len(parts) < 3:
@@ -79,3 +84,71 @@ def verify_session_token(token: Optional[str], db: Session) -> Optional[str]:
 
 def get_current_student_usn(x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"), db: Session = Depends(get_db)) -> Optional[str]:
     return verify_session_token(x_student_token, db)
+
+
+def create_faculty_jwt(faculty: Faculty, expires_in_days: int = 7) -> str:
+    """Creates a signed JWT token for an authenticated faculty member."""
+    now = datetime.utcnow()
+    payload = {
+        "sub": faculty.username,
+        "username": faculty.username,
+        "name": faculty.name,
+        "department": faculty.department,
+        "role": "faculty",
+        "iat": int(now.timestamp()),
+        "exp": int((now + timedelta(days=expires_in_days)).timestamp()),
+    }
+    return jwt.encode(payload, FACULTY_JWT_SECRET, algorithm=FACULTY_JWT_ALGORITHM)
+
+
+def extract_token_from_header(authorization: Optional[str], x_token: Optional[str]) -> Optional[str]:
+    if authorization and isinstance(authorization, str) and authorization.strip():
+        parts = authorization.strip().split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1]
+        return authorization.strip()
+    if x_token and isinstance(x_token, str) and x_token.strip():
+        return x_token.strip()
+    return None
+
+
+def verify_faculty_jwt(token: Optional[str], db: Session) -> Optional[Faculty]:
+    """Decodes and validates a faculty JWT token, returning the Faculty entity."""
+    if not token or not isinstance(token, str):
+        return None
+    try:
+        payload = jwt.decode(token, FACULTY_JWT_SECRET, algorithms=[FACULTY_JWT_ALGORITHM])
+        if payload.get("role") != "faculty":
+            return None
+        username = payload.get("username") or payload.get("sub")
+        if not username:
+            return None
+        faculty = db.query(Faculty).filter(Faculty.username == username).first()
+        return faculty
+    except (jwt.PyJWTError, Exception):
+        return None
+
+
+def get_current_faculty(
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    x_faculty_token: Optional[str] = Header(default=None, alias="X-Faculty-Token"),
+    db: Session = Depends(get_db),
+) -> Faculty:
+    token = extract_token_from_header(authorization, x_faculty_token)
+    faculty = verify_faculty_jwt(token, db)
+    if not faculty:
+        raise HTTPException(
+            status_code=403,
+            detail="Faculty access forbidden. Valid faculty credentials required.",
+        )
+    return faculty
+
+
+def get_optional_faculty(
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    x_faculty_token: Optional[str] = Header(default=None, alias="X-Faculty-Token"),
+    db: Session = Depends(get_db),
+) -> Optional[Faculty]:
+    token = extract_token_from_header(authorization, x_faculty_token)
+    return verify_faculty_jwt(token, db)
+

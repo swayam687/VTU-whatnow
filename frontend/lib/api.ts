@@ -265,6 +265,7 @@ export async function fetchStudents(params?: {
   limit?: number;
   token?: string;
   adminKey?: string;
+  facultyToken?: string;
 }): Promise<Student[]> {
   try {
     const query = new URLSearchParams();
@@ -280,6 +281,11 @@ export async function fetchStudents(params?: {
     const token = params?.token || getStoredStudentToken();
     if (token) {
       headers["X-Student-Token"] = token;
+    }
+    const facultyToken = params?.facultyToken || getStoredFacultySession()?.token;
+    if (facultyToken) {
+      headers["X-Faculty-Token"] = facultyToken;
+      headers["Authorization"] = `Bearer ${facultyToken}`;
     }
 
     const res = await fetch(`${API_BASE}/api/students?${query.toString()}`, {
@@ -1345,8 +1351,13 @@ export async function fetchLiveCreditsSync(adminKey: string): Promise<CreditSync
 export async function compareStudents(
   usn_a: string,
   usn_b: string
-): Promise<{ ok: boolean; student1: Student; student2: Student; credits_remaining?: number }> {
+): Promise<{ ok: boolean; student1: Student; student2: Student; credits_remaining?: number; is_faculty?: boolean }> {
   const headers: Record<string, string> = {};
+  const facultyToken = getStoredFacultyToken();
+  if (facultyToken) {
+    headers["Authorization"] = `Bearer ${facultyToken}`;
+    headers["X-Faculty-Token"] = facultyToken;
+  }
   const token = getStoredStudentToken();
   if (token) headers["X-Student-Token"] = token;
 
@@ -1456,4 +1467,170 @@ export async function updateStudentCredits(
 
   return res.json();
 }
+
+// -------------------------------------------------------------
+// Faculty Authentication & Portal APIs
+// -------------------------------------------------------------
+
+export interface FacultySession {
+  token: string;
+  username: string;
+  name: string;
+  department: string;
+}
+
+export interface FacultyLoginResponse {
+  ok: boolean;
+  require_captcha?: boolean;
+  session_id?: string;
+  captcha_base64?: string;
+  status?: string;
+  token?: string;
+  faculty?: {
+    username: string;
+    name: string;
+    department: string;
+  };
+  message?: string;
+}
+
+export interface FacultyLoginLogItem {
+  id: number;
+  faculty_username: string;
+  timestamp: string;
+  ip_address?: string;
+}
+
+export interface FacultyComparisonLogItem {
+  id: number;
+  faculty_username: string;
+  usn_a: string;
+  usn_b: string;
+  timestamp: string;
+}
+
+export interface FacultyAuditsData {
+  login_logs: FacultyLoginLogItem[];
+  comparison_logs: FacultyComparisonLogItem[];
+}
+
+export function getStoredFacultySession(): FacultySession | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem("vtu_faculty_session") || localStorage.getItem("vtu_faculty_session");
+    if (raw) return JSON.parse(raw) as FacultySession;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function getStoredFacultyToken(): string | null {
+  const session = getStoredFacultySession();
+  return session ? session.token : null;
+}
+
+export function setStoredFacultySession(session: FacultySession): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem("vtu_faculty_session", JSON.stringify(session));
+    localStorage.setItem("vtu_faculty_session", JSON.stringify(session));
+  } catch {
+    // ignore
+  }
+}
+
+export function clearStoredFacultySession(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem("vtu_faculty_session");
+    localStorage.removeItem("vtu_faculty_session");
+  } catch {
+    // ignore
+  }
+}
+
+export async function loginFaculty(
+  username: string,
+  password: string,
+  sessionId?: string,
+  captchaSolution?: string
+): Promise<FacultyLoginResponse> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/auth/faculty-login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username: username.trim(),
+      password: password.trim(),
+      session_id: sessionId,
+      captcha_solution: captchaSolution ? captchaSolution.trim() : undefined,
+    }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || "Faculty authentication failed. Please check your credentials.");
+  }
+  return data;
+}
+
+export async function fetchFacultyAnalytics(facultyToken?: string): Promise<BacklogAnalytics> {
+  const baseUrl = getApiBase();
+  const token = facultyToken || getStoredFacultyToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+    headers["X-Faculty-Token"] = token;
+  }
+  const res = await fetch(`${baseUrl}/api/faculty/analytics`, {
+    headers,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to load faculty analytics. Faculty authorization required.");
+  }
+  return res.json();
+}
+
+export async function downloadFacultyCsv(facultyToken?: string): Promise<void> {
+  const baseUrl = getApiBase();
+  const token = facultyToken || getStoredFacultyToken();
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+    headers["X-Faculty-Token"] = token;
+  }
+  const res = await fetch(`${baseUrl}/api/faculty/export`, {
+    headers,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to download CSV export. Forbidden.");
+  }
+  const blob = await res.blob();
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "vtu_results.csv";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+}
+
+export async function fetchAdminFacultyAudits(adminKey: string): Promise<FacultyAuditsData> {
+  const baseUrl = getApiBase();
+  const res = await fetch(`${baseUrl}/api/admin/faculty-audits`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to fetch faculty audits.");
+  }
+  return res.json();
+}
+
 
