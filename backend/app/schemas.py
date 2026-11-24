@@ -427,6 +427,22 @@ class SemesterAuditResponse(BaseModel):
     students: List[StudentSemesterAudit]
 
 
+class SecureStatsRequest(BaseModel):
+    usn: str
+    session_id: Optional[str] = None
+
+
+class SecureStatsResponse(BaseModel):
+    ok: bool = True
+    usn: str
+    credits: Optional[int] = None
+    total_credits: Optional[int] = None
+    sgpa: Optional[float] = None
+    cgpa: Optional[float] = None
+    is_hidden: bool = False
+    message: Optional[str] = None
+
+
 class CompareCaptchaChallengeResponse(BaseModel):
     ok: bool = True
     session_id: str

@@ -1442,6 +1442,91 @@ export async function cancelCompareCaptcha(sessionId: string): Promise<void> {
   } catch {}
 }
 
+export interface SecureStatsData {
+  ok: boolean;
+  usn: string;
+  credits?: number;
+  total_credits?: number;
+  sgpa?: number;
+  cgpa?: number;
+  is_hidden?: boolean;
+  message?: string;
+}
+
+export async function getSecureStats(usn: string, sessionId?: string): Promise<SecureStatsData> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+  const facultyToken = getStoredFacultyToken();
+  if (facultyToken) headers["X-Faculty-Token"] = facultyToken;
+
+  const res = await fetch(`${API_BASE}/api/analytics/secure-stats`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ usn, session_id: sessionId }),
+  });
+
+  if (res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    const err = new Error(data.detail || "CAPTCHA_REQUIRED");
+    err.name = "CAPTCHA_REQUIRED";
+    throw err;
+  }
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to load academic metrics");
+  }
+
+  return res.json();
+}
+
+export async function requestAnalyticsCaptcha(targetUsn?: string): Promise<{
+  ok: boolean;
+  session_id: string;
+  captcha_base64: string;
+  message: string;
+}> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+
+  const res = await fetch(`${API_BASE}/api/analytics/request-captcha`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ target_usn: targetUsn }),
+  });
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to initialize verification challenge");
+  }
+
+  return res.json();
+}
+
+export async function submitAnalyticsCaptcha(
+  sessionId: string,
+  captchaCode: string
+): Promise<{ ok: boolean; session_id: string; message: string }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+
+  const res = await fetch(`${API_BASE}/api/analytics/submit-captcha`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ session_id: sessionId, captcha: captchaCode }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) {
+    throw new Error(data.detail || data.message || "Verification failed. Please retry.");
+  }
+
+  return data;
+}
+
 export async function cancelOnDemandCaptcha(sessionId: string): Promise<void> {
   if (!sessionId) return;
   try {

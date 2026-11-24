@@ -1,5 +1,6 @@
 import sys
 import os
+import time
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -14,7 +15,7 @@ backend_dir = Path(__file__).resolve().parent.parent
 if str(backend_dir) not in sys.path:
     sys.path.insert(0, str(backend_dir))
 
-from typing import List, Optional
+from typing import List, Optional, Dict, Any, Tuple
 from datetime import datetime, timezone, timedelta
 
 def to_utc_iso(dt: Optional[datetime]) -> Optional[str]:
@@ -103,6 +104,8 @@ from .schemas import (
     CompareCaptchaSubmitRequest,
     AdminCreditUpdateRequest,
     SessionCancelRequest,
+    SecureStatsRequest,
+    SecureStatsResponse,
     FacultyLoginRequest,
     FacultyLoginResponse,
     FacultyInfo,
@@ -442,6 +445,9 @@ app.add_middleware(
     allow_headers=["*"],
     expose_headers=["*"],
 )
+
+# In-memory single-use verified captcha sessions for secure analytics (expires in 5 minutes)
+verified_secure_stats_sessions: Dict[str, Dict[str, Any]] = {}
 
 
 @app.get("/")
@@ -2157,6 +2163,11 @@ async def submit_compare_captcha(
     )
 
     if res.get("ok"):
+        verified_secure_stats_sessions[req.session_id] = {
+            "solved_at": time.time(),
+            "consumed": False,
+            "user_usn": current_usn or "ANONYMOUS"
+        }
         user_student = db.query(Student).filter(Student.usn == current_usn).first()
         if user_student:
             # Grant +2 comparison credits
@@ -2187,6 +2198,197 @@ async def cancel_compare_captcha(req: SessionCancelRequest):
     if req.session_id:
         await ondemand_scraper.cancel_session(req.session_id)
     return {"ok": True, "message": "Verification session cancelled."}
+
+
+# -------------------------------------------------------------
+# Secure Stats & Crowdsourced Captcha Verification Gate
+# -------------------------------------------------------------
+
+@app.post("/api/analytics/request-captcha", response_model=CompareCaptchaChallengeResponse)
+@limiter.limit("20/minute")
+async def request_analytics_captcha(
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db) or "STUDENT_VIEWER"
+
+    target_info = ondemand_scraper.get_next_scrape_target(db)
+    if not target_info:
+        unscraped = db.query(Student).filter(
+            ~Student.marks.any(),
+            Student.is_hidden == False
+        ).first()
+
+        default_link = db.query(SemesterLink).filter(SemesterLink.is_default == True).first()
+        target_url = (default_link.url if default_link and default_link.url else settings.VTU_URL_SEM1).strip()
+        target_sem = (default_link.semester if default_link and default_link.semester else "1").strip()
+
+        if unscraped:
+            target_usn = unscraped.usn
+            portal_url = target_url
+            target_id = None
+            target_semester = target_sem
+        else:
+            sample_student = db.query(Student).first()
+            target_usn = sample_student.usn if sample_student else "1RM25CD001"
+            portal_url = target_url
+            target_id = None
+            target_semester = target_sem
+    else:
+        target, target_usn = target_info
+        portal_url = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+        target_id = target.id
+        target_semester = target.semester or "1"
+
+    res = await ondemand_scraper.start_session(
+        target_usn=target_usn,
+        semester=target_semester,
+        target_url=portal_url,
+        student_usn=current_usn,
+        is_self_scrape=False,
+        target_id=target_id,
+    )
+
+    if not res or not res.get("ok"):
+        raise HTTPException(
+            status_code=503,
+            detail="VTU examination servers are currently busy or slow. Please try again."
+        )
+
+    return CompareCaptchaChallengeResponse(
+        ok=True,
+        session_id=res["session_id"],
+        captcha_base64=res["captcha_base64"],
+        message="Please solve this captcha to verify your identity and view sensitive academic records."
+    )
+
+
+@app.post("/api/analytics/submit-captcha")
+@limiter.limit("20/minute")
+async def submit_analytics_captcha(
+    req: CompareCaptchaSubmitRequest,
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    db: Session = Depends(get_db)
+):
+    current_usn = verify_session_token(x_student_token, db)
+
+    if not req.captcha.strip():
+        raise HTTPException(status_code=400, detail="Please enter the captcha code.")
+
+    client_ip = request.headers.get("x-forwarded-for")
+    if client_ip:
+        client_ip = client_ip.split(",")[0].strip()
+    else:
+        client_ip = request.client.host if request.client else "unknown"
+
+    res = await ondemand_scraper.submit_captcha(
+        session_id=req.session_id,
+        captcha_code=req.captcha.strip(),
+        password="",
+        client_ip=client_ip
+    )
+
+    if res.get("ok"):
+        verified_secure_stats_sessions[req.session_id] = {
+            "solved_at": time.time(),
+            "consumed": False,
+            "user_usn": current_usn or "ANONYMOUS"
+        }
+        if current_usn:
+            user_student = db.query(Student).filter(Student.usn == current_usn).first()
+            if user_student:
+                user_student.comparison_credits = (user_student.comparison_credits or 0) + 1
+                db.commit()
+
+        return {
+            "ok": True,
+            "session_id": req.session_id,
+            "message": "Verification complete! You can now view sensitive academic records."
+        }
+    else:
+        return res
+
+
+@app.post("/api/analytics/secure-stats", response_model=SecureStatsResponse)
+@limiter.limit("30/minute")
+def get_secure_stats(
+    req: SecureStatsRequest,
+    request: Request,
+    x_student_token: Optional[str] = Header(default=None, alias="X-Student-Token"),
+    x_admin_key: Optional[str] = Header(default=None, alias="X-Admin-Key"),
+    x_faculty_token: Optional[str] = Header(default=None, alias="X-Faculty-Token"),
+    authorization: Optional[str] = Header(default=None, alias="Authorization"),
+    db: Session = Depends(get_db)
+):
+    clean_usn = (req.usn or "").strip().upper()
+    if not clean_usn:
+        raise HTTPException(status_code=400, detail="USN is required.")
+
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail=f"Student {clean_usn} not found.")
+
+    current_usn = verify_session_token(x_student_token, db)
+    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    fac_token = extract_token_from_header(authorization, x_faculty_token)
+    current_faculty = verify_faculty_jwt(fac_token, db) if fac_token else None
+    is_faculty = bool(current_faculty)
+
+    is_privileged = bool(is_admin or is_faculty)
+
+    # Captcha Session Verification:
+    # Must solve captcha on every single view unless viewer is privileged faculty/admin.
+    if not is_privileged:
+        sess_id = (req.session_id or "").strip()
+        if not sess_id or sess_id not in verified_secure_stats_sessions:
+            raise HTTPException(
+                status_code=403,
+                detail="CAPTCHA_REQUIRED",
+                headers={"X-Captcha-Required": "true"}
+            )
+        
+        sess_record = verified_secure_stats_sessions.pop(sess_id)
+        if sess_record.get("consumed") or (time.time() - sess_record.get("solved_at", 0) > 300):
+            raise HTTPException(
+                status_code=403,
+                detail="CAPTCHA_REQUIRED",
+                headers={"X-Captcha-Required": "true"}
+            )
+
+    # Privacy Protection Gate:
+    # If student has marked their marks/results private or is_hidden,
+    # their detailed SGPA and CGPA remain strictly hidden unless viewer is owner or faculty/admin.
+    is_owner = bool(current_usn and current_usn.strip().upper() == clean_usn)
+    is_hidden_marks = bool(student.is_hidden or student.show_my_marks is False)
+
+    if is_hidden_marks and not (is_privileged or is_owner):
+        return SecureStatsResponse(
+            ok=True,
+            usn=clean_usn,
+            credits=None,
+            total_credits=None,
+            sgpa=None,
+            cgpa=None,
+            is_hidden=True,
+            message="This student has chosen to keep their detailed academic grades private."
+        )
+
+    # Calculate credit-weighted stats using VTU 2025 scheme (excluding NCMC non-credit courses)
+    from .services.vtu_credits import calculate_student_credits_and_gpa
+    gpa_info = calculate_student_credits_and_gpa(student.marks or [])
+
+    return SecureStatsResponse(
+        ok=True,
+        usn=clean_usn,
+        credits=gpa_info["credits_earned"],
+        total_credits=gpa_info["total_credits"],
+        sgpa=gpa_info["sgpa"],
+        cgpa=gpa_info["cgpa"],
+        is_hidden=False
+    )
+
 
 
 @app.patch("/api/admin/students/{usn}/credits", dependencies=[Depends(require_admin)])

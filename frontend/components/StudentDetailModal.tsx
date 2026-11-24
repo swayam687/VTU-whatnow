@@ -1,7 +1,14 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { Student, AuthSession } from "../lib/api";
+import {
+  Student,
+  AuthSession,
+  getSecureStats,
+  requestAnalyticsCaptcha,
+  submitAnalyticsCaptcha,
+  SecureStatsData,
+} from "../lib/api";
 import {
   IconClose,
   IconCompare,
@@ -14,6 +21,7 @@ import {
   IconShield,
   IconArrowLeft,
   IconArrowRight,
+  IconLock,
 } from "./Icons";
 import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";
@@ -204,6 +212,79 @@ export default function StudentDetailModal({
   const [isClosing, setIsClosing] = useState(false);
   const [isRescrapeModalOpen, setIsRescrapeModalOpen] = useState(false);
   const [isPrivacyModalOpen, setIsPrivacyModalOpen] = useState(false);
+
+  // Secure Stats & Captcha Verification State
+  const [unlockedStats, setUnlockedStats] = useState<SecureStatsData | null>(null);
+  const [isVerificationModalOpen, setIsVerificationModalOpen] = useState(false);
+  const [captchaSessionId, setCaptchaSessionId] = useState<string | null>(null);
+  const [captchaBase64, setCaptchaBase64] = useState<string | null>(null);
+  const [captchaInput, setCaptchaInput] = useState("");
+  const [isCaptchaLoading, setIsCaptchaLoading] = useState(false);
+  const [isSubmittingCaptcha, setIsSubmittingCaptcha] = useState(false);
+  const [captchaError, setCaptchaError] = useState<string | null>(null);
+  const captchaInputRef = useRef<HTMLInputElement>(null);
+
+  // Re-blur stats whenever student USN changes, navigating to next/prev, or modal opens/closes
+  useEffect(() => {
+    setUnlockedStats(null);
+    setIsVerificationModalOpen(false);
+    setCaptchaSessionId(null);
+    setCaptchaBase64(null);
+    setCaptchaInput("");
+    setCaptchaError(null);
+  }, [usn, isOpen]);
+
+  const handleOpenVerification = async () => {
+    sfx.playMechanicalClick();
+    setIsVerificationModalOpen(true);
+    setIsCaptchaLoading(true);
+    setCaptchaError(null);
+    setCaptchaInput("");
+    try {
+      const data = await requestAnalyticsCaptcha(usn || undefined);
+      setCaptchaSessionId(data.session_id);
+      setCaptchaBase64(data.captcha_base64);
+      setTimeout(() => captchaInputRef.current?.focus(), 150);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to load verification challenge";
+      setCaptchaError(msg);
+    } finally {
+      setIsCaptchaLoading(false);
+    }
+  };
+
+  const handleCancelVerification = () => {
+    sfx.playMechanicalClick();
+    setIsVerificationModalOpen(false);
+    setCaptchaSessionId(null);
+    setCaptchaBase64(null);
+    setCaptchaInput("");
+    setCaptchaError(null);
+  };
+
+  const handleSubmitCaptcha = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!captchaSessionId || !captchaInput.trim() || !usn) return;
+    sfx.playMechanicalClick();
+    setIsSubmittingCaptcha(true);
+    setCaptchaError(null);
+
+    try {
+      await submitAnalyticsCaptcha(captchaSessionId, captchaInput.trim());
+      // Session validated on VTU exam portal! Now fetch secure stats with session_id
+      const stats = await getSecureStats(usn, captchaSessionId);
+      setUnlockedStats(stats);
+      setIsVerificationModalOpen(false);
+      sfx.playSonarChime();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Verification code incorrect. Please try again.";
+      setCaptchaError(msg);
+      // Refresh captcha on failure
+      handleOpenVerification();
+    } finally {
+      setIsSubmittingCaptcha(false);
+    }
+  };
 
   // Sorted marks: Grouped by Semester ascending (Sem 1, Sem 2, Sem 3...), then by subject code
   const sortedMarks = useMemo(() => {
@@ -655,17 +736,17 @@ export default function StudentDetailModal({
           ) : (
             <div className="space-y-4 sm:space-y-5 transition-all duration-500 ease-out opacity-100 translate-y-0">
               {/* Summary Metric Tiles */}
-              {/* Key Metrics Grid - Credit-weighted VTU 2025 Scheme */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                {/* Score */}
+              {/* Key Metrics Grid - Top Stats Dashboard (Responsive 6-Card Grid) */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 text-center">
+                {/* 1. Score */}
                 <div
                   className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
                     }`}
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-60 tracking-wider truncate">
-                    Total Score
+                    Score
                   </p>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                  <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
                     {student.total_marks}
                     <span className="text-[10px] font-normal opacity-50 ml-0.5">
                       /{student.max_marks || 100}
@@ -673,7 +754,7 @@ export default function StudentDetailModal({
                   </p>
                 </div>
 
-                {/* Percentage */}
+                {/* 2. Percentage */}
                 <div
                   className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
                       ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
@@ -683,48 +764,168 @@ export default function StudentDetailModal({
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     Percentage
                   </p>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                  <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
                     {student.percentage.toFixed(1)}%
                   </p>
                 </div>
 
-                {/* SGPA / CGPA (Credit-Weighted) */}
-                <div
-                  className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
-                      ? "bg-emerald-950/20 border-emerald-800/40 text-emerald-300"
-                      : "bg-emerald-50/60 border-emerald-100 text-emerald-700"
-                    }`}
-                >
-                  <div className="flex items-center justify-center gap-1">
-                    <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
-                      {student.cgpa && student.cgpa !== student.sgpa ? "CGPA / SGPA" : "SGPA"}
-                    </p>
-                    <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 font-mono">
-                      VTU
-                    </span>
-                  </div>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
-                    {student.sgpa ? student.sgpa.toFixed(2) : (student.cgpa ? student.cgpa.toFixed(2) : "—")}
-                    <span className="text-[10px] font-normal opacity-50 ml-0.5">/ 10</span>
-                  </p>
-                </div>
+                {/* 3. Re-attempts / Pending Status */}
+                {(() => {
+                  const isHidden = !isMyVerifiedProfile && student.show_my_backlogs === false;
+                  const hasBacklogs = student.total_backlogs > 0;
 
-                {/* Earned Academic Credits */}
+                  return (
+                    <div
+                      className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isHidden
+                          ? isObsidian
+                            ? "bg-slate-900/60 border-slate-800 text-slate-400"
+                            : "bg-slate-50 border-slate-200 text-slate-600"
+                          : hasBacklogs
+                            ? isObsidian
+                              ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
+                              : "bg-rose-50 border-rose-200 text-rose-700"
+                            : isObsidian
+                              ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
+                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                        }`}
+                    >
+                      <p
+                        className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate"
+                        title="Re-attempts / Pending"
+                      >
+                        Re-attempts
+                      </p>
+                      <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
+                        {isHidden
+                          ? "Hidden"
+                          : hasBacklogs
+                            ? `${student.total_backlogs} Pending`
+                            : "All Clear"}
+                      </p>
+                    </div>
+                  );
+                })()}
+
+                {/* 4. Credits (Protected by Captcha Verification Gate) */}
                 <div
-                  className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
-                      ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-300"
-                      : "bg-indigo-50/60 border-indigo-100 text-indigo-700"
-                    }`}
+                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${
+                    isObsidian ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-300" : "bg-indigo-50/60 border-indigo-100 text-indigo-700"
+                  }`}
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
-                    Credits Earned
+                    Credits
                   </p>
-                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
-                    {student.credits_earned ?? (student.total_backlogs === 0 ? 20 : 15)}
-                    <span className="text-[10px] font-normal opacity-50 ml-0.5">
-                      /{student.total_credits || 20} Cr
-                    </span>
+                  {unlockedStats && unlockedStats.usn === student.usn ? (
+                    <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
+                      {unlockedStats.is_hidden ? (
+                        <span className="text-amber-400 text-xs">Hidden</span>
+                      ) : (
+                        <>
+                          {unlockedStats.credits ?? 0}
+                          <span className="text-[10px] font-normal opacity-50 ml-0.5">
+                            /{unlockedStats.total_credits || 20} Cr
+                          </span>
+                        </>
+                      )}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleOpenVerification}
+                      className="relative w-full group mt-0.5 cursor-pointer outline-none"
+                      title="Click to solve security captcha and view verified credits"
+                    >
+                      <div className="filter blur-md select-none opacity-30 font-mono font-bold text-xs sm:text-sm">
+                        20 / 20 Cr
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center gap-1 rounded bg-black/10 group-hover:bg-black/30 transition-colors">
+                        <IconLock className="w-2.5 h-2.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-300">
+                          Verify
+                        </span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+
+                {/* 5. SGPA (Protected by Captcha Verification Gate) */}
+                <div
+                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${
+                    isObsidian ? "bg-emerald-950/20 border-emerald-800/40 text-emerald-300" : "bg-emerald-50/60 border-emerald-100 text-emerald-700"
+                  }`}
+                >
+                  <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
+                    SGPA
                   </p>
+                  {unlockedStats && unlockedStats.usn === student.usn ? (
+                    <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
+                      {unlockedStats.is_hidden ? (
+                        <span className="text-amber-400 text-xs">Hidden</span>
+                      ) : (
+                        <>
+                          {unlockedStats.sgpa?.toFixed(2) ?? "—"}
+                          <span className="text-[10px] font-normal opacity-50 ml-0.5">/ 10</span>
+                        </>
+                      )}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleOpenVerification}
+                      className="relative w-full group mt-0.5 cursor-pointer outline-none"
+                      title="Click to solve security captcha and view verified SGPA"
+                    >
+                      <div className="filter blur-md select-none opacity-30 font-mono font-bold text-xs sm:text-sm">
+                        8.75 / 10
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center gap-1 rounded bg-black/10 group-hover:bg-black/30 transition-colors">
+                        <IconLock className="w-2.5 h-2.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-300">
+                          Verify
+                        </span>
+                      </div>
+                    </button>
+                  )}
+                </div>
+
+                {/* 6. CGPA (Protected by Captcha Verification Gate) */}
+                <div
+                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${
+                    isObsidian ? "bg-purple-950/20 border-purple-800/40 text-purple-300" : "bg-purple-50/60 border-purple-100 text-purple-700"
+                  }`}
+                >
+                  <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
+                    CGPA
+                  </p>
+                  {unlockedStats && unlockedStats.usn === student.usn ? (
+                    <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
+                      {unlockedStats.is_hidden ? (
+                        <span className="text-amber-400 text-xs">Hidden</span>
+                      ) : (
+                        <>
+                          {unlockedStats.cgpa?.toFixed(2) ?? "—"}
+                          <span className="text-[10px] font-normal opacity-50 ml-0.5">/ 10</span>
+                        </>
+                      )}
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleOpenVerification}
+                      className="relative w-full group mt-0.5 cursor-pointer outline-none"
+                      title="Click to solve security captcha and view verified CGPA"
+                    >
+                      <div className="filter blur-md select-none opacity-30 font-mono font-bold text-xs sm:text-sm">
+                        8.90 / 10
+                      </div>
+                      <div className="absolute inset-0 flex items-center justify-center gap-1 rounded bg-black/10 group-hover:bg-black/30 transition-colors">
+                        <IconLock className="w-2.5 h-2.5 text-cyan-400 group-hover:scale-110 transition-transform" />
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-cyan-300">
+                          Verify
+                        </span>
+                      </div>
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1130,6 +1331,154 @@ export default function StudentDetailModal({
           studentToken={studentSession?.token}
           isObsidian={isObsidian}
         />
+      )}
+
+      {/* Security Verification Modal (Crowdsourced Scrape Captcha Gate) */}
+      {isVerificationModalOpen && (
+        <div
+          onClick={handleCancelVerification}
+          className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fade-in"
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className={`w-full max-w-sm rounded-2xl sm:rounded-3xl border shadow-2xl overflow-hidden p-5 sm:p-6 transition-all ${
+              isObsidian ? "bg-[#0c0e12] border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+            }`}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-cyan-500/15 border border-cyan-500/25 text-cyan-400">
+                  <IconShield className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm sm:text-base leading-tight">
+                    Security Verification
+                  </h3>
+                  <span className="text-[10px] font-mono text-cyan-400 font-semibold tracking-wider uppercase">
+                    One-Time Authorization
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={handleCancelVerification}
+                className="p-1 rounded-lg text-slate-400 hover:text-white transition-colors cursor-pointer"
+              >
+                <IconClose className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Strict User Copy: DO NOT mention scraping, admin queues, or VTU links */}
+            <p className="text-xs opacity-75 leading-relaxed mb-4">
+              Please solve this captcha to verify your identity and view sensitive academic records.
+            </p>
+
+            {/* Error Notice */}
+            {captchaError && (
+              <div className="mb-3 p-2.5 rounded-xl text-xs bg-rose-500/10 border border-rose-500/25 text-rose-400 flex items-center justify-between">
+                <span>{captchaError}</span>
+                <button
+                  type="button"
+                  onClick={handleOpenVerification}
+                  className="font-bold underline ml-2 text-[11px] cursor-pointer shrink-0"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {isCaptchaLoading ? (
+              <div className="py-8 flex flex-col items-center justify-center gap-2 text-center">
+                <div className="w-6 h-6 border-2 border-cyan-400/30 border-t-cyan-400 rounded-full animate-spin" />
+                <span className="text-xs font-mono opacity-60">Loading challenge...</span>
+              </div>
+            ) : (
+              <form onSubmit={handleSubmitCaptcha} className="space-y-4">
+                {/* Captcha Image */}
+                {captchaBase64 && (
+                  <div className={`p-3 rounded-xl border flex flex-col items-center gap-2 ${
+                    isObsidian ? "bg-slate-900/80 border-slate-800" : "bg-slate-50 border-slate-200"
+                  }`}>
+                    <div className="flex items-center justify-between w-full text-[10px] opacity-60 font-mono">
+                      <span>CHALLENGE CHECKSUM</span>
+                      <button
+                        type="button"
+                        onClick={handleOpenVerification}
+                        className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
+                      >
+                        <IconRotateCcw className="w-3 h-3" />
+                        <span>Refresh</span>
+                      </button>
+                    </div>
+                    <img
+                      src={`data:image/png;base64,${captchaBase64}`}
+                      alt="Security Captcha"
+                      className="h-14 rounded-lg border border-white/10 shadow-sm"
+                    />
+                  </div>
+                )}
+
+                {/* Input */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium opacity-80">
+                      Enter Captcha Code
+                    </label>
+                    <span className="text-[10px] font-mono opacity-50">
+                      Case-Sensitive
+                    </span>
+                  </div>
+                  <input
+                    ref={captchaInputRef}
+                    type="text"
+                    value={captchaInput}
+                    onChange={(e) => setCaptchaInput(e.target.value)}
+                    placeholder="e.g. 5k9P2x"
+                    maxLength={10}
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    required
+                    className={`w-full px-4 py-2.5 text-base font-mono text-center tracking-widest rounded-xl border outline-none transition-colors ${
+                      isObsidian
+                        ? "bg-slate-900 border-slate-700 text-white focus:border-cyan-400"
+                        : "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500"
+                    }`}
+                  />
+                </div>
+
+                {/* Buttons */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={handleCancelVerification}
+                    className="flex-1 py-2.5 px-3 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/15 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingCaptcha || !captchaInput.trim()}
+                    className="flex-2 py-2.5 px-4 rounded-xl text-xs font-semibold bg-cyan-600 hover:bg-cyan-500 disabled:opacity-50 text-white shadow-md shadow-cyan-600/20 transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                  >
+                    {isSubmittingCaptcha ? (
+                      <>
+                        <div className="w-3.5 h-3.5 rounded-full border border-white/30 border-t-white animate-spin" />
+                        <span>Verifying...</span>
+                      </>
+                    ) : (
+                      <>
+                        <IconLock className="w-3.5 h-3.5" />
+                        <span>Verify & Unlock</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
