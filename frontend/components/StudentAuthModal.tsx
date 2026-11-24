@@ -264,10 +264,14 @@ export default function StudentAuthModal({
   const [missingStudentName, setMissingStudentName] = useState("");
   const [missingStudentBranch, setMissingStudentBranch] = useState("CSE");
 
-  // Selfie capture state for disputes
+  // Photo verification state for disputes & password reset
   const [selfieBase64, setSelfieBase64] = useState<string | null>(null);
   const [selfiePreview, setSelfiePreview] = useState<string | null>(null);
+  const [photoFileName, setPhotoFileName] = useState<string | null>(null);
+  const [processingPhoto, setProcessingPhoto] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
   const captchaInputRef = useRef<HTMLInputElement | null>(null);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -312,6 +316,8 @@ export default function StudentAuthModal({
     setShowNewPassword(false);
     setSelfieBase64(null);
     setSelfiePreview(null);
+    setPhotoFileName(null);
+    setProcessingPhoto(false);
     setAgreedToPrivacy(false);
     setOnDemandState("idle");
     setOnDemandSessionId(null);
@@ -707,45 +713,169 @@ export default function StudentAuthModal({
     }
   };
 
-  // Client-side image compression to <50KB Base64 JPEG for disputes
-  const handleSelfieChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  // Resilient multi-tier client-side photo compression for ID Card / Selfie verification
+  // Supports Android, iOS Safari (HEIC auto-transcode via JPEG accept), Canvas & FileReader fallbacks
+  const processImageFile = async (file: File): Promise<string> => {
+    const MAX_DIM = 1200; // 1200px keeps College ID text/hall-ticket legible while base64 payload is <200KB
+    const JPEG_QUALITY = 0.78;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement("canvas");
-        const MAX_DIM = 420;
-        let width = img.width;
-        let height = img.height;
-
-        if (width > height) {
-          if (width > MAX_DIM) {
+    // Method 1: Modern createImageBitmap (hardware accelerated, orientation-aware, low memory)
+    if (typeof window !== "undefined" && "createImageBitmap" in window) {
+      try {
+        const bitmap = await createImageBitmap(file);
+        let { width, height } = bitmap;
+        if (width > MAX_DIM || height > MAX_DIM) {
+          if (width > height) {
             height = Math.round((height * MAX_DIM) / width);
             width = MAX_DIM;
-          }
-        } else {
-          if (height > MAX_DIM) {
+          } else {
             width = Math.round((width * MAX_DIM) / height);
             height = MAX_DIM;
           }
         }
-
-        canvas.width = width;
-        canvas.height = height;
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(width, 1);
+        canvas.height = Math.max(height, 1);
         const ctx = canvas.getContext("2d");
         if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL("image/jpeg", 0.65);
-          setSelfieBase64(compressed);
-          setSelfiePreview(compressed);
+          ctx.drawImage(bitmap, 0, 0, width, height);
+          bitmap.close();
+          const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+          if (dataUrl && dataUrl.startsWith("data:image/jpeg")) {
+            return dataUrl;
+          }
         }
+      } catch (bitmapErr) {
+        console.warn("createImageBitmap failed, falling back to Image element:", bitmapErr);
+      }
+    }
+
+    // Method 2: HTMLImageElement with URL.createObjectURL (broad cross-browser support)
+    try {
+      const result = await new Promise<string>((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          try {
+            let { width, height } = img;
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(width, 1);
+            canvas.height = Math.max(height, 1);
+            const ctx = canvas.getContext("2d");
+            if (!ctx) {
+              reject(new Error("Unable to create canvas context"));
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL("image/jpeg", JPEG_QUALITY);
+            resolve(dataUrl);
+          } catch (canvasErr) {
+            reject(canvasErr);
+          }
+        };
+        img.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("Image element could not decode this photo format"));
+        };
+        img.src = url;
+      });
+      return result;
+    } catch (objUrlErr) {
+      console.warn("createObjectURL failed, falling back to FileReader:", objUrlErr);
+    }
+
+    // Method 3: FileReader base64 fallback (handles legacy environments & direct string payloads)
+    return new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawDataUrl = e.target?.result as string;
+        if (!rawDataUrl) {
+          reject(new Error("Empty file content"));
+          return;
+        }
+
+        const img = new Image();
+        img.onload = () => {
+          try {
+            let { width, height } = img;
+            if (width > MAX_DIM || height > MAX_DIM) {
+              if (width > height) {
+                height = Math.round((height * MAX_DIM) / width);
+                width = MAX_DIM;
+              } else {
+                width = Math.round((width * MAX_DIM) / height);
+                height = MAX_DIM;
+              }
+            }
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.max(width, 1);
+            canvas.height = Math.max(height, 1);
+            const ctx = canvas.getContext("2d");
+            if (ctx) {
+              ctx.drawImage(img, 0, 0, width, height);
+              resolve(canvas.toDataURL("image/jpeg", JPEG_QUALITY));
+              return;
+            }
+          } catch {
+            // fall through
+          }
+          if (rawDataUrl.length < 5_000_000) {
+            resolve(rawDataUrl);
+          } else {
+            reject(new Error("Photo exceeds size limit. Please choose a smaller image."));
+          }
+        };
+        img.onerror = () => {
+          // If browser cannot render, but raw payload is within backend limit (<5MB), send raw
+          if (rawDataUrl.length < 5_000_000) {
+            resolve(rawDataUrl);
+          } else {
+            reject(new Error("Image format not supported. Please select a JPG or PNG file."));
+          }
+        };
+        img.src = rawDataUrl;
       };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+      reader.onerror = () => reject(new Error("Could not read file from device storage."));
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handlePhotoFile = async (file: File | undefined) => {
+    if (!file) return;
+    setProcessingPhoto(true);
+    setError(null);
+    setPhotoFileName(file.name || "verification_photo.jpg");
+
+    try {
+      const compressedDataUrl = await processImageFile(file);
+      setSelfieBase64(compressedDataUrl);
+      setSelfiePreview(compressedDataUrl);
+      sfx.playMechanicalClick();
+    } catch (err: unknown) {
+      console.error("Photo processing error:", err);
+      setError("Unable to process photo. Please take a photo directly or select a standard JPG or PNG.");
+    } finally {
+      setProcessingPhoto(false);
+    }
+  };
+
+  const onFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    // Clear input value so selecting the same photo triggers onChange again
+    e.target.value = "";
+    if (file) {
+      handlePhotoFile(file);
+    }
   };
 
   const handleDisputeSubmit = async (e: React.FormEvent) => {
@@ -759,7 +889,7 @@ export default function StudentAuthModal({
       return;
     }
     if (!selfieBase64) {
-      setError("Please take or upload a clear selfie to prove ownership of your USN.");
+      setError("Please take a photo or upload an image (ID card or selfie) to verify ownership.");
       return;
     }
 
@@ -829,7 +959,7 @@ export default function StudentAuthModal({
                   ? "Faculty Portal Access"
                   : mode === "auth"
                   ? "Student Access Portal"
-                  : "Verify USN Ownership"}
+                  : "Claim USN / Reset Password"}
               </h2>
               <p className={`text-xs ${isObsidian ? "text-zinc-400" : "text-zinc-500"}`}>
                 {onDemandState === "captcha_ready"
@@ -844,7 +974,7 @@ export default function StudentAuthModal({
                   ? "Elevated access for university faculty & academic audits"
                   : mode === "auth"
                   ? "Enter USN & password to unlock full rank and marksheet"
-                  : "Submit photo verification for admin review"}
+                  : "Submit photo proof (ID Card / Admit Card / Selfie) for verification"}
               </p>
             </div>
 
@@ -1467,7 +1597,7 @@ export default function StudentAuthModal({
                       }}
                       className="text-[11px] text-cyan-400 hover:underline cursor-pointer"
                     >
-                      Not you? Claim USN
+                      Forgot password / Claim USN →
                     </button>
                   )}
                 </div>
@@ -1559,7 +1689,7 @@ export default function StudentAuthModal({
                   }}
                   className={`text-xs ${isObsidian ? "text-zinc-400 hover:text-zinc-200" : "text-zinc-500 hover:text-zinc-800"} cursor-pointer`}
                 >
-                  Did someone else take your USN? <span className="text-cyan-400 underline">Send Selfie Verification</span>
+                  Forgot password or not your USN? <span className="text-cyan-400 underline font-medium">Claim USN with Photo Verification</span>
                 </button>
               </div>
             </form>
@@ -1573,7 +1703,7 @@ export default function StudentAuthModal({
               <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
                 isObsidian ? "bg-amber-500/10 border-amber-500/20 text-amber-300" : "bg-amber-50 border-amber-200 text-amber-800"
               }`}>
-                📸 <strong>Selfie Verification:</strong> To ensure privacy and prevent unauthorized account takeover, take or upload a selfie. The admin will verify your identity against college records and approve your ownership.
+                📸 <strong>Account Verification:</strong> Forgot your password or is your USN claimed by someone else? Take a photo or upload your College ID Card, Admit Card, or Selfie. The admin will verify your identity and activate your new password.
               </div>
 
               {/* USN Field */}
@@ -1625,54 +1755,129 @@ export default function StudentAuthModal({
                 </div>
               </div>
 
-              {/* Selfie Upload / Camera */}
+              {/* Photo Verification Upload (Camera or Gallery) */}
               <div>
                 <label className={`block text-xs font-medium mb-1.5 ${isObsidian ? "text-zinc-300" : "text-zinc-700"}`}>
-                  Selfie Photo (Front Camera or Gallery)
+                  Proof Photo (College ID Card, Admit Card, or Selfie)
                 </label>
+
+                {/* Hidden native inputs: Camera direct & Gallery/Files selector */}
                 <input
-                  ref={fileInputRef}
+                  ref={cameraInputRef}
                   type="file"
-                  accept="image/*"
-                  capture="user"
-                  onChange={handleSelfieChange}
+                  accept="image/jpeg,image/png,image/webp,image/*"
+                  capture="environment"
+                  onChange={onFileInputChange}
+                  className="hidden"
+                />
+                <input
+                  ref={galleryInputRef}
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/heic,image/heif,image/*"
+                  onChange={onFileInputChange}
                   className="hidden"
                 />
 
-                <div className="flex items-center space-x-3">
+                {/* Dual mobile-friendly triggers */}
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className={`flex-1 py-2.5 px-3.5 rounded-xl border text-xs font-medium flex items-center justify-center space-x-2 transition-all cursor-pointer ${
+                    disabled={processingPhoto}
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      cameraInputRef.current?.click();
+                    }}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                       isObsidian
                         ? "bg-white/5 border-white/10 hover:bg-white/10 text-white"
                         : "bg-zinc-100 border-zinc-300 hover:bg-zinc-200 text-zinc-800"
-                    }`}
+                    } disabled:opacity-50`}
                   >
                     <span>📷</span>
-                    <span>{selfiePreview ? "Change Photo" : "Take / Choose Selfie"}</span>
+                    <span>Take Photo</span>
                   </button>
 
-                  {selfiePreview && (
-                    <div className="relative w-11 h-11 rounded-xl overflow-hidden border-2 border-emerald-500 shrink-0">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={selfiePreview}
-                        alt="Selfie Preview"
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
+                  <button
+                    type="button"
+                    disabled={processingPhoto}
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      galleryInputRef.current?.click();
+                    }}
+                    className={`py-2.5 px-3 rounded-xl border text-xs font-medium flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                      isObsidian
+                        ? "bg-white/5 border-white/10 hover:bg-white/10 text-white"
+                        : "bg-zinc-100 border-zinc-300 hover:bg-zinc-200 text-zinc-800"
+                    } disabled:opacity-50`}
+                  >
+                    <span>📁</span>
+                    <span>Upload from Files</span>
+                  </button>
                 </div>
+
+                {/* Processing State */}
+                {processingPhoto && (
+                  <div className="mt-2.5 p-2.5 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs flex items-center gap-2">
+                    <span className="animate-spin text-sm">⏳</span>
+                    <span>Compressing &amp; preparing photo for instant upload...</span>
+                  </div>
+                )}
+
+                {/* Photo Preview and Info Card */}
+                {selfiePreview && !processingPhoto && (
+                  <div className={`mt-2.5 p-2.5 rounded-xl border flex items-center justify-between gap-3 ${
+                    isObsidian ? "bg-white/[0.04] border-white/10" : "bg-zinc-50 border-zinc-200"
+                  }`}>
+                    <div className="flex items-center gap-3 overflow-hidden">
+                      <div className="relative w-12 h-12 rounded-lg overflow-hidden border border-emerald-500/40 shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={selfiePreview}
+                          alt="Photo Verification Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-emerald-400 flex items-center gap-1">
+                          <span>✓</span>
+                          <span>Photo ready</span>
+                        </div>
+                        <div className="text-[11px] text-zinc-400 truncate max-w-[160px]">
+                          {photoFileName || "verification_photo.jpg"}
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelfieBase64(null);
+                        setSelfiePreview(null);
+                        setPhotoFileName(null);
+                      }}
+                      className="text-xs text-rose-400 hover:text-rose-300 px-2 py-1 rounded-lg hover:bg-rose-500/10 transition-colors cursor-pointer shrink-0"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Submit Dispute */}
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-amber-600 hover:bg-amber-700 text-white shadow-xs active:scale-[0.99] transition-all disabled:opacity-50 cursor-pointer"
+                disabled={loading || processingPhoto || !selfieBase64}
+                className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
               >
-                {loading ? "Submitting..." : "Submit Verification to Admin"}
+                {loading ? (
+                  <>
+                    <span className="animate-spin text-sm">⏳</span>
+                    <span>Submitting Claim...</span>
+                  </>
+                ) : processingPhoto ? (
+                  <span>Processing Photo...</span>
+                ) : (
+                  <span>Submit Verification to Admin</span>
+                )}
               </button>
 
               <div className="text-center">
