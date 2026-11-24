@@ -1871,6 +1871,9 @@ def sanitize_student_record(
 
     public_marks.sort(key=lambda m: (_get_sem_order(m), (getattr(m, "subject_code", "") or "").strip().upper()))
 
+    from .services.vtu_credits import calculate_student_credits_and_gpa
+    gpa_info = calculate_student_credits_and_gpa(s.marks or [])
+
     return {
         "usn": s.usn,
         "name": s.name or s.usn,
@@ -1879,7 +1882,10 @@ def sanitize_student_record(
         "total_marks": s.total_marks,
         "max_marks": s.max_marks,
         "percentage": s.percentage,
-        "cgpa": s.cgpa,
+        "cgpa": gpa_info["cgpa"] if gpa_info["cgpa"] > 0 else s.cgpa,
+        "sgpa": gpa_info["sgpa"],
+        "credits_earned": gpa_info["credits_earned"],
+        "total_credits": gpa_info["total_credits"],
         "total_backlogs": public_backlogs,
         "github_url": s.github_url or "",
         "linkedin_url": s.linkedin_url or "",

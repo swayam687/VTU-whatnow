@@ -523,6 +523,10 @@ export default function CompareModal({
                     {s1.percentage.toFixed(1)}%
                   </span>
                   <p className="text-[10px] opacity-60 font-mono">{s1.total_marks}/{s1.max_marks || 100} pts</p>
+                  <p className="text-[10px] font-mono font-semibold text-emerald-400 mt-0.5">
+                    SGPA: {s1.sgpa ? s1.sgpa.toFixed(2) : (s1.cgpa ? s1.cgpa.toFixed(2) : (s1.percentage / 9.5).toFixed(2))}
+                    <span className="opacity-60 font-normal ml-1">({s1.credits_earned ?? (s1.total_backlogs === 0 ? 20 : 15)} Cr)</span>
+                  </p>
                 </div>
               </div>
 
@@ -608,6 +612,10 @@ export default function CompareModal({
                     {s2.percentage.toFixed(1)}%
                   </span>
                   <p className="text-[10px] opacity-60 font-mono">{s2.total_marks}/{s2.max_marks || 100} pts</p>
+                  <p className="text-[10px] font-mono font-semibold text-emerald-400 mt-0.5">
+                    SGPA: {s2.sgpa ? s2.sgpa.toFixed(2) : (s2.cgpa ? s2.cgpa.toFixed(2) : (s2.percentage / 9.5).toFixed(2))}
+                    <span className="opacity-60 font-normal ml-1">({s2.credits_earned ?? (s2.total_backlogs === 0 ? 20 : 15)} Cr)</span>
+                  </p>
                 </div>
               </div>
 
@@ -646,38 +654,59 @@ export default function CompareModal({
           </div>
 
           {/* Key Difference Overview Banner */}
-          <div
-            className={`p-3 rounded-2xl border flex flex-wrap items-center justify-around gap-2 text-center text-xs ${isObsidian
-              ? "bg-slate-900/60 border-slate-800/80"
-              : "bg-slate-50 border-slate-200"
-              }`}
-          >
-            <div>
-              <p className="opacity-50 font-semibold uppercase tracking-wider text-[9px]">Percentage Delta</p>
-              <p className="text-xs sm:text-sm font-bold mt-0.5 font-mono tabular-nums">
-                {pctDiff > 0 ? (
-                  <span className="text-cyan-400 font-bold">{s1.name} ahead by +{pctDiff.toFixed(1)}%</span>
-                ) : pctDiff < 0 ? (
-                  <span className="text-indigo-400 font-bold">{s2.name} ahead by +{Math.abs(pctDiff).toFixed(1)}%</span>
-                ) : (
-                  <span className="opacity-60">Identical Percentage</span>
-                )}
-              </p>
-            </div>
-            <div className="h-7 w-px bg-slate-800 hidden sm:block" />
-            <div>
-              <p className="opacity-50 font-semibold uppercase tracking-wider text-[9px]">Total Marks Delta</p>
-              <p className="text-xs sm:text-sm font-bold mt-0.5 font-mono tabular-nums">
-                {marksDiff > 0 ? (
-                  <span className="text-cyan-400 font-bold">+{marksDiff} Marks (Student A)</span>
-                ) : marksDiff < 0 ? (
-                  <span className="text-indigo-400 font-bold">+{Math.abs(marksDiff)} Marks (Student B)</span>
-                ) : (
-                  <span className="opacity-60">Equal Total Score</span>
-                )}
-              </p>
-            </div>
-          </div>
+          {(() => {
+            const sgpa1 = s1.sgpa || s1.cgpa || (s1.percentage ? +(s1.percentage / 9.5).toFixed(2) : 0);
+            const sgpa2 = s2.sgpa || s2.cgpa || (s2.percentage ? +(s2.percentage / 9.5).toFixed(2) : 0);
+            const sgpaDelta = +(sgpa1 - sgpa2).toFixed(2);
+
+            return (
+              <div
+                className={`p-3 rounded-2xl border flex flex-wrap items-center justify-around gap-2 text-center text-xs ${isObsidian
+                  ? "bg-slate-900/60 border-slate-800/80"
+                  : "bg-slate-50 border-slate-200"
+                  }`}
+              >
+                <div>
+                  <p className="opacity-50 font-semibold uppercase tracking-wider text-[9px]">SGPA Delta (VTU 2025)</p>
+                  <p className="text-xs sm:text-sm font-bold mt-0.5 font-mono tabular-nums">
+                    {sgpaDelta > 0 ? (
+                      <span className="text-emerald-400 font-bold">+{sgpaDelta} SGPA (Student A)</span>
+                    ) : sgpaDelta < 0 ? (
+                      <span className="text-indigo-400 font-bold">+{Math.abs(sgpaDelta)} SGPA (Student B)</span>
+                    ) : (
+                      <span className="opacity-60">Equal SGPA</span>
+                    )}
+                  </p>
+                </div>
+                <div className="h-7 w-px bg-slate-800 hidden sm:block" />
+                <div>
+                  <p className="opacity-50 font-semibold uppercase tracking-wider text-[9px]">Percentage Delta</p>
+                  <p className="text-xs sm:text-sm font-bold mt-0.5 font-mono tabular-nums">
+                    {pctDiff > 0 ? (
+                      <span className="text-cyan-400 font-bold">{s1.name} ahead by +{pctDiff.toFixed(1)}%</span>
+                    ) : pctDiff < 0 ? (
+                      <span className="text-indigo-400 font-bold">{s2.name} ahead by +{Math.abs(pctDiff).toFixed(1)}%</span>
+                    ) : (
+                      <span className="opacity-60">Identical Percentage</span>
+                    )}
+                  </p>
+                </div>
+                <div className="h-7 w-px bg-slate-800 hidden sm:block" />
+                <div>
+                  <p className="opacity-50 font-semibold uppercase tracking-wider text-[9px]">Total Marks Delta</p>
+                  <p className="text-xs sm:text-sm font-bold mt-0.5 font-mono tabular-nums">
+                    {marksDiff > 0 ? (
+                      <span className="text-cyan-400 font-bold">+{marksDiff} Marks (Student A)</span>
+                    ) : marksDiff < 0 ? (
+                      <span className="text-indigo-400 font-bold">+{Math.abs(marksDiff)} Marks (Student B)</span>
+                    ) : (
+                      <span className="opacity-60">Equal Total Score</span>
+                    )}
+                  </p>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Subject-by-Subject Deep Dive */}
           <div>
@@ -729,7 +758,7 @@ export default function CompareModal({
                     >
                       {/* Subject Name & Code */}
                       <div className="col-span-5 mb-2 sm:mb-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
                           <span className="font-mono text-xs font-bold">{code}</span>
                           {(m1?.semester || m2?.semester) && (
                             <span
@@ -741,6 +770,33 @@ export default function CompareModal({
                               Sem {m1?.semester || m2?.semester}
                             </span>
                           )}
+                          {(() => {
+                            const isNcmc = Boolean(
+                              m1?.is_ncmc || m2?.is_ncmc ||
+                              code.includes("ICO") || code.includes("CIP")
+                            );
+                            const cr = isNcmc ? 0 : (
+                              m1?.credits ?? m2?.credits ?? (
+                                code.includes("MAT") || code.includes("PHY") || code.includes("CHE") || code.includes("PLC") ? 4 :
+                                code.includes("CED") || code.includes("AIA") || code.includes("ESC") || code.includes("EIT") ? 3 : 1
+                              )
+                            );
+                            return isNcmc ? (
+                              <span
+                                className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-400 border border-amber-500/25"
+                                title="Non-Credit Mandatory Course (Excluded from SGPA)"
+                              >
+                                NCMC
+                              </span>
+                            ) : (
+                              <span
+                                className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded bg-cyan-500/10 text-cyan-400 border border-cyan-500/20"
+                                title={`${cr} Credits weight in SGPA`}
+                              >
+                                {cr} Cr
+                              </span>
+                            );
+                          })()}
                         </div>
                         {subjectName && subjectName.toUpperCase() !== code.toUpperCase() ? (
                           <p className="text-[11px] opacity-75 line-clamp-1 mt-0.5 font-medium" title={subjectName}>

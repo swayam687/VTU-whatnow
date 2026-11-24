@@ -23,6 +23,10 @@ export interface Mark {
   max_marks: number;
   status: "P" | "F" | "A" | "W" | string;
   semester: string;
+  credits?: number;
+  grade?: string;
+  grade_point?: number;
+  is_ncmc?: boolean;
 }
 
 export interface Student {
@@ -34,6 +38,9 @@ export interface Student {
   max_marks: number;
   percentage: number;
   cgpa: number;
+  sgpa?: number;
+  credits_earned?: number;
+  total_credits?: number;
   total_backlogs: number;
   github_url?: string;
   linkedin_url?: string;

@@ -70,6 +70,26 @@ class Mark(Base):
         from .services.subject_catalog import get_catalog_subject_name
         return get_catalog_subject_name(self.subject_code or "", self.subject.name if self.subject else None)
 
+    @property
+    def credits(self) -> int:
+        from .services.vtu_credits import get_course_credit_info
+        return get_course_credit_info(self.subject_code or "")[0]
+
+    @property
+    def is_ncmc(self) -> bool:
+        from .services.vtu_credits import get_course_credit_info
+        return get_course_credit_info(self.subject_code or "")[1]
+
+    @property
+    def grade(self) -> str:
+        from .services.vtu_credits import get_vtu_grade
+        return get_vtu_grade(self.total or 0, self.status or "P", is_ncmc=self.is_ncmc)[0]
+
+    @property
+    def grade_point(self) -> int:
+        from .services.vtu_credits import get_vtu_grade
+        return get_vtu_grade(self.total or 0, self.status or "P", is_ncmc=self.is_ncmc)[1]
+
 
 class SemesterLink(Base):
     __tablename__ = "semester_links"

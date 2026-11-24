@@ -492,6 +492,10 @@ export default function FacultyPortalPage() {
                     <p className="text-[10px] opacity-60 font-mono">
                       {compareResult.student1.total_marks}/{compareResult.student1.max_marks} pts
                     </p>
+                    <p className="text-[10px] font-mono font-semibold text-emerald-400 mt-0.5">
+                      SGPA: {compareResult.student1.sgpa ? compareResult.student1.sgpa.toFixed(2) : (compareResult.student1.cgpa ? compareResult.student1.cgpa.toFixed(2) : (compareResult.student1.percentage / 9.5).toFixed(2))}
+                      <span className="opacity-60 font-normal ml-1">({compareResult.student1.credits_earned ?? (compareResult.student1.total_backlogs === 0 ? 20 : 15)} Cr)</span>
+                    </p>
                   </div>
                 </div>
 
@@ -549,6 +553,10 @@ export default function FacultyPortalPage() {
                     </span>
                     <p className="text-[10px] opacity-60 font-mono">
                       {compareResult.student2.total_marks}/{compareResult.student2.max_marks} pts
+                    </p>
+                    <p className="text-[10px] font-mono font-semibold text-emerald-400 mt-0.5">
+                      SGPA: {compareResult.student2.sgpa ? compareResult.student2.sgpa.toFixed(2) : (compareResult.student2.cgpa ? compareResult.student2.cgpa.toFixed(2) : (compareResult.student2.percentage / 9.5).toFixed(2))}
+                      <span className="opacity-60 font-normal ml-1">({compareResult.student2.credits_earned ?? (compareResult.student2.total_backlogs === 0 ? 20 : 15)} Cr)</span>
                     </p>
                   </div>
                 </div>

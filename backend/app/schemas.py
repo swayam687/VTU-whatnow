@@ -11,6 +11,10 @@ class MarkBase(BaseModel):
     max_marks: int = 100
     status: str
     semester: str
+    credits: int = 0
+    grade: str = "P"
+    grade_point: int = 0
+    is_ncmc: bool = False
 
 class AdminMarkItem(BaseModel):
     subject_code: str
@@ -39,6 +43,9 @@ class StudentBase(BaseModel):
     max_marks: int = 0
     percentage: float = 0.0
     cgpa: float = 0.0
+    sgpa: float = 0.0
+    credits_earned: int = 0
+    total_credits: int = 0
     total_backlogs: int = 0
     github_url: Optional[str] = ""
     linkedin_url: Optional[str] = ""

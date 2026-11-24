@@ -163,6 +163,9 @@ export default function StudentCard({
             >
               {student.percentage.toFixed(1)}%
             </div>
+            <div className="text-[9px] font-mono opacity-70 mt-0.5">
+              {student.sgpa ? student.sgpa.toFixed(2) : (student.cgpa ? student.cgpa.toFixed(2) : (student.percentage / 9.5).toFixed(2))} SGPA
+            </div>
             <div className="mt-1">{pendingStatusBadge}</div>
           </div>
 
@@ -322,16 +325,16 @@ export default function StudentCard({
             }`}
           >
             <div>
-              <p className="text-[9px] uppercase font-semibold opacity-50 tracking-wider">Total Marks</p>
+              <p className="text-[9px] uppercase font-semibold opacity-50 tracking-wider">Score & Credits</p>
               <p className="text-sm font-bold mt-0.5 font-mono tabular-nums">
                 {student.total_marks}
-                <span className="text-[10px] opacity-40 font-normal ml-0.5">
-                  /{student.max_marks || 100}
+                <span className="text-[10px] opacity-60 font-medium ml-1">
+                  • {student.credits_earned ?? (student.total_backlogs === 0 ? 20 : 15)} Cr
                 </span>
               </p>
             </div>
             <div>
-              <p className="text-[9px] uppercase font-semibold opacity-50 tracking-wider">Percentage</p>
+              <p className="text-[9px] uppercase font-semibold opacity-50 tracking-wider">Score & SGPA</p>
               <p
                 className={`text-sm font-black mt-0.5 font-mono tabular-nums ${
                   isTopper
@@ -342,6 +345,9 @@ export default function StudentCard({
                 }`}
               >
                 {student.percentage.toFixed(1)}%
+                <span className="text-[10px] opacity-75 font-bold ml-1">
+                  ({student.sgpa ? student.sgpa.toFixed(2) : (student.cgpa ? student.cgpa.toFixed(2) : (student.percentage / 9.5).toFixed(2))})
+                </span>
               </p>
             </div>
           </div>

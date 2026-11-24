@@ -655,75 +655,104 @@ export default function StudentDetailModal({
           ) : (
             <div className="space-y-4 sm:space-y-5 transition-all duration-500 ease-out opacity-100 translate-y-0">
               {/* Summary Metric Tiles */}
-              {/* Key Metrics Grid - Ultra-compact on mobile, spacious on desktop */}
-              <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 text-center">
+              {/* Key Metrics Grid - Credit-weighted VTU 2025 Scheme */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                {/* Score */}
                 <div
-                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
+                  className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-50 border-slate-100"
                     }`}
                 >
-                  <p className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-60 tracking-tight sm:tracking-normal truncate">
-                    Score
+                  <p className="text-[10px] uppercase font-semibold opacity-60 tracking-wider truncate">
+                    Total Score
                   </p>
-                  <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                     {student.total_marks}
-                    <span className="text-[9px] sm:text-[10px] font-normal opacity-50 ml-0.5">
+                    <span className="text-[10px] font-normal opacity-50 ml-0.5">
                       /{student.max_marks || 100}
                     </span>
                   </p>
                 </div>
 
+                {/* Percentage */}
                 <div
-                  className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
+                  className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
                       ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
                       : "bg-blue-50/60 border-blue-100 text-blue-700"
                     }`}
                 >
-                  <p className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate">
+                  <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     Percentage
                   </p>
-                  <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
                     {student.percentage.toFixed(1)}%
                   </p>
                 </div>
 
-                {/* Pending / Re-attempts Tile */}
-                {(() => {
-                  const isHidden = !isMyVerifiedProfile && student.show_my_backlogs === false;
-                  const hasBacklogs = student.total_backlogs > 0;
+                {/* SGPA / CGPA (Credit-Weighted) */}
+                <div
+                  className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
+                      ? "bg-emerald-950/20 border-emerald-800/40 text-emerald-300"
+                      : "bg-emerald-50/60 border-emerald-100 text-emerald-700"
+                    }`}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
+                      {student.cgpa && student.cgpa !== student.sgpa ? "CGPA / SGPA" : "SGPA"}
+                    </p>
+                    <span className="text-[9px] px-1 py-0.2 rounded bg-emerald-500/10 text-emerald-400 font-mono">
+                      VTU
+                    </span>
+                  </div>
+                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                    {student.sgpa ? student.sgpa.toFixed(2) : (student.cgpa ? student.cgpa.toFixed(2) : "—")}
+                    <span className="text-[10px] font-normal opacity-50 ml-0.5">/ 10</span>
+                  </p>
+                </div>
 
-                  return (
-                    <div
-                      className={`p-2 py-2 sm:p-3 rounded-xl border flex flex-col justify-center min-w-0 ${isHidden
-                          ? isObsidian
-                            ? "bg-slate-900/60 border-slate-800 text-slate-400"
-                            : "bg-slate-50 border-slate-200 text-slate-600"
-                          : hasBacklogs
-                            ? isObsidian
-                              ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
-                              : "bg-rose-50 border-rose-200 text-rose-700"
-                            : isObsidian
-                              ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
-                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
-                        }`}
-                    >
-                      <p
-                        className="text-[9px] sm:text-[10px] uppercase font-semibold opacity-80 tracking-tight sm:tracking-normal truncate"
-                        title="Re-attempts / Pending"
-                      >
-                        <span className="sm:hidden">Re-attempts</span>
-                        <span className="hidden sm:inline">Re-attempts / Pending</span>
-                      </p>
-                      <p className="text-xs sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
-                        {isHidden
-                          ? "Hidden"
-                          : hasBacklogs
-                            ? `${student.total_backlogs} Pending`
-                            : "All Clear"}
-                      </p>
-                    </div>
-                  );
-                })()}
+                {/* Earned Academic Credits */}
+                <div
+                  className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
+                      ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-300"
+                      : "bg-indigo-50/60 border-indigo-100 text-indigo-700"
+                    }`}
+                >
+                  <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
+                    Credits Earned
+                  </p>
+                  <p className="text-sm sm:text-base font-bold font-mono mt-0.5 tabular-nums truncate">
+                    {student.credits_earned ?? (student.total_backlogs === 0 ? 20 : 15)}
+                    <span className="text-[10px] font-normal opacity-50 ml-0.5">
+                      /{student.total_credits || 20} Cr
+                    </span>
+                  </p>
+                </div>
               </div>
+
+              {/* Backlog Alert Strip (Only visible if backlogs exist or status is hidden) */}
+              {(() => {
+                const isHidden = !isMyVerifiedProfile && student.show_my_backlogs === false;
+                const hasBacklogs = student.total_backlogs > 0;
+                if (!hasBacklogs && !isHidden) return null;
+
+                return (
+                  <div
+                    className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs font-medium ${
+                      isHidden
+                        ? isObsidian
+                          ? "bg-slate-900/60 border-slate-800 text-slate-400"
+                          : "bg-slate-50 border-slate-200 text-slate-600"
+                        : isObsidian
+                          ? "bg-rose-950/25 border-rose-800/50 text-rose-300"
+                          : "bg-rose-50 border-rose-200 text-rose-700"
+                    }`}
+                  >
+                    <span className="text-[11px] opacity-80">Academic Progression Status:</span>
+                    <span className="font-mono font-bold text-xs">
+                      {isHidden ? "Backlog Details Hidden" : `${student.total_backlogs} Pending Subject${student.total_backlogs > 1 ? "s" : ""} (Requires Clearing)`}
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Head-to-Head Comparison Banner */}
               <div
@@ -856,10 +885,13 @@ export default function StudentDetailModal({
 
               {/* Marks Breakdown Table */}
               <div>
-                <div className="mb-2">
+                <div className="mb-2 flex items-center justify-between">
                   <h3 className="font-bold text-xs uppercase tracking-wider opacity-70">
                     Subject Marks Breakdown ({student.marks?.length || 0})
                   </h3>
+                  <span className="text-[10px] font-mono opacity-60">
+                    VTU 2025 NEP Grading
+                  </span>
                 </div>
 
                 <div
@@ -873,11 +905,13 @@ export default function StudentDetailModal({
                           }`}
                       >
                         <th className="py-2 px-3 font-semibold">Code</th>
-                        <th className="py-2 px-2 font-semibold text-center">Sem</th>
+                        <th className="py-2 px-1.5 font-semibold text-center">Sem</th>
                         <th className="py-2 px-3 font-semibold">Subject</th>
+                        <th className="py-2 px-2 font-semibold text-center">Weight</th>
                         <th className="py-2 px-2 font-semibold text-center">Int</th>
                         <th className="py-2 px-2 font-semibold text-center">Ext</th>
                         <th className="py-2 px-2 font-semibold text-center">Total</th>
+                        <th className="py-2 px-2 font-semibold text-center">Grade</th>
                         <th className="py-2 px-3 font-semibold text-right">Result</th>
                       </tr>
                     </thead>
@@ -886,54 +920,121 @@ export default function StudentDetailModal({
                         }`}
                     >
                       {sortedMarks && sortedMarks.length > 0 ? (
-                        sortedMarks.map((m, i) => (
-                          <tr
-                            key={i}
-                            className={isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"}
-                          >
-                            <td className="py-2 px-3 font-mono font-semibold opacity-80">
-                              {m.subject_code}
-                            </td>
-                            <td className="py-2 px-2 text-center font-mono text-[10px] opacity-70">
-                              S{m.semester || "1"}
-                            </td>
-                            <td className="py-2 px-3 font-medium max-w-[180px] sm:max-w-[220px] truncate">
-                              {getSubjectName(m.subject_code, m.subject_name)}
-                            </td>
-                            <td className="py-2 px-2 text-center opacity-60 font-mono">
-                              {m.internal_marks}
-                            </td>
-                            <td className="py-2 px-2 text-center opacity-60 font-mono">
-                              {m.external_marks}
-                            </td>
-                            <td className="py-2 px-2 text-center font-bold font-mono">
-                              {m.total}
-                            </td>
-                            <td className="py-2 px-3 text-right">
-                              <span
-                                className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${m.status === "P"
-                                    ? isObsidian
-                                      ? "bg-emerald-950 text-emerald-400 border-emerald-800"
-                                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                    : isObsidian
-                                      ? "bg-rose-950 text-rose-400 border-rose-800"
-                                      : "bg-rose-50 text-rose-700 border-rose-200"
-                                  }`}
-                              >
-                                {m.status === "P" ? "PASS" : "F"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
+                        sortedMarks.map((m, i) => {
+                          const isNcmc = Boolean(
+                            m.is_ncmc ||
+                            m.subject_code.includes("ICO") ||
+                            m.subject_code.includes("CIP")
+                          );
+                          const credits = isNcmc ? 0 : (m.credits ?? (
+                            m.subject_code.includes("MAT") || m.subject_code.includes("PHY") || m.subject_code.includes("CHE") || m.subject_code.includes("PLC") ? 4 :
+                            m.subject_code.includes("CED") || m.subject_code.includes("AIA") || m.subject_code.includes("ESC") || m.subject_code.includes("EIT") ? 3 : 1
+                          ));
+                          const grade = m.grade || (
+                            isNcmc
+                              ? (m.status === "P" && m.total >= 40 ? "PP" : "NP")
+                              : m.status !== "P" || m.total < 40 ? "F"
+                              : m.total >= 90 ? "O"
+                              : m.total >= 80 ? "A+"
+                              : m.total >= 70 ? "A"
+                              : m.total >= 60 ? "B+"
+                              : m.total >= 55 ? "B"
+                              : m.total >= 50 ? "C" : "P"
+                          );
+
+                          return (
+                            <tr
+                              key={i}
+                              className={isObsidian ? "hover:bg-slate-900/40" : "hover:bg-slate-50/60"}
+                            >
+                              <td className="py-2 px-3 font-mono font-semibold opacity-80 whitespace-nowrap">
+                                {m.subject_code}
+                              </td>
+                              <td className="py-2 px-1.5 text-center font-mono text-[10px] opacity-70">
+                                S{m.semester || "1"}
+                              </td>
+                              <td className="py-2 px-3 font-medium max-w-[170px] sm:max-w-[210px] truncate" title={getSubjectName(m.subject_code, m.subject_name)}>
+                                {getSubjectName(m.subject_code, m.subject_name)}
+                              </td>
+                              <td className="py-2 px-2 text-center whitespace-nowrap">
+                                {isNcmc ? (
+                                  <span
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-mono font-medium bg-amber-500/15 text-amber-400 border border-amber-500/25"
+                                    title="Non-Credit Course: Required to pass (PP) but excluded from SGPA/CGPA"
+                                  >
+                                    NCMC (0)
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-[10px] font-semibold text-cyan-400">
+                                    {credits} Cr
+                                  </span>
+                                )}
+                              </td>
+                              <td className="py-2 px-2 text-center opacity-60 font-mono">
+                                {m.internal_marks}
+                              </td>
+                              <td className="py-2 px-2 text-center opacity-60 font-mono">
+                                {m.external_marks}
+                              </td>
+                              <td className="py-2 px-2 text-center font-bold font-mono">
+                                {m.total}
+                              </td>
+                              <td className="py-2 px-2 text-center font-mono font-bold text-xs">
+                                <span className={
+                                  grade === "O" ? "text-amber-400" :
+                                  grade === "A+" || grade === "A" ? "text-emerald-400" :
+                                  grade === "B+" || grade === "B" ? "text-cyan-400" :
+                                  grade === "C" || grade === "P" || grade === "PP" ? "text-indigo-400" :
+                                  "text-rose-400"
+                                }>
+                                  {grade}
+                                </span>
+                              </td>
+                              <td className="py-2 px-3 text-right whitespace-nowrap">
+                                <span
+                                  className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${m.status === "P"
+                                      ? isObsidian
+                                        ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                      : isObsidian
+                                        ? "bg-rose-950 text-rose-400 border-rose-800"
+                                        : "bg-rose-50 text-rose-700 border-rose-200"
+                                    }`}
+                                >
+                                  {m.status === "P" ? "PASS" : "F"}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })
                       ) : (
                         <tr>
-                          <td colSpan={7} className="py-6 text-center opacity-40 text-xs">
+                          <td colSpan={9} className="py-6 text-center opacity-40 text-xs">
                             No subject records available for this student.
                           </td>
                         </tr>
                       )}
                     </tbody>
                   </table>
+                </div>
+
+                {/* Educational Note on 2025 Scheme Credits & GPA */}
+                <div
+                  className={`mt-2.5 p-2.5 rounded-xl border text-[11px] flex items-start gap-2.5 ${
+                    isObsidian
+                      ? "bg-slate-900/40 border-slate-800 text-slate-400"
+                      : "bg-slate-50 border-slate-200 text-slate-600"
+                  }`}
+                >
+                  <span className="text-base select-none">📊</span>
+                  <div className="space-y-0.5">
+                    <p className="font-semibold text-slate-300 dark:text-slate-200 text-xs">
+                      VTU 2025 Scheme Credit Weighting
+                    </p>
+                    <p className="leading-relaxed">
+                      SGPA is computed as <code className="font-mono text-cyan-400">Σ(Credit × Grade Point) ÷ Σ(Credits)</code>. Courses with 4 credits (Maths, Physics/Chemistry) exert 4× the impact of 1-credit labs. Non-credit mandatory courses (<span className="font-mono text-amber-400">1BICO107 / 207</span>) require a passing grade (PP) but are completely excluded from SGPA and CGPA.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
