@@ -207,14 +207,14 @@ export default function StudentDetailModal({
 
   // Sorted marks: Grouped by Semester ascending (Sem 1, Sem 2, Sem 3...), then by subject code
   const sortedMarks = useMemo(() => {
-    if (!student.marks) return [];
+    if (!student?.marks) return [];
     return [...student.marks].sort((a, b) => {
       const semA = parseInt(String(a.semester || "1").replace(/\D/g, ""), 10) || 1;
       const semB = parseInt(String(b.semester || "1").replace(/\D/g, ""), 10) || 1;
       if (semA !== semB) return semA - semB;
       return a.subject_code.localeCompare(b.subject_code);
     });
-  }, [student.marks]);
+  }, [student?.marks]);
 
   // History popstate and hardware back button tracking
   const isClosingViaHistoryRef = useRef(false);
