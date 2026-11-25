@@ -929,31 +929,6 @@ export default function StudentDetailModal({
                 </div>
               </div>
 
-              {/* Backlog Alert Strip (Only visible if backlogs exist or status is hidden) */}
-              {(() => {
-                const isHidden = !isMyVerifiedProfile && student.show_my_backlogs === false;
-                const hasBacklogs = student.total_backlogs > 0;
-                if (!hasBacklogs && !isHidden) return null;
-
-                return (
-                  <div
-                    className={`px-3 py-2 rounded-xl border flex items-center justify-between text-xs font-medium ${
-                      isHidden
-                        ? isObsidian
-                          ? "bg-slate-900/60 border-slate-800 text-slate-400"
-                          : "bg-slate-50 border-slate-200 text-slate-600"
-                        : isObsidian
-                          ? "bg-rose-950/25 border-rose-800/50 text-rose-300"
-                          : "bg-rose-50 border-rose-200 text-rose-700"
-                    }`}
-                  >
-                    <span className="text-[11px] opacity-80">Academic Progression Status:</span>
-                    <span className="font-mono font-bold text-xs">
-                      {isHidden ? "Backlog Details Hidden" : `${student.total_backlogs} Pending Subject${student.total_backlogs > 1 ? "s" : ""} (Requires Clearing)`}
-                    </span>
-                  </div>
-                );
-              })()}
 
               {/* Head-to-Head Comparison Banner */}
               <div
