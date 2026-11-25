@@ -27,6 +27,7 @@ from ..database import SessionLocal
 from ..models import Student, Subject, Mark, RescrapeRequest
 from .parser import parse_vtu_html
 from ..services.job_manager import job_manager
+from ..services.subject_catalog import get_catalog_subject_name
 
 BRANCH_MAP = {
     "CS": "CSE",
@@ -411,7 +412,6 @@ class ScraperWorker:
 
             for m in parsed["marks"]:
                 code = m["subject_code"].strip().upper()
-                from ..services.subject_catalog import get_catalog_subject_name
                 resolved_name = get_catalog_subject_name(code, m.get("subject_name"))
                 subj = db.query(Subject).filter(Subject.code == code).first()
                 if not subj:
@@ -499,7 +499,7 @@ class ScraperWorker:
                 RescrapeRequest.status.in_(["pending", "in_progress"])
             ).all()
             for pr in pending_requests:
-                if pr.target_semester == semester or pr.target_semester in ("all", "both"):
+                if pr.request_type != "DATA_DELETION" and (pr.target_semester == semester or pr.target_semester in ("all", "both")):
                     pr.status = "resolved"
                     pr.resolved_at = datetime.utcnow()
                     pr.admin_notes = f"Automatically resolved via scraper run on semester {semester}."

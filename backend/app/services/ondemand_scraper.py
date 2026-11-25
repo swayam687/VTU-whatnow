@@ -206,12 +206,15 @@ class OnDemandScraperManager:
 
         # Periodic Chromium refresh: restart process every 100 sessions when idle to prevent RAM fragmentation
         if self._sessions_served >= 100 and len(self._sessions) == 0 and self._browser:
-            try:
-                await self._browser.close()
-            except Exception:
-                pass
-            self._browser = None
-            self._sessions_served = 0
+            async with self._browser_lock:
+                if self._sessions_served >= 100 and len(self._sessions) == 0 and self._browser:
+                    old_browser = self._browser
+                    self._browser = None
+                    self._sessions_served = 0
+                    try:
+                        await old_browser.close()
+                    except Exception:
+                        pass
 
     def get_next_scrape_target(self, db: Session) -> Optional[Tuple[ScrapeTarget, str]]:
         """

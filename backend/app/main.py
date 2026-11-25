@@ -1790,11 +1790,8 @@ async def start_student_record_update(
             is_self_scrape=True
         )
     else:
-        # action_type == "DELETE_REQUEST" or "ISSUE_REPORT"
-        if action_type == "DELETE_REQUEST":
-            heading = "Profile Deletion Request"
-        else:
-            heading = "Report Issue / Something Went Wrong"
+        # action_type == "DELETE_REQUEST"
+        heading = "Profile Deletion Request"
 
         # Check crowdsourced target queue in admin
         target_info = ondemand_scraper.get_next_scrape_target(db)
@@ -1926,27 +1923,6 @@ async def submit_student_record_update_captcha(
         return StudentUpdateSubmitResponse(
             ok=True,
             message="deletion request sent to the admin ur profile will be removed from the portal."
-        )
-
-    elif action_type == "ISSUE_REPORT":
-        issue_msg = (req.description or "Marksheet updated wrongly / Issue reported by student.").strip()
-        ticket = RescrapeRequest(
-            usn=current_usn,
-            name=student_name,
-            branch=student_branch,
-            request_type="CORRECTION",
-            target_semester="all",
-            message=sanitize_text(issue_msg, max_length=1000, allow_multiline=True),
-            status="pending",
-            created_at=datetime.utcnow(),
-            ip_address=client_ip,
-        )
-        db.add(ticket)
-        db.commit()
-
-        return StudentUpdateSubmitResponse(
-            ok=True,
-            message="Ticket created for admin to view and resolve your issue."
         )
 
     else:

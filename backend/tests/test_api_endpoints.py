@@ -4,9 +4,11 @@ Tests auth status, admin verification, faculty JWT authentication,
 and student listing privacy gates.
 """
 
+import asyncio
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch, AsyncMock
 
 # Add backend directory to sys.path
 backend_dir = Path(__file__).resolve().parent.parent
@@ -17,10 +19,19 @@ from fastapi import HTTPException, Response
 from starlette.requests import Request
 from app.config import settings
 from app.database import SessionLocal
-from app.models import Faculty, Student, FacultyComparisonLog
-from app.schemas import AdminVerifyRequest
-from app.main import get_auth_status, verify_admin, require_admin, get_students, get_admin_faculty_audits
-from app.auth import create_faculty_jwt, verify_faculty_jwt
+from app.models import Faculty, Student, FacultyComparisonLog, RescrapeRequest
+from app.schemas import AdminVerifyRequest, SessionCancelRequest, StudentUpdateSubmitRequest
+from app.main import (
+    get_auth_status,
+    verify_admin,
+    require_admin,
+    get_students,
+    get_admin_faculty_audits,
+    cancel_student_record_update,
+    submit_student_record_update_captcha,
+)
+from app.auth import create_faculty_jwt, verify_faculty_jwt, create_session
+from app.scraper.worker import scraper_worker
 
 
 def make_mock_request(path: str = "/", client_host: str = "127.0.0.1") -> Request:
@@ -202,6 +213,75 @@ class TestAPIEndpoints(unittest.TestCase):
         finally:
             self.db.delete(test_log)
             self.db.commit()
+
+    def test_cancel_student_record_update(self):
+        req = SessionCancelRequest(session_id="dummy_test_session_id")
+        res = asyncio.run(cancel_student_record_update(req))
+        self.assertTrue(res.get("ok"))
+        self.assertIn("cancelled", res.get("message", "").lower())
+
+    def test_submit_deletion_request_creates_ticket_and_preserves_on_scrape(self):
+        # 1. Setup a test student
+        test_usn = "TEST99DELETEME"
+        student = self.db.query(Student).filter(Student.usn == test_usn).first()
+        if not student:
+            student = Student(usn=test_usn, name="Delete Me Student", branch="CSE", password_hash="dummyhash", is_claimed=True)
+            self.db.add(student)
+            self.db.commit()
+        else:
+            student.password_hash = "dummyhash"
+            student.is_claimed = True
+            self.db.commit()
+
+        token = create_session(test_usn, student.password_hash)
+        req_obj = StudentUpdateSubmitRequest(
+            session_id="dummy_delete_sess",
+            captcha="ABCD",
+            action_type="DELETE_REQUEST",
+            description="Please remove my account"
+        )
+        mock_http_req = make_mock_request(path="/api/student/update-record/submit")
+
+        # 2. Mock captcha verification success
+        with patch("app.main.ondemand_scraper.submit_update_captcha", new_callable=AsyncMock) as mock_submit:
+            mock_submit.return_value = {"ok": True, "message": "Captcha solved"}
+            res = asyncio.run(submit_student_record_update_captcha(
+                req=req_obj,
+                request=mock_http_req,
+                x_student_token=token,
+                db=self.db
+            ))
+
+        self.assertTrue(res.ok)
+        self.assertIn("deletion request sent", res.message)
+
+        # 3. Verify DATA_DELETION ticket was created
+        ticket = self.db.query(RescrapeRequest).filter(
+            RescrapeRequest.usn == test_usn,
+            RescrapeRequest.request_type == "DATA_DELETION"
+        ).first()
+        self.assertIsNotNone(ticket)
+        self.assertEqual(ticket.status, "pending")
+
+        # 4. Simulate subsequent scraper run on this USN - MUST NOT resolve the deletion ticket!
+        dummy_parsed = {
+            "student": {"usn": test_usn, "name": "Delete Me Student"},
+            "marks": [],
+            "total_marks": 0,
+            "max_marks": 0,
+            "percentage": 0.0,
+            "total_backlogs": 0
+        }
+        scraper_worker._save_result(dummy_parsed, semester="1")
+
+        # Refresh ticket from DB
+        self.db.refresh(ticket)
+        self.assertEqual(ticket.status, "pending", "Scraper must NOT automatically resolve DATA_DELETION tickets")
+
+        # Cleanup
+        self.db.delete(ticket)
+        self.db.delete(student)
+        self.db.commit()
 
 
 if __name__ == "__main__":
