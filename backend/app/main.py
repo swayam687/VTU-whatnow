@@ -429,6 +429,20 @@ def init_db():
         except Exception as fac_err:
             print(f"⚠️ faculty seed notice: {fac_err}")
 
+        # Ensure performance indices for leaderboard, sorting, and privacy filters
+        indices_to_ensure = [
+            ("idx_students_percentage", "CREATE INDEX IF NOT EXISTS idx_students_percentage ON students (percentage);"),
+            ("idx_students_cgpa", "CREATE INDEX IF NOT EXISTS idx_students_cgpa ON students (cgpa);"),
+            ("idx_students_backlogs", "CREATE INDEX IF NOT EXISTS idx_students_backlogs ON students (total_backlogs);"),
+            ("idx_students_hidden", "CREATE INDEX IF NOT EXISTS idx_students_hidden ON students (is_hidden);"),
+        ]
+        for idx_name, idx_stmt in indices_to_ensure:
+            try:
+                with engine.begin() as conn:
+                    conn.execute(text(idx_stmt))
+            except Exception:
+                pass
+
         print("✅ Database schema initialized and verified.")
     except Exception as e:
         print(f"⚠️ Notice: DB connection check ({e}). Web service remains live.")
@@ -443,6 +457,10 @@ async def lifespan(app: FastAPI):
         await ondemand_scraper.shutdown()
     except Exception as e:
         print(f"⚠️ Notice during ondemand_scraper shutdown: {e}")
+    try:
+        engine.dispose()
+    except Exception:
+        pass
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 
@@ -1833,6 +1851,13 @@ async def refresh_student_record_update_captcha(req: StudentUpdateRefreshRequest
         captcha_base64=res.get("captcha_base64"),
         message="New verification code loaded."
     )
+
+
+@app.post("/api/student/update-record/cancel")
+async def cancel_student_record_update(req: SessionCancelRequest):
+    if req.session_id:
+        await ondemand_scraper.cancel_session(req.session_id)
+    return {"ok": True, "message": "Verification session cancelled."}
 
 
 @app.post("/api/student/update-record/submit", response_model=StudentUpdateSubmitResponse)

@@ -14,9 +14,9 @@ class Student(Base):
     batch = Column(Integer, index=True, nullable=True)
     total_marks = Column(Integer, default=0)
     max_marks = Column(Integer, default=0)
-    percentage = Column(Float, default=0.0)
-    cgpa = Column(Float, default=0.0)
-    total_backlogs = Column(Integer, default=0)
+    percentage = Column(Float, default=0.0, index=True)
+    cgpa = Column(Float, default=0.0, index=True)
+    total_backlogs = Column(Integer, default=0, index=True)
     github_url = Column(String, nullable=True, default="")
     linkedin_url = Column(String, nullable=True, default="")
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -34,7 +34,7 @@ class Student(Base):
     show_my_marks = Column(Boolean, default=True)
     show_my_backlogs = Column(Boolean, default=True)  # default on
     allow_comparison = Column(Boolean, default=True)
-    is_hidden = Column(Boolean, default=False)  # Soft hide for data deletion requests / admin control
+    is_hidden = Column(Boolean, default=False, index=True)  # Soft hide for data deletion requests / admin control
     hidden = synonym("is_hidden")
 
     marks = relationship("Mark", back_populates="student", cascade="all, delete-orphan", lazy="selectin", order_by="[Mark.semester, Mark.subject_code]")

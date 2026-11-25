@@ -1848,6 +1848,20 @@ export async function refreshStudentUpdateCaptcha(
   return await res.json();
 }
 
+export async function cancelStudentUpdateSession(sessionId: string): Promise<void> {
+  if (!sessionId) return;
+  const baseUrl = getApiBase();
+  try {
+    await fetch(`${baseUrl}/api/student/update-record/cancel`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+  } catch {
+    // ignore
+  }
+}
+
 export async function submitStudentUpdateCaptcha(
   sessionId: string,
   captcha: string,

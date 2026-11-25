@@ -119,6 +119,7 @@ class OnDemandScraperManager:
         self._browser: Optional[Browser] = None
         self._semaphore: Optional[asyncio.Semaphore] = None
         self._browser_lock: Optional[asyncio.Lock] = None
+        self._sessions_served: int = 0
 
     async def _ensure_browser(self) -> Browser:
         """
@@ -185,12 +186,12 @@ class OnDemandScraperManager:
             return self._browser
 
     async def _cleanup_expired(self):
-        """Purge sessions older than 5 minutes to avoid browser context and semaphore leaks."""
+        """Purge sessions older than 2 minutes to avoid browser context and semaphore leaks."""
         now = time.time()
         with self._lock:
             expired_ids = [
                 sid for sid, s in self._sessions.items()
-                if now - s.created_at > 300
+                if now - s.created_at > 120
             ]
             expired_sessions = [self._sessions.pop(sid) for sid in expired_ids if sid in self._sessions]
             for s in expired_sessions:
@@ -201,6 +202,16 @@ class OnDemandScraperManager:
                 await session.close()
             except Exception:
                 pass
+            self._sessions_served += 1
+
+        # Periodic Chromium refresh: restart process every 100 sessions when idle to prevent RAM fragmentation
+        if self._sessions_served >= 100 and len(self._sessions) == 0 and self._browser:
+            try:
+                await self._browser.close()
+            except Exception:
+                pass
+            self._browser = None
+            self._sessions_served = 0
 
     def get_next_scrape_target(self, db: Session) -> Optional[Tuple[ScrapeTarget, str]]:
         """
@@ -1065,6 +1076,7 @@ class OnDemandScraperManager:
 
         if session:
             await session.close()
+            self._sessions_served += 1
 
         return {"ok": True, "message": "Verification session cancelled."}
 

@@ -9,6 +9,7 @@ import {
   startStudentUpdate,
   refreshStudentUpdateCaptcha,
   submitStudentUpdateCaptcha,
+  cancelStudentUpdateSession,
 } from "../lib/api";
 import { IconClose, IconRotateCcw, IconShield, IconCheck, IconLock } from "./Icons";
 import { sfx } from "../lib/sfx";
@@ -65,6 +66,22 @@ export default function RescrapeRequestModal({
   }, [cooldownSeconds]);
 
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleModalClose = () => {
+    if (sessionId) {
+      cancelStudentUpdateSession(sessionId);
+    }
+    sfx.playMechanicalClick();
+    onClose();
+  };
+
+  useEffect(() => {
+    return () => {
+      if (sessionId) {
+        cancelStudentUpdateSession(sessionId);
+      }
+    };
+  }, [sessionId]);
 
   // Load available portals from backend whenever modal opens
   useEffect(() => {
@@ -228,7 +245,7 @@ export default function RescrapeRequestModal({
 
   return (
     <div
-      onClick={step === "VERIFYING" ? undefined : onClose}
+      onClick={step === "VERIFYING" ? undefined : handleModalClose}
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-150"
     >
       <div
@@ -283,10 +300,7 @@ export default function RescrapeRequestModal({
 
           {step !== "VERIFYING" && (
             <button
-              onClick={() => {
-                sfx.playMechanicalClick();
-                onClose();
-              }}
+              onClick={handleModalClose}
               className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors cursor-pointer"
             >
               <IconClose className="w-4 h-4" />

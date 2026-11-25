@@ -521,20 +521,20 @@ export default function StudentDetailModal({
     <div
       ref={backdropRef}
       onClick={handleModalClose}
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm overflow-y-auto transition-opacity duration-300"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/75 backdrop-blur-sm overflow-y-auto transition-opacity duration-300 print:bg-white print:p-0 print:static print:overflow-visible print:z-auto"
       style={{ opacity: 0 }}
     >
       <div
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
-        className={`rounded-2xl sm:rounded-3xl border shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-auto will-change-transform ${isObsidian
+        className={`rounded-2xl sm:rounded-3xl border shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-auto will-change-transform print:max-w-none print:max-h-none print:shadow-none print:border-none print:my-0 print:bg-white print:text-black ${isObsidian
             ? "bg-[#0b0d11] border-slate-800 text-white"
             : "bg-white border-slate-200 text-slate-900"
           }`}
       >
         {/* Mobile Swipe-Down Handle & Touch Drag Bar */}
         <div
-          className="sm:hidden pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
+          className="print:hidden sm:hidden pt-2.5 pb-1 flex justify-center cursor-grab active:cursor-grabbing touch-none select-none shrink-0"
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
@@ -666,9 +666,27 @@ export default function StudentDetailModal({
               type="button"
               onClick={() => {
                 sfx.playMechanicalClick();
+                window.print();
+              }}
+              title="Print Marksheet / Save PDF"
+              className={`print:hidden p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all cursor-pointer ${
+                isObsidian
+                  ? "bg-slate-900 text-slate-300 border-slate-800 hover:bg-slate-800"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
+              <span className="hidden sm:inline text-[11px]">Print</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                sfx.playMechanicalClick();
                 onToggleCompare(usn);
               }}
-              className={`p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all ${compareUsns.includes(usn)
+              className={`print:hidden p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all ${compareUsns.includes(usn)
                   ? "bg-blue-600 text-white border-blue-600 font-bold"
                   : isObsidian
                     ? "bg-slate-900 text-slate-300 border-slate-800"
@@ -682,7 +700,7 @@ export default function StudentDetailModal({
             </button>
             <button
               onClick={handleModalClose}
-              className="p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl transition-colors cursor-pointer"
+              className="print:hidden p-1.5 sm:p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white rounded-xl transition-colors cursor-pointer"
             >
               <IconClose className="w-4 h-4" />
             </button>
@@ -932,7 +950,7 @@ export default function StudentDetailModal({
 
               {/* Head-to-Head Comparison Banner */}
               <div
-                className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${isObsidian ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200/80"
+                className={`print:hidden p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${isObsidian ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200/80"
                   }`}
               >
                 <div className="text-left w-full sm:w-auto">
@@ -997,7 +1015,7 @@ export default function StudentDetailModal({
               {/* Account Holder Marksheet Update Request Banner */}
               {isMyVerifiedProfile && (
                 <div
-                  className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isObsidian
+                  className={`print:hidden p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isObsidian
                       ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-200"
                       : "bg-blue-50/70 border-blue-200 text-blue-900"
                     }`}
@@ -1219,7 +1237,7 @@ export default function StudentDetailModal({
 
         {/* Modal Bottom Thumb-Friendly Navigation Bar */}
         <div
-          className={`px-3 sm:px-6 py-2.5 sm:py-3 border-t flex items-center justify-between gap-2 shrink-0 ${isObsidian ? "border-slate-800/90 bg-[#08090b]/95" : "border-slate-200/90 bg-white/95"
+          className={`print:hidden px-3 sm:px-6 py-2.5 sm:py-3 border-t flex items-center justify-between gap-2 shrink-0 ${isObsidian ? "border-slate-800/90 bg-[#08090b]/95" : "border-slate-200/90 bg-white/95"
             } backdrop-blur-md`}
         >
           {/* Previous Student Button */}
