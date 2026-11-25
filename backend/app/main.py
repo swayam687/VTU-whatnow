@@ -198,6 +198,18 @@ def init_db():
             if "faculty" in existing_tables:
                 fac_cols = {c["name"] for c in insp.get_columns("faculty")}
                 if "username" not in fac_cols:
+                    pass
+
+            if "faculty_comparison_logs" in existing_tables:
+                fcomp_cols = {c["name"] for c in insp.get_columns("faculty_comparison_logs")}
+                for col in ["name_a", "name_b"]:
+                    if col not in fcomp_cols:
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(text(f"ALTER TABLE faculty_comparison_logs ADD COLUMN {col} VARCHAR DEFAULT '';"))
+                            print(f"✅ Added column '{col}' to faculty_comparison_logs table.")
+                        except Exception as col_err:
+                            print(f"⚠️ Could not add column '{col}' to faculty_comparison_logs: {col_err}")
                     try:
                         with engine.begin() as conn:
                             conn.execute(text("ALTER TABLE faculty ADD COLUMN username VARCHAR;"))
@@ -560,10 +572,19 @@ async def login_or_register(req: AuthLoginRequest, request: Request, db: Session
             is_self_scrape=True,
         )
 
+        if res.get("server_busy"):
+            return LoginGateChallengeResponse(
+                ok=False,
+                require_captcha=False,
+                server_busy=True,
+                retry_after=res.get("retry_after", 60),
+                message=res.get("message") or "Service is under load. Server is currently serving 5 users. Please wait 1 minute.",
+            )
+
         if not res or not res.get("ok"):
             raise HTTPException(
                 status_code=503,
-                detail="VTU examination servers are currently busy or slow. Please try again."
+                detail=res.get("message") or "VTU examination servers are currently busy or slow. Please try again."
             )
 
         return LoginGateChallengeResponse(
@@ -898,6 +919,14 @@ async def start_on_demand_registration(req: OnDemandStartRequest, db: Session = 
 
     semester = req.semester or "1"
     res = await ondemand_scraper.start_session(clean_usn, semester=semester, target_url=target_url)
+    if res.get("server_busy"):
+        return OnDemandStartResponse(
+            ok=False,
+            server_busy=True,
+            retry_after=res.get("retry_after", 60),
+            usn=clean_usn,
+            message=res.get("message") or "Service is under load. Server is currently serving 5 users. Please wait 1 minute.",
+        )
     if not res.get("ok"):
         raise HTTPException(status_code=502, detail=res.get("message", "Failed to connect to VTU portal."))
 
@@ -1734,6 +1763,14 @@ async def start_student_record_update(
         target_url=target_url,
         is_self_scrape=True
     )
+    if res.get("server_busy"):
+        return StudentUpdateStartResponse(
+            ok=False,
+            server_busy=True,
+            retry_after=res.get("retry_after", 60),
+            heading=link.title,
+            message=res.get("message") or "Service is under load. Server is currently serving 5 users. Please wait 1 minute.",
+        )
     if not res.get("ok"):
         raise HTTPException(status_code=502, detail=res.get("message", "Unable to connect to verification portal. Please try again."))
 
@@ -2144,7 +2181,9 @@ def compare_students(
         comp_log = FacultyComparisonLog(
             faculty_username=faculty.username,
             usn_a=clean_a,
+            name_a=st1.name or "",
             usn_b=clean_b,
+            name_b=st2.name or "",
             timestamp=datetime.utcnow()
         )
         db.add(comp_log)
@@ -3381,6 +3420,19 @@ def get_admin_faculty_audits(db: Session = Depends(get_db)):
     logins = db.query(FacultyLoginLog).order_by(FacultyLoginLog.timestamp.desc()).limit(150).all()
     comparisons = db.query(FacultyComparisonLog).order_by(FacultyComparisonLog.timestamp.desc()).limit(150).all()
 
+    # Pre-fetch student names for any USNs
+    all_usns = set()
+    for c in comparisons:
+        if c.usn_a:
+            all_usns.add(c.usn_a.strip().upper())
+        if c.usn_b:
+            all_usns.add(c.usn_b.strip().upper())
+
+    student_names = {}
+    if all_usns:
+        st_rows = db.query(Student.usn, Student.name).filter(Student.usn.in_(all_usns)).all()
+        student_names = {r.usn.strip().upper(): (r.name or "").strip() for r in st_rows}
+
     return FacultyAuditsResponse(
         login_logs=[
             FacultyLoginLogItem(
@@ -3396,7 +3448,9 @@ def get_admin_faculty_audits(db: Session = Depends(get_db)):
                 id=c.id,
                 faculty_username=c.faculty_username,
                 usn_a=c.usn_a,
+                name_a=(getattr(c, "name_a", None) or student_names.get(c.usn_a.strip().upper(), "")),
                 usn_b=c.usn_b,
+                name_b=(getattr(c, "name_b", None) or student_names.get(c.usn_b.strip().upper(), "")),
                 timestamp=to_utc_iso(c.timestamp) or "",
             )
             for c in comparisons

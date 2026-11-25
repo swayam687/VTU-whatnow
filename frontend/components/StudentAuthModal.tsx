@@ -38,6 +38,13 @@ function cleanErrorMessage(rawMsg: string): string {
   if (!rawMsg) return "Please try again.";
   const lower = rawMsg.toLowerCase();
   if (
+    lower.includes("under load") ||
+    lower.includes("serving 5") ||
+    lower.includes("wait 1 minute")
+  ) {
+    return "Service is under load. Server is currently serving 5 users. Please wait 1 minute.";
+  }
+  if (
     lower.includes("failed to fetch") ||
     lower.includes("networkerror") ||
     lower.includes("load failed") ||
@@ -242,6 +249,16 @@ export default function StudentAuthModal({
   const [gateMessage, setGateMessage] = useState("Please solve this captcha to verify your session and update campus records.");
   const [failCount, setFailCount] = useState(0);
   const [bypassedToast, setBypassedToast] = useState<string | null>(null);
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  // 1-minute server underload queue timer
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
   const [extractedStudent, setExtractedStudent] = useState<{
     name: string;
     branch: string;
@@ -391,12 +408,36 @@ export default function StudentAuthModal({
     setElapsedSeconds(0);
     sfx.playMechanicalClick();
 
-    let res: { ok?: boolean; session_id?: string; captcha_base64?: string; message?: string } | null = null;
+    let res: {
+      ok?: boolean;
+      session_id?: string;
+      captcha_base64?: string;
+      message?: string;
+      server_busy?: boolean;
+      retry_after?: number;
+    } | null = null;
     try {
       res = await startOnDemandRegistration(cleanUsn);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Connecting to VTU...";
-      setError(cleanErrorMessage(msg));
+      if (
+        msg.toLowerCase().includes("under load") ||
+        msg.toLowerCase().includes("serving 5") ||
+        msg.toLowerCase().includes("wait 1 minute")
+      ) {
+        setCooldownSeconds(60);
+        setError("Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
+      } else {
+        setError(cleanErrorMessage(msg));
+      }
+      setOnDemandState("idle");
+      setLoading(false);
+      return;
+    }
+
+    if (res && res.server_busy) {
+      setCooldownSeconds(res.retry_after || 60);
+      setError("Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
       setOnDemandState("idle");
       setLoading(false);
       return;
@@ -631,13 +672,33 @@ export default function StudentAuthModal({
       session_id?: string;
       captcha_base64?: string;
       message?: string;
+      server_busy?: boolean;
+      retry_after?: number;
     } | null = null;
 
     try {
       challenge = await loginOrRegisterStudent(cleanUsn, cleanPassword);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Establishing session with VTU servers...";
-      setError(cleanErrorMessage(msg));
+      if (
+        msg.toLowerCase().includes("under load") ||
+        msg.toLowerCase().includes("serving 5") ||
+        msg.toLowerCase().includes("wait 1 minute")
+      ) {
+        setCooldownSeconds(60);
+        setError("Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
+      } else {
+        setError(cleanErrorMessage(msg));
+      }
+      setOnDemandState("idle");
+      setLoading(false);
+      sfx.playMechanicalClick();
+      return;
+    }
+
+    if (challenge && challenge.server_busy) {
+      setCooldownSeconds(challenge.retry_after || 60);
+      setError(challenge.message || "Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
       setOnDemandState("idle");
       setLoading(false);
       sfx.playMechanicalClick();
@@ -998,6 +1059,24 @@ export default function StudentAuthModal({
               <p className="flex items-start gap-1.5 font-medium">
                 <span className="shrink-0 mt-0.5">⚠️</span>
                 <span>{bypassedToast}</span>
+              </p>
+            </div>
+          )}
+
+          {/* Cooldown / High Load Timer Banner */}
+          {cooldownSeconds > 0 && (
+            <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs sm:text-sm leading-relaxed space-y-1.5 animate-in fade-in">
+              <div className="flex items-center justify-between font-medium">
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                  <span className="font-semibold text-amber-200">Service Under High Load</span>
+                </span>
+                <span className="font-mono text-xs px-2.5 py-0.5 rounded-md bg-amber-500/20 text-amber-100 border border-amber-500/30 font-semibold tabular-nums">
+                  0:{String(cooldownSeconds).padStart(2, "0")}
+                </span>
+              </div>
+              <p className="text-zinc-300 text-xs leading-normal">
+                Server is currently serving 5 active users. Please wait 1 minute before requesting a new verification session.
               </p>
             </div>
           )}
@@ -1659,10 +1738,12 @@ export default function StudentAuthModal({
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={loading || !agreedToPrivacy || !usn.trim() || password.length < 4}
+                disabled={loading || cooldownSeconds > 0 || !agreedToPrivacy || !usn.trim() || password.length < 4}
                 className="w-full py-3 px-4 rounded-xl text-sm font-semibold tracking-wide bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.99] transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer flex items-center justify-center gap-2"
               >
-                {loading ? (
+                {cooldownSeconds > 0 ? (
+                  <span>Please wait ({cooldownSeconds}s)</span>
+                ) : loading ? (
                   <>
                     <div className="w-3.5 h-3.5 rounded-full border-2 border-slate-400 border-t-white dark:border-slate-600 dark:border-t-slate-950 animate-spin" />
                     <span>Signing in...</span>

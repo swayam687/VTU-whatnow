@@ -4053,12 +4053,26 @@ export default function AdminPanel() {
                         </span>
                         <span className="text-slate-400 text-[11px]">compared</span>
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-200/60 dark:border-cyan-800/40">
-                            {log.usn_a}
+                          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-200/60 dark:border-cyan-800/40">
+                            {log.name_a ? (
+                              <>
+                                <span className="font-sans font-bold text-slate-800 dark:text-slate-100">{log.name_a}</span>
+                                <span className="opacity-60 text-[10px]">({log.usn_a})</span>
+                              </>
+                            ) : (
+                              <span className="font-bold">{log.usn_a}</span>
+                            )}
                           </span>
                           <span className="text-slate-400 text-[10px] font-bold">vs</span>
-                          <span className="font-mono font-bold text-[11px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-200/60 dark:border-cyan-800/40">
-                            {log.usn_b}
+                          <span className="inline-flex items-center gap-1 font-mono text-[11px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/30 px-2 py-0.5 rounded border border-cyan-200/60 dark:border-cyan-800/40">
+                            {log.name_b ? (
+                              <>
+                                <span className="font-sans font-bold text-slate-800 dark:text-slate-100">{log.name_b}</span>
+                                <span className="opacity-60 text-[10px]">({log.usn_b})</span>
+                              </>
+                            ) : (
+                              <span className="font-bold">{log.usn_b}</span>
+                            )}
                           </span>
                         </div>
                       </div>

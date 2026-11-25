@@ -50,6 +50,16 @@ export default function RescrapeRequestModal({
   const [selectedHeading, setSelectedHeading] = useState<string>("");
   const [isRefreshingCaptcha, setIsRefreshingCaptcha] = useState<boolean>(false);
   const [errorMsg, setErrorMsg] = useState<string>("");
+  const [cooldownSeconds, setCooldownSeconds] = useState<number>(0);
+
+  // 1-minute server underload queue timer
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => {
+      setCooldownSeconds((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds]);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -111,6 +121,12 @@ export default function RescrapeRequestModal({
 
     try {
       const res = await startStudentUpdate(selectedPortalId, studentSession?.token);
+      if (res.server_busy) {
+        setCooldownSeconds(res.retry_after || 60);
+        setErrorMsg(res.message || "Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
+        setStep("SELECT");
+        return;
+      }
       if (res.ok && res.session_id && res.captcha_base64) {
         setSessionId(res.session_id);
         setCaptchaBase64(res.captcha_base64);
@@ -123,7 +139,16 @@ export default function RescrapeRequestModal({
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unable to reach verification portal.";
-      setErrorMsg(msg);
+      if (
+        msg.toLowerCase().includes("under load") ||
+        msg.toLowerCase().includes("serving 5") ||
+        msg.toLowerCase().includes("wait 1 minute")
+      ) {
+        setCooldownSeconds(60);
+        setErrorMsg("Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
+      } else {
+        setErrorMsg(msg);
+      }
       setStep("SELECT");
     }
   };
@@ -356,6 +381,29 @@ export default function RescrapeRequestModal({
                 )}
               </div>
 
+              {cooldownSeconds > 0 && (
+                <div
+                  className={`p-3 rounded-xl border text-xs space-y-1.5 animate-in fade-in ${
+                    isObsidian
+                      ? "bg-amber-950/30 border-amber-800/40 text-amber-200"
+                      : "bg-amber-50 border-amber-200 text-amber-800"
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      <span className="font-semibold">Service Under Load</span>
+                    </span>
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-amber-500/20 font-semibold tabular-nums">
+                      0:{String(cooldownSeconds).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <p className="opacity-80">
+                    Server is currently serving 5 active users. Please wait 1 minute.
+                  </p>
+                </div>
+              )}
+
               {errorMsg && (
                 <div
                   className={`p-3 rounded-xl border text-xs ${
@@ -371,12 +419,16 @@ export default function RescrapeRequestModal({
               <div className="pt-2">
                 <button
                   type="button"
-                  disabled={loadingPortals || !selectedPortalId}
+                  disabled={loadingPortals || !selectedPortalId || cooldownSeconds > 0}
                   onClick={handleStartUpdate}
                   className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
                 >
                   <IconLock className="w-3.5 h-3.5" />
-                  <span>Verify to create ticket</span>
+                  <span>
+                    {cooldownSeconds > 0
+                      ? `Please wait (${cooldownSeconds}s)`
+                      : "Verify to create ticket"}
+                  </span>
                 </button>
               </div>
             </div>
@@ -468,6 +520,29 @@ export default function RescrapeRequestModal({
                   }`}
                 />
               </div>
+
+              {cooldownSeconds > 0 && (
+                <div
+                  className={`p-3 rounded-xl border text-xs space-y-1.5 animate-in fade-in ${
+                    isObsidian
+                      ? "bg-amber-950/30 border-amber-800/40 text-amber-200"
+                      : "bg-amber-50 border-amber-200 text-amber-800"
+                  }`}
+                >
+                  <div className="flex items-center justify-between font-medium">
+                    <span className="flex items-center gap-1.5">
+                      <span className="inline-block w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+                      <span className="font-semibold">Service Under Load</span>
+                    </span>
+                    <span className="font-mono text-xs px-2 py-0.5 rounded bg-amber-500/20 font-semibold tabular-nums">
+                      0:{String(cooldownSeconds).padStart(2, "0")}
+                    </span>
+                  </div>
+                  <p className="opacity-80">
+                    Server is currently serving 5 active users. Please wait 1 minute.
+                  </p>
+                </div>
+              )}
 
               {errorMsg && (
                 <div

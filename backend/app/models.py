@@ -242,7 +242,9 @@ class FacultyComparisonLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     faculty_username = Column(String, index=True, nullable=False)
     usn_a = Column(String, index=True, nullable=False)
+    name_a = Column(String, default="")
     usn_b = Column(String, index=True, nullable=False)
+    name_b = Column(String, default="")
     timestamp = Column(DateTime, default=datetime.utcnow)
 
 

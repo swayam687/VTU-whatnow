@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo, useRef } from "react";
 import Link from "next/link";
 import {
+  fetchStudent,
   fetchFacultyAnalytics,
   fetchStudents,
   downloadFacultyCsv,
@@ -17,7 +18,26 @@ import {
 import { sfx } from "../../lib/sfx";
 import { getSubjectName } from "../../lib/subjects";
 import Identicon from "../../components/Identicon";
-import { IconSearch } from "../../components/Icons";
+import StudentCard from "../../components/StudentCard";
+import DenseStudentTable from "../../components/DenseStudentTable";
+import StudentDetailModal, { OriginRect } from "../../components/StudentDetailModal";
+import BranchTabs from "../../components/BranchTabs";
+import FadeContent from "../../components/FadeContent";
+import DecryptedText from "../../components/DecryptedText";
+import {
+  IconSearch,
+  IconClose,
+  IconGrid,
+  IconTable,
+  IconCompare,
+  IconShield,
+  IconBolt,
+} from "../../components/Icons";
+import {
+  cacheStudent,
+  getCachedStudent,
+  getCacheAgeString,
+} from "../../lib/cache";
 
 const BRANCH_LIST = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
 
@@ -49,6 +69,14 @@ export default function FacultyPortalPage() {
   const [compareError, setCompareError] = useState<string | null>(null);
   const compareTableRef = useRef<HTMLDivElement>(null);
 
+  // Student Detail Modal state
+  const [selectedUsn, setSelectedUsn] = useState<string | null>(null);
+  const [detailStudent, setDetailStudent] = useState<Student | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [modalOriginRect, setModalOriginRect] = useState<OriginRect | null>(null);
+  const [isDetailCached, setIsDetailCached] = useState(false);
+  const [cachedAge, setCachedAge] = useState("");
+
   useEffect(() => {
     // Check dark mode
     if (typeof window !== "undefined") {
@@ -75,7 +103,7 @@ export default function FacultyPortalPage() {
       })
       .finally(() => setLoading(false));
 
-    // 2. Fetch ALL students (including hidden/deleted records) with faculty token
+    // 2. Fetch ALL students (including hidden profiles) with faculty token
     setStudentsLoading(true);
     fetchStudents({ facultyToken: current.token })
       .then((data) => setStudents(data))
@@ -203,6 +231,88 @@ export default function FacultyPortalPage() {
 
     return result;
   }, [students, activeBranch, search, sortBy]);
+
+  // Modal navigation
+  const currentIndex = useMemo(() => {
+    if (!selectedUsn) return -1;
+    return filteredStudents.findIndex((s) => s.usn.toUpperCase() === selectedUsn.toUpperCase());
+  }, [selectedUsn, filteredStudents]);
+
+  const prevUsn = currentIndex > 0 ? filteredStudents[currentIndex - 1]?.usn : null;
+  const nextUsn =
+    currentIndex >= 0 && currentIndex < filteredStudents.length - 1
+      ? filteredStudents[currentIndex + 1]?.usn
+      : null;
+
+  // Open detail modal and fetch full unredacted marks
+  const handleOpenDetail = async (usn: string, e?: React.MouseEvent) => {
+    if (e && e.currentTarget) {
+      const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+      setModalOriginRect({
+        left: rect.left,
+        top: rect.top,
+        width: rect.width,
+        height: rect.height,
+      });
+    } else {
+      setModalOriginRect(null);
+    }
+
+    setSelectedUsn(usn);
+
+    // 1. 0ms local cache check
+    const cached = getCachedStudent(usn);
+    if (cached) {
+      setDetailStudent(cached.student);
+      setIsDetailCached(true);
+      setCachedAge(getCacheAgeString(cached.timestamp));
+      setDetailLoading(false);
+    } else {
+      setDetailLoading(true);
+      setIsDetailCached(false);
+      setCachedAge("");
+    }
+
+    // 2. Fresh network fetch using faculty token so hidden profiles are unredacted
+    try {
+      const freshData = await fetchStudent(usn, undefined, session?.token);
+      setDetailStudent(freshData);
+      cacheStudent(freshData);
+      setIsDetailCached(false);
+    } catch (err) {
+      console.warn("Could not fetch fresh student detail for faculty:", err);
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCloseDetail = () => {
+    setSelectedUsn(null);
+    setDetailStudent(null);
+    setIsDetailCached(false);
+    setCachedAge("");
+    setModalOriginRect(null);
+  };
+
+  // Branch statistics for department tabs
+  const branchStats = useMemo(() => {
+    const stats: Record<string, any> = {};
+    BRANCH_LIST.forEach((b) => {
+      const bStudents =
+        b === "ALL" ? students : students.filter((s) => s.branch?.toUpperCase() === b);
+      const total = bStudents.length;
+      const avg = total > 0 ? bStudents.reduce((acc, s) => acc + s.percentage, 0) / total : 0;
+      stats[b] = {
+        branch: b,
+        total_students: total,
+        avg_percentage: avg,
+        highest_percentage: total > 0 ? Math.max(...bStudents.map((s) => s.percentage)) : 0,
+        lowest_percentage: total > 0 ? Math.min(...bStudents.map((s) => s.percentage)) : 0,
+        total_backlogs: bStudents.reduce((acc, s) => acc + (s.total_backlogs || 0), 0),
+      };
+    });
+    return stats;
+  }, [students]);
 
   // Branch student counts for tabs
   const branchCounts = useMemo(() => {
@@ -805,7 +915,7 @@ export default function FacultyPortalPage() {
                 Search Students &amp; Compare Marksheets
               </h3>
               <p className="text-xs opacity-60 mt-0.5 max-w-xl">
-                Faculty mode reveals 100% of student records including hidden/deleted profiles. Click &quot;Compare&quot; on any two students to compare unredacted marks.
+                Faculty mode reveals 100% of student records including hidden profiles. Click on any student to view their unredacted marksheet, or click &quot;Compare&quot; to compare students.
               </p>
             </div>
 
@@ -838,107 +948,120 @@ export default function FacultyPortalPage() {
           </div>
 
           {/* Department Tabs (Same like Student Portal) */}
-          <div className="py-4 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-1.5 min-w-max">
-              {BRANCH_LIST.map((branch) => {
-                const count = branchCounts[branch] || 0;
-                const isActive = activeBranch === branch;
-                return (
-                  <button
-                    key={branch}
-                    onClick={() => {
-                      sfx.playMechanicalClick();
-                      setActiveBranch(branch);
-                    }}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                      isActive
-                        ? "bg-cyan-500 text-slate-950 shadow-sm"
-                        : isObsidian
-                        ? "bg-slate-900/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
-                        : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                    }`}
-                  >
-                    <span>{branch}</span>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
-                        isActive ? "bg-slate-950/20 text-slate-950" : "bg-white/10 opacity-70"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
+          <div className="py-2">
+            <BranchTabs
+              branches={BRANCH_LIST}
+              activeBranch={activeBranch}
+              onSelect={setActiveBranch}
+              branchStats={branchStats}
+              isObsidian={isObsidian}
+            />
           </div>
 
           {/* Search, Sort, and View Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pb-4">
-            {/* Search input */}
-            <div className="relative flex-1 max-w-md">
-              <IconSearch className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <div
+            className={`flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center justify-between p-3 rounded-2xl border transition-all mt-4 mb-4 ${
+              isObsidian
+                ? "bg-[#0c0e12] border-slate-800/90 text-white"
+                : "bg-white border-slate-200/90 shadow-sm text-slate-900"
+            }`}
+          >
+            <div className="relative flex-1">
               <input
                 type="text"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search student name or USN (e.g. 1RM25CS..., 1RM25CD...)"
-                className={`w-full pl-9 pr-4 py-2 text-xs font-mono rounded-xl border outline-none transition-colors ${
+                className={`w-full h-9 pl-9 pr-24 sm:pr-28 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   isObsidian
-                    ? "bg-slate-900 border-slate-800 text-white placeholder-slate-500 focus:border-cyan-400"
-                    : "bg-slate-50 border-slate-300 text-slate-900 placeholder-slate-400 focus:border-cyan-500"
+                    ? "bg-slate-950 border-slate-800 text-white placeholder-slate-500"
+                    : "bg-slate-50/70 border-slate-200 text-slate-900"
                 }`}
               />
-              {search && (
-                <button
-                  onClick={() => setSearch("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs opacity-60 hover:opacity-100"
-                >
-                  ✕
-                </button>
-              )}
+              <span className="absolute left-3 top-2.5 opacity-40">
+                <IconSearch className="w-4 h-4" />
+              </span>
+              {search ? (
+                <div className="absolute right-2.5 top-1.5 flex items-center gap-1.5">
+                  <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-mono bg-blue-500/10 text-blue-600 dark:text-cyan-400 border border-blue-500/20">
+                    <span className="opacity-60 text-[9px]">USN</span>
+                    <DecryptedText
+                      text={search.toUpperCase()}
+                      speed={30}
+                      maxIterations={6}
+                      animateOn="view"
+                      className="font-mono font-bold"
+                    />
+                  </span>
+                  <button
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      setSearch("");
+                    }}
+                    className="opacity-40 hover:opacity-100 p-1"
+                    title="Clear search"
+                  >
+                    <IconClose className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : null}
             </div>
 
-            {/* Sort & View Toggle */}
-            <div className="flex items-center gap-2 self-end sm:self-auto">
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value)}
-                className={`px-3 py-2 text-xs font-bold rounded-xl border outline-none transition-colors ${
-                  isObsidian
-                    ? "bg-slate-900 border-slate-800 text-white"
-                    : "bg-slate-50 border-slate-300 text-slate-900"
-                }`}
-              >
-                <option value="percentage">Highest Percentage</option>
-                <option value="total_marks">Total Marks</option>
-                <option value="backlogs">Lowest Backlogs</option>
-                <option value="usn">USN Sequence</option>
-              </select>
-
-              <div
-                className={`p-0.5 rounded-xl border flex items-center ${
-                  isObsidian ? "bg-slate-900 border-slate-800" : "bg-slate-100 border-slate-200"
-                }`}
-              >
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
-                    viewMode === "grid"
-                      ? "bg-cyan-500 text-slate-950"
-                      : "opacity-60 hover:opacity-100 text-slate-400"
+            {/* Sort & View Mode Switcher */}
+            <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-medium opacity-60">Sort:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => {
+                    sfx.playMechanicalClick();
+                    setSortBy(e.target.value);
+                  }}
+                  className={`h-9 text-xs font-semibold rounded-xl border px-2.5 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                    isObsidian
+                      ? "bg-slate-950 border-slate-800 text-slate-200"
+                      : "bg-white border-slate-200 text-slate-700"
                   }`}
                 >
-                  Grid
+                  <option value="percentage">Highest Percentage</option>
+                  <option value="total_marks">Total Marks</option>
+                  <option value="backlogs">Least Backlogs</option>
+                  <option value="usn">USN Sequence</option>
+                </select>
+              </div>
+
+              <div className="h-9 flex items-center bg-slate-100 dark:bg-white/5 p-0.5 rounded-xl border border-slate-200 dark:border-white/10 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setViewMode("grid");
+                  }}
+                  title="Card Grid View"
+                  className={`h-full px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
+                    viewMode === "grid"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
+                  }`}
+                >
+                  <IconGrid className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Grid</span>
                 </button>
                 <button
-                  onClick={() => setViewMode("table")}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all ${
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setViewMode("table");
+                  }}
+                  title="Dense Spreadsheet Table View"
+                  className={`h-full px-2.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
                     viewMode === "table"
-                      ? "bg-cyan-500 text-slate-950"
-                      : "opacity-60 hover:opacity-100 text-slate-400"
+                      ? "bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs"
+                      : "text-slate-500 hover:text-slate-900 dark:hover:text-white"
                   }`}
                 >
-                  Table
+                  <IconTable className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Table</span>
                 </button>
               </div>
             </div>
@@ -950,8 +1073,8 @@ export default function FacultyPortalPage() {
               Showing <strong>{filteredStudents.length}</strong> students{" "}
               {activeBranch !== "ALL" && `in ${activeBranch}`}
               {students.some((s) => s.is_hidden) && (
-                <span className="ml-1 text-purple-400">
-                  ({students.filter((s) => s.is_hidden).length} hidden records visible to faculty)
+                <span className="ml-1 text-purple-400 font-medium">
+                  ({students.filter((s) => s.is_hidden).length} hidden profiles visible to faculty)
                 </span>
               )}
             </span>
@@ -968,165 +1091,44 @@ export default function FacultyPortalPage() {
               No students match &quot;{search}&quot;.
             </div>
           ) : viewMode === "grid" ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              {filteredStudents.map((st) => {
-                const isSelected = compareUsns.includes(st.usn);
-                return (
-                  <div
+            <FadeContent
+              key={`grid-${activeBranch}-${sortBy}`}
+              trigger="mount"
+              duration={0.35}
+              blur={false}
+              className="w-full"
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
+                {filteredStudents.map((st, idx) => (
+                  <StudentCard
                     key={st.usn}
-                    className={`p-4 rounded-2xl border transition-all ${
-                      isSelected
-                        ? "border-cyan-400 bg-cyan-950/20 shadow-md shadow-cyan-950/30"
-                        : isObsidian
-                        ? "bg-slate-900/40 border-slate-800 hover:border-slate-700"
-                        : "bg-slate-50/70 border-slate-200 hover:border-slate-300"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <Identicon
-                        usn={st.usn}
-                        percentage={st.percentage}
-                        totalBacklogs={st.total_backlogs}
-                        customPixelArt={st.avatar_pixel_art}
-                        size={38}
-                      />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold opacity-60 font-mono">
-                            {st.branch || "ENG"}
-                          </span>
-                          {st.is_hidden && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                              🔒 Hidden
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="font-bold text-sm truncate mt-0.5">{st.name || st.usn}</h4>
-                        <p className="font-mono text-[11px] opacity-60 truncate">{st.usn}</p>
-                      </div>
-
-                      {/* Compare Button */}
-                      <button
-                        onClick={() => handleToggleCompare(st.usn)}
-                        className={`px-2.5 py-1 rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 ${
-                          isSelected
-                            ? "bg-cyan-500 text-slate-950 shadow-xs"
-                            : isObsidian
-                            ? "bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700"
-                            : "bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 shadow-xs"
-                        }`}
-                      >
-                        {isSelected ? "✓ Compare" : "+ Compare"}
-                      </button>
-                    </div>
-
-                    <div className="mt-3 pt-2.5 border-t border-slate-200 dark:border-slate-800/80 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-[10px] opacity-50 block uppercase">Marks</span>
-                        <span className="font-mono font-bold text-cyan-400">
-                          {st.percentage.toFixed(1)}%
-                        </span>
-                        <span className="text-[10px] opacity-50 ml-1 font-mono">
-                          ({st.total_marks} pts)
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-[10px] opacity-50 block uppercase">Backlogs</span>
-                        <span
-                          className={`font-mono font-bold text-[11px] ${
-                            st.total_backlogs > 0 ? "text-rose-400" : "text-emerald-400"
-                          }`}
-                        >
-                          {st.total_backlogs > 0 ? `${st.total_backlogs} Pending` : "0 (Clear)"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                    student={st}
+                    rank={sortBy === "percentage" && !search ? idx + 1 : undefined}
+                    isSelectedForCompare={compareUsns.includes(st.usn)}
+                    onToggleCompare={() => handleToggleCompare(st.usn)}
+                    onOpenDetail={(e) => handleOpenDetail(st.usn, e)}
+                    isObsidian={isObsidian}
+                  />
+                ))}
+              </div>
+            </FadeContent>
           ) : (
             /* Table View */
-            <div
-              className={`border rounded-2xl overflow-hidden ${
-                isObsidian ? "border-slate-800" : "border-slate-200"
-              }`}
+            <FadeContent
+              key={`table-${activeBranch}-${sortBy}`}
+              trigger="mount"
+              duration={0.35}
+              blur={false}
+              className="w-full"
             >
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead
-                    className={`text-[10px] uppercase font-bold tracking-wider ${
-                      isObsidian ? "bg-slate-900 text-slate-400" : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    <tr>
-                      <th className="p-3">Student</th>
-                      <th className="p-3">USN</th>
-                      <th className="p-3">Branch</th>
-                      <th className="p-3 text-right">Percentage</th>
-                      <th className="p-3 text-right">Total Marks</th>
-                      <th className="p-3 text-center">Backlogs</th>
-                      <th className="p-3 text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-200 dark:divide-slate-800 font-mono">
-                    {filteredStudents.map((st) => {
-                      const isSelected = compareUsns.includes(st.usn);
-                      return (
-                        <tr
-                          key={st.usn}
-                          className={`hover:bg-slate-500/5 transition-colors ${
-                            isSelected ? "bg-cyan-500/10" : ""
-                          }`}
-                        >
-                          <td className="p-3 font-sans">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold">{st.name || st.usn}</span>
-                              {st.is_hidden && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-sans">
-                                  🔒 Hidden
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td className="p-3">{st.usn}</td>
-                          <td className="p-3 font-sans">{st.branch}</td>
-                          <td className="p-3 text-right font-bold text-cyan-400">
-                            {st.percentage.toFixed(1)}%
-                          </td>
-                          <td className="p-3 text-right opacity-80">{st.total_marks}</td>
-                          <td className="p-3 text-center">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                st.total_backlogs > 0
-                                  ? "bg-rose-500/20 text-rose-300"
-                                  : "bg-emerald-500/20 text-emerald-300"
-                              }`}
-                            >
-                              {st.total_backlogs > 0 ? `${st.total_backlogs} Pending` : "Clear"}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center font-sans">
-                            <button
-                              onClick={() => handleToggleCompare(st.usn)}
-                              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                                isSelected
-                                  ? "bg-cyan-500 text-slate-950"
-                                  : isObsidian
-                                  ? "bg-slate-800 hover:bg-slate-700 text-slate-300"
-                                  : "bg-slate-100 hover:bg-slate-200 text-slate-800"
-                              }`}
-                            >
-                              {isSelected ? "✓ Selected" : "Compare"}
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+              <DenseStudentTable
+                students={filteredStudents}
+                compareUsns={compareUsns}
+                onToggleCompare={handleToggleCompare}
+                onOpenDetail={handleOpenDetail}
+                isObsidian={isObsidian}
+              />
+            </FadeContent>
           )}
         </section>
 
@@ -1298,6 +1300,34 @@ export default function FacultyPortalPage() {
           </div>
         </section>
       </div>
+
+      {/* Student Detail Modal (Unredacted full marksheet & analytics for Faculty) */}
+      <StudentDetailModal
+        isOpen={Boolean(selectedUsn)}
+        usn={selectedUsn}
+        student={detailStudent}
+        isLoading={detailLoading}
+        isCached={isDetailCached}
+        cachedAge={cachedAge}
+        myUsn=""
+        studentSession={null}
+        originRect={modalOriginRect}
+        compareUsns={compareUsns}
+        isObsidian={isObsidian}
+        isComparingLoading={comparing}
+        onClose={handleCloseDetail}
+        onToggleCompare={handleToggleCompare}
+        onCompareWithMe={() => {}}
+        onOpenAuth={() => {}}
+        onOpenPixelModal={() => {}}
+        onRetry={(u) => handleOpenDetail(u)}
+        onNavigatePrev={prevUsn ? () => handleOpenDetail(prevUsn) : undefined}
+        onNavigateNext={nextUsn ? () => handleOpenDetail(nextUsn) : undefined}
+        hasPrev={Boolean(prevUsn)}
+        hasNext={Boolean(nextUsn)}
+        currentIndex={currentIndex >= 0 ? currentIndex + 1 : undefined}
+        totalStudents={filteredStudents.length > 0 ? filteredStudents.length : undefined}
+      />
     </main>
   );
 }

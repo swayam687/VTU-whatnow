@@ -193,6 +193,8 @@ class OnDemandStartRequest(BaseModel):
 
 class OnDemandStartResponse(BaseModel):
     ok: bool
+    server_busy: bool = False
+    retry_after: int = 0
     session_id: Optional[str] = None
     captcha_base64: Optional[str] = None
     usn: str
@@ -263,6 +265,8 @@ class AuthResponse(BaseModel):
 class LoginGateChallengeResponse(BaseModel):
     ok: bool
     require_captcha: bool = False
+    server_busy: bool = False
+    retry_after: int = 0
     session_id: Optional[str] = None
     captcha_base64: Optional[str] = None
     message: Optional[str] = None
@@ -499,7 +503,9 @@ class FacultyComparisonLogItem(BaseModel):
     id: int
     faculty_username: str
     usn_a: str
+    name_a: Optional[str] = ""
     usn_b: str
+    name_b: Optional[str] = ""
     timestamp: str
 
 
@@ -521,9 +527,11 @@ class StudentUpdateStartRequest(BaseModel):
 
 class StudentUpdateStartResponse(BaseModel):
     ok: bool
-    session_id: str
-    captcha_base64: str
-    heading: str
+    server_busy: bool = False
+    retry_after: int = 0
+    session_id: Optional[str] = None
+    captcha_base64: Optional[str] = None
+    heading: Optional[str] = ""
     message: Optional[str] = None
 
 

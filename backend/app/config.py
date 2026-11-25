@@ -20,8 +20,8 @@ class Settings(BaseSettings):
     SECRET_KEY: str = ""
 
     # Playwright Concurrency Throttle (active simultaneous browser contexts)
-    # Set to 3 for guaranteed safety under Render free tier (512MB RAM cap)
-    MAX_CONCURRENT_SCRAPERS: int = 3
+    # Strictly limits active concurrent captchas to 5 users
+    MAX_CONCURRENT_SCRAPERS: int = 5
 
     class Config:
         env_file = ".env"

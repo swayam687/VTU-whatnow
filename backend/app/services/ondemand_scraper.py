@@ -126,7 +126,7 @@ class OnDemandScraperManager:
         Initializes an asyncio.Semaphore to throttle active browser sessions to max concurrent slots.
         """
         if self._semaphore is None:
-            max_concurrent = getattr(settings, "MAX_CONCURRENT_SCRAPERS", 10)
+            max_concurrent = getattr(settings, "MAX_CONCURRENT_SCRAPERS", 5)
             self._semaphore = asyncio.Semaphore(max_concurrent)
         if self._browser_lock is None:
             self._browser_lock = asyncio.Lock()
@@ -306,19 +306,35 @@ class OnDemandScraperManager:
         clean_student_usn = (student_usn or clean_target_usn).strip().upper()
         await self._cleanup_expired()
 
+        # Check if server is already serving 5 captchas to 5 users
+        with self._lock:
+            active_sessions_count = len([s for s in self._sessions.values() if not getattr(s, "is_closed", False)])
+        if active_sessions_count >= getattr(settings, "MAX_CONCURRENT_SCRAPERS", 5):
+            with self._lock:
+                self._reserved_usns.discard(clean_target_usn)
+            return {
+                "ok": False,
+                "server_busy": True,
+                "retry_after": 60,
+                "usn": clean_target_usn,
+                "message": "Service is under load. Server is currently serving 5 users. Please wait 1 minute.",
+            }
+
         browser = await self._ensure_browser()
 
-        # Strict Concurrency Throttle: acquire 1 of 3 concurrent browser slots
+        # Strict Concurrency Throttle: acquire 1 of 5 concurrent browser slots with short timeout (no 30s hang)
         try:
             assert self._semaphore is not None
-            await asyncio.wait_for(self._semaphore.acquire(), timeout=30.0)
+            await asyncio.wait_for(self._semaphore.acquire(), timeout=1.5)
         except asyncio.TimeoutError:
             with self._lock:
                 self._reserved_usns.discard(clean_target_usn)
             return {
                 "ok": False,
+                "server_busy": True,
+                "retry_after": 60,
                 "usn": clean_target_usn,
-                "message": "Verification servers are busy with maximum concurrent sessions. Please retry in a few seconds.",
+                "message": "Service is under load. Server is currently serving 5 users. Please wait 1 minute.",
             }
 
         slot_acquired = True

@@ -186,13 +186,12 @@ export default function Dashboard() {
       // ignore
     }
 
-    // Active listener: Kick out user immediately if token is invalidated on the server (e.g. USN hidden/deleted)
+    // Session state synchronization: clean up session if token is revoked
     const handleRevocation = () => {
       clearStoredStudentSession();
       setStudentSession(null);
       setMyUsn("");
       loadStudentsData(null);
-      alert("⚠️ Your session has ended because this USN was deleted/hidden by admin. To restore access, send your selfie photo verification to the admin.");
     };
 
     window.addEventListener("vtu:session-revoked", handleRevocation);

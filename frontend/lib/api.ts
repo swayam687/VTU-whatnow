@@ -303,7 +303,6 @@ export async function fetchStudents(params?: {
     if (res.headers.get("X-Token-Revoked") === "true") {
       if (typeof window !== "undefined") {
         clearStoredStudentSession();
-        window.dispatchEvent(new CustomEvent("vtu:session-revoked"));
       }
     }
 
@@ -315,11 +314,15 @@ export async function fetchStudents(params?: {
   }
 }
 
-export async function fetchStudent(usn: string, token?: string): Promise<Student> {
+export async function fetchStudent(usn: string, token?: string, facultyToken?: string): Promise<Student> {
   const headers: Record<string, string> = {};
   const effectiveToken = token || getStoredStudentToken();
   if (effectiveToken) {
     headers["X-Student-Token"] = effectiveToken;
+  }
+  const fToken = facultyToken || getStoredFacultyToken();
+  if (fToken) {
+    headers["X-Faculty-Token"] = fToken;
   }
   const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}`, {
     headers,
@@ -645,6 +648,8 @@ export async function fetchAuthStatus(usn: string): Promise<AuthStatus> {
 export interface LoginGateResponse {
   ok: boolean;
   require_captcha: boolean;
+  server_busy?: boolean;
+  retry_after?: number;
   session_id?: string;
   captcha_base64?: string;
   message?: string;
@@ -657,9 +662,12 @@ export async function loginOrRegisterStudent(usn: string, password: string): Pro
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ usn: usn.trim().toUpperCase(), password: password.trim() }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (data.server_busy) {
+    return data;
+  }
   if (!res.ok) {
-    throw new Error(data.detail || "Authentication failed. Check your password.");
+    throw new Error(data.detail || data.message || "Authentication failed. Check your password.");
   }
   return data;
 }
@@ -801,7 +809,7 @@ export async function verifyStudentSession(token?: string): Promise<{
     if (!res.ok) {
       if (res.status === 401) {
         if (typeof window !== "undefined") {
-          window.dispatchEvent(new Event("vtu:session-revoked"));
+          clearStoredStudentSession();
         }
         return { valid: false, revoked: true };
       }
@@ -1057,6 +1065,8 @@ export async function toggleAdminStudentVisibility(
 
 export interface OnDemandStartResponse {
   ok: boolean;
+  server_busy?: boolean;
+  retry_after?: number;
   session_id?: string;
   captcha_base64?: string;
   usn: string;
@@ -1100,11 +1110,14 @@ export async function startOnDemandRegistration(
       semester_link_id: semesterLinkId,
     }),
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.detail || "Failed to connect to VTU portal");
+  const data = await res.json().catch(() => ({}));
+  if (data.server_busy) {
+    return data;
   }
-  return res.json();
+  if (!res.ok) {
+    throw new Error(data.detail || data.message || "Failed to connect to VTU portal");
+  }
+  return data;
 }
 
 export async function refreshOnDemandCaptcha(sessionId: string): Promise<OnDemandRefreshResponse> {
@@ -1613,7 +1626,9 @@ export interface FacultyComparisonLogItem {
   id: number;
   faculty_username: string;
   usn_a: string;
+  name_a?: string;
   usn_b: string;
+  name_b?: string;
   timestamp: string;
 }
 
@@ -1750,9 +1765,11 @@ export interface StudentPortalOption {
 
 export interface StudentUpdateStartResult {
   ok: boolean;
-  session_id: string;
-  captcha_base64: string;
-  heading: string;
+  server_busy?: boolean;
+  retry_after?: number;
+  session_id?: string;
+  captcha_base64?: string;
+  heading?: string;
   message?: string;
 }
 
@@ -1794,6 +1811,9 @@ export async function startStudentUpdate(
     body: JSON.stringify({ semester_link_id: semesterLinkId }),
   });
   const data = await res.json().catch(() => ({}));
+  if (data.server_busy) {
+    return data;
+  }
   if (!res.ok) {
     throw new Error(data.detail || data.message || "Unable to connect to verification portal.");
   }

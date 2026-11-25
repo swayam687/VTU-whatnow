@@ -139,6 +139,11 @@ export default function StudentCard({
                   You
                 </span>
               )}
+              {student.is_hidden && (
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                  🔒 Hidden
+                </span>
+              )}
             </div>
             <h3 className="font-bold text-xs leading-snug truncate mt-0.5">
               {student.name || student.usn}
@@ -266,6 +271,11 @@ export default function StudentCard({
                       }`}
                     >
                       Topper
+                    </span>
+                  )}
+                  {student.is_hidden && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30">
+                      🔒 Hidden
                     </span>
                   )}
                   {isMyProfile && (

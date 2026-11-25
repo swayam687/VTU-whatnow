@@ -17,9 +17,9 @@ from fastapi import HTTPException, Response
 from starlette.requests import Request
 from app.config import settings
 from app.database import SessionLocal
-from app.models import Faculty, Student
+from app.models import Faculty, Student, FacultyComparisonLog
 from app.schemas import AdminVerifyRequest
-from app.main import get_auth_status, verify_admin, require_admin, get_students
+from app.main import get_auth_status, verify_admin, require_admin, get_students, get_admin_faculty_audits
 from app.auth import create_faculty_jwt, verify_faculty_jwt
 
 
@@ -180,7 +180,28 @@ class TestAPIEndpoints(unittest.TestCase):
         except StopIteration:
             pass
 
+    def test_faculty_comparison_audit_log_names(self):
+        # Insert a comparison log
+        test_log = FacultyComparisonLog(
+            faculty_username="prof_tester",
+            usn_a="TEST_USN_A",
+            name_a="Alice Tester",
+            usn_b="TEST_USN_B",
+            name_b="Bob Tester"
+        )
+        self.db.add(test_log)
+        self.db.commit()
 
+        try:
+            audits = get_admin_faculty_audits(db=self.db)
+            matching = [c for c in audits.comparison_logs if c.usn_a == "TEST_USN_A"]
+            self.assertTrue(len(matching) > 0)
+            self.assertEqual(matching[0].name_a, "Alice Tester")
+            self.assertEqual(matching[0].name_b, "Bob Tester")
+            self.assertEqual(matching[0].faculty_username, "prof_tester")
+        finally:
+            self.db.delete(test_log)
+            self.db.commit()
 
 
 if __name__ == "__main__":
