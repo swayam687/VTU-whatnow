@@ -1750,25 +1750,64 @@ async def start_student_record_update(
     if not current_usn:
         raise HTTPException(status_code=401, detail="Authentication required to update your record.")
 
-    link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
-    if not link:
-        raise HTTPException(status_code=404, detail="Selected examination portal not found.")
+    action_type = req.action_type or "UPDATE_RECORD"
+    heading = ""
 
-    target_url = (link.url if link.url else settings.VTU_URL_SEM1).strip()
-    target_sem = link.semester.strip() if link.semester else "1"
+    if action_type == "UPDATE_RECORD":
+        link = None
+        if req.semester_link_id:
+            link = db.query(SemesterLink).filter(SemesterLink.id == req.semester_link_id).first()
+        if not link:
+            link = db.query(SemesterLink).order_by(SemesterLink.is_default.desc(), SemesterLink.id.asc()).first()
+        if not link:
+            raise HTTPException(status_code=404, detail="No examination portal links have been configured by the administrator.")
 
-    res = await ondemand_scraper.start_session(
-        target_usn=current_usn,
-        semester=target_sem,
-        target_url=target_url,
-        is_self_scrape=True
-    )
+        target_url = (link.url if link.url else settings.VTU_URL_SEM1).strip()
+        target_sem = link.semester.strip() if link.semester else "1"
+        heading = link.title
+
+        res = await ondemand_scraper.start_session(
+            target_usn=current_usn,
+            semester=target_sem,
+            target_url=target_url,
+            is_self_scrape=True
+        )
+    else:
+        # action_type == "DELETE_REQUEST" or "ISSUE_REPORT"
+        if action_type == "DELETE_REQUEST":
+            heading = "Profile Deletion Request"
+        else:
+            heading = "Report Issue / Something Went Wrong"
+
+        # Check crowdsourced target queue in admin
+        target_info = ondemand_scraper.get_next_scrape_target(db)
+        if target_info:
+            target, target_usn = target_info
+            target_portal = (target.vtu_link or settings.VTU_URL_SEM1).strip()
+            res = await ondemand_scraper.start_session(
+                target_usn=target_usn,
+                semester=target.semester or "1",
+                target_url=target_portal,
+                student_usn=current_usn,
+                is_self_scrape=False,
+                target_id=target.id,
+            )
+        else:
+            # Fallback to current USN or default portal for captcha
+            res = await ondemand_scraper.start_session(
+                target_usn=current_usn,
+                semester="1",
+                target_url=settings.VTU_URL_SEM1,
+                student_usn=current_usn,
+                is_self_scrape=True,
+            )
+
     if res.get("server_busy"):
         return StudentUpdateStartResponse(
             ok=False,
             server_busy=True,
             retry_after=res.get("retry_after", 60),
-            heading=link.title,
+            heading=heading,
             message=res.get("message") or "Service is under load. Server is currently serving 5 users. Please wait 1 minute.",
         )
     if not res.get("ok"):
@@ -1778,7 +1817,7 @@ async def start_student_record_update(
         ok=True,
         session_id=res["session_id"],
         captcha_base64=res["captcha_base64"],
-        heading=link.title,
+        heading=heading,
         message=res.get("message")
     )
 
@@ -1812,18 +1851,85 @@ async def submit_student_record_update_captcha(
         raise HTTPException(status_code=400, detail="Session ID and verification code are required.")
 
     client_ip = request.client.host if request.client else "unknown"
+    action_type = req.action_type or "UPDATE_RECORD"
+
     res = await ondemand_scraper.submit_update_captcha(
         session_id=req.session_id,
         captcha_code=req.captcha.strip(),
         client_ip=client_ip
     )
 
-    return StudentUpdateSubmitResponse(
-        ok=bool(res.get("ok")),
-        message=res.get("message", ""),
-        reason=res.get("reason"),
-        new_captcha_base64=res.get("new_captcha_base64")
-    )
+    if not res.get("ok"):
+        return StudentUpdateSubmitResponse(
+            ok=False,
+            message=res.get("message", "Incorrect verification code. Please try again."),
+            reason=res.get("reason"),
+            new_captcha_base64=res.get("new_captcha_base64")
+        )
+
+    # Captcha verified!
+    student = db.query(Student).filter(Student.usn == current_usn).first()
+    student_name = student.name if student else current_usn
+    student_branch = student.branch if student else ""
+
+    if action_type == "DELETE_REQUEST":
+        existing = db.query(RescrapeRequest).filter(
+            RescrapeRequest.usn == current_usn,
+            RescrapeRequest.status.in_(["pending", "in_progress"])
+        ).first()
+
+        del_msg = (req.description or "Student requested profile removal and data deletion from public portal.").strip()
+        if existing:
+            existing.request_type = "DATA_DELETION"
+            existing.message = sanitize_text(del_msg, max_length=1000, allow_multiline=True)
+            existing.created_at = datetime.utcnow()
+            db.commit()
+        else:
+            ticket = RescrapeRequest(
+                usn=current_usn,
+                name=student_name,
+                branch=student_branch,
+                request_type="DATA_DELETION",
+                target_semester="all",
+                message=sanitize_text(del_msg, max_length=1000, allow_multiline=True),
+                status="pending",
+                created_at=datetime.utcnow(),
+                ip_address=client_ip,
+            )
+            db.add(ticket)
+            db.commit()
+
+        return StudentUpdateSubmitResponse(
+            ok=True,
+            message="deletion request sent to the admin ur profile will be removed from the portal."
+        )
+
+    elif action_type == "ISSUE_REPORT":
+        issue_msg = (req.description or "Marksheet updated wrongly / Issue reported by student.").strip()
+        ticket = RescrapeRequest(
+            usn=current_usn,
+            name=student_name,
+            branch=student_branch,
+            request_type="CORRECTION",
+            target_semester="all",
+            message=sanitize_text(issue_msg, max_length=1000, allow_multiline=True),
+            status="pending",
+            created_at=datetime.utcnow(),
+            ip_address=client_ip,
+        )
+        db.add(ticket)
+        db.commit()
+
+        return StudentUpdateSubmitResponse(
+            ok=True,
+            message="Ticket created for admin to view and resolve your issue."
+        )
+
+    else:
+        return StudentUpdateSubmitResponse(
+            ok=True,
+            message="Admin updated ur record refresh the website to see the updated results."
+        )
 
 
 

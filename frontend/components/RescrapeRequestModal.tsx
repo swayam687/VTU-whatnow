@@ -24,6 +24,7 @@ interface RescrapeRequestModalProps {
 }
 
 type ModalStep = "SELECT" | "CONNECTING" | "CAPTCHA" | "VERIFYING" | "SUCCESS";
+type ActionType = "UPDATE_RECORD" | "DELETE_REQUEST" | "ISSUE_REPORT";
 
 export default function RescrapeRequestModal({
   isOpen,
@@ -39,6 +40,10 @@ export default function RescrapeRequestModal({
   const isOwner = Boolean(studentSession && targetUsn === sessionUsn);
 
   const [step, setStep] = useState<ModalStep>("SELECT");
+  const [actionType, setActionType] = useState<ActionType>("UPDATE_RECORD");
+  const [issueDescription, setIssueDescription] = useState<string>("");
+  const [successMessage, setSuccessMessage] = useState<string>("");
+
   const [portals, setPortals] = useState<StudentPortalOption[]>([]);
   const [loadingPortals, setLoadingPortals] = useState<boolean>(true);
   const [selectedPortalId, setSelectedPortalId] = useState<number | null>(null);
@@ -70,6 +75,9 @@ export default function RescrapeRequestModal({
     let isMounted = true;
     setLoadingPortals(true);
     setStep("SELECT");
+    setActionType("UPDATE_RECORD");
+    setIssueDescription("");
+    setSuccessMessage("");
     setErrorMsg("");
     setCaptchaInput("");
     setSessionId("");
@@ -110,8 +118,13 @@ export default function RescrapeRequestModal({
 
   // Step 1 -> Step 2: Start session
   const handleStartUpdate = async () => {
-    if (!selectedPortalId) {
+    if (actionType === "UPDATE_RECORD" && !selectedPortalId) {
       setErrorMsg("Please select an examination heading to update.");
+      return;
+    }
+
+    if (actionType === "ISSUE_REPORT" && (!issueDescription.trim() || issueDescription.trim().length < 5)) {
+      setErrorMsg("Please describe what went wrong (minimum 5 characters).");
       return;
     }
 
@@ -120,13 +133,22 @@ export default function RescrapeRequestModal({
     sfx.playMechanicalClick();
 
     try {
-      const res = await startStudentUpdate(selectedPortalId, studentSession?.token);
+      const res = await startStudentUpdate(
+        {
+          semesterLinkId: actionType === "UPDATE_RECORD" ? selectedPortalId : null,
+          actionType,
+          description: issueDescription.trim() || undefined,
+        },
+        studentSession?.token
+      );
+
       if (res.server_busy) {
         setCooldownSeconds(res.retry_after || 60);
         setErrorMsg(res.message || "Service is under load. Server is currently serving 5 users. Please wait 1 minute.");
         setStep("SELECT");
         return;
       }
+
       if (res.ok && res.session_id && res.captcha_base64) {
         setSessionId(res.session_id);
         setCaptchaBase64(res.captcha_base64);
@@ -187,9 +209,16 @@ export default function RescrapeRequestModal({
     sfx.playMechanicalClick();
 
     try {
-      const res = await submitStudentUpdateCaptcha(sessionId, cleanCode, studentSession?.token);
+      const res = await submitStudentUpdateCaptcha(
+        sessionId,
+        cleanCode,
+        studentSession?.token,
+        actionType,
+        issueDescription.trim() || undefined
+      );
 
       if (res.ok) {
+        setSuccessMessage(res.message);
         setStep("SUCCESS");
         sfx.playSonarChime();
         if (onSuccess) onSuccess();
@@ -251,8 +280,16 @@ export default function RescrapeRequestModal({
                 {step === "CAPTCHA" || step === "VERIFYING"
                   ? "Security Verification"
                   : step === "SUCCESS"
-                  ? "Record Updated"
-                  : "Create Update Ticket"}
+                  ? actionType === "DELETE_REQUEST"
+                    ? "Deletion Request Sent"
+                    : actionType === "ISSUE_REPORT"
+                    ? "Ticket Created"
+                    : "Record Updated"
+                  : actionType === "DELETE_REQUEST"
+                  ? "Request Profile Deletion"
+                  : actionType === "ISSUE_REPORT"
+                  ? "Report Marksheet Issue"
+                  : "Update Examination Record"}
               </h2>
               <p className="text-[11px] opacity-60 font-mono">
                 {targetUsn} {student?.name ? `• ${student.name}` : ""}
@@ -302,85 +339,182 @@ export default function RescrapeRequestModal({
               </div>
             </div>
           ) : step === "SELECT" ? (
-            /* Step 1: Select Portal Heading */
+            /* Step 1: Select Action & Options */
             <div className="space-y-4">
-              <div>
-                <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70 mb-2">
-                  Select Examination Record to Update
-                </label>
-                <p className="text-xs opacity-65 leading-relaxed mb-3">
-                  Choose the examination portal heading corresponding to your recent results or revaluation:
-                </p>
-
-                {loadingPortals ? (
-                  <div className="py-8 text-center text-xs opacity-60 flex flex-col items-center justify-center gap-2">
-                    <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
-                    <span>Loading available examination portals...</span>
-                  </div>
-                ) : portals.length === 0 ? (
-                  <div
-                    className={`p-4 rounded-2xl border text-xs text-center opacity-70 ${
-                      isObsidian ? "bg-slate-900/40 border-slate-800" : "bg-slate-50 border-slate-200"
-                    }`}
-                  >
-                    No examination portal links have been configured by the administrator yet.
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {portals.map((p) => {
-                      const isSelected = selectedPortalId === p.id;
-                      return (
-                        <button
-                          key={p.id}
-                          type="button"
-                          onClick={() => {
-                            sfx.playMechanicalClick();
-                            setSelectedPortalId(p.id);
-                            setSelectedHeading(p.title);
-                            setErrorMsg("");
-                          }}
-                          className={`p-3.5 text-left rounded-2xl border transition-all text-xs flex items-center justify-between cursor-pointer ${
-                            isSelected
-                              ? isObsidian
-                                ? "bg-cyan-950/30 border-cyan-500/80 text-white ring-1 ring-cyan-500/50"
-                                : "bg-blue-50/70 border-blue-500 text-slate-900 ring-1 ring-blue-500"
-                              : isObsidian
-                              ? "bg-slate-900/40 border-slate-800 text-slate-300 hover:bg-slate-900/70"
-                              : "bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100"
-                          }`}
-                        >
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <span className="font-bold text-xs sm:text-sm">{p.title}</span>
-                              {p.is_default && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-cyan-400 font-bold">
-                                  Default
-                                </span>
-                              )}
-                            </div>
-                            <span className="inline-block text-[10px] font-mono opacity-60 uppercase">
-                              Semester {p.semester}
-                            </span>
-                          </div>
-
-                          <div
-                            className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ml-3 ${
-                              isSelected
-                                ? "border-blue-600 bg-blue-600 dark:border-cyan-400 dark:bg-cyan-400"
-                                : "border-slate-300 dark:border-slate-700"
-                            }`}
-                          >
-                            {isSelected && (
-                              <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-900" />
-                            )}
-                          </div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
+              {/* Action Mode Segmented Switcher */}
+              <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-slate-900/60 border border-slate-200/80 dark:border-slate-800 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setActionType("UPDATE_RECORD");
+                    setErrorMsg("");
+                  }}
+                  className={`py-2 px-2 rounded-lg font-medium transition-all text-center cursor-pointer ${
+                    actionType === "UPDATE_RECORD"
+                      ? isObsidian
+                        ? "bg-slate-800 text-cyan-400 font-bold shadow-xs"
+                        : "bg-white text-blue-600 font-bold shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Update Record
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setActionType("DELETE_REQUEST");
+                    setErrorMsg("");
+                  }}
+                  className={`py-2 px-2 rounded-lg font-medium transition-all text-center cursor-pointer ${
+                    actionType === "DELETE_REQUEST"
+                      ? isObsidian
+                        ? "bg-slate-800 text-rose-400 font-bold shadow-xs"
+                        : "bg-white text-rose-600 font-bold shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Delete Request
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.playMechanicalClick();
+                    setActionType("ISSUE_REPORT");
+                    setErrorMsg("");
+                  }}
+                  className={`py-2 px-2 rounded-lg font-medium transition-all text-center cursor-pointer ${
+                    actionType === "ISSUE_REPORT"
+                      ? isObsidian
+                        ? "bg-slate-800 text-amber-400 font-bold shadow-xs"
+                        : "bg-white text-amber-600 font-bold shadow-xs"
+                      : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                  }`}
+                >
+                  Something Wrong
+                </button>
               </div>
 
+              {/* Mode 1: Update Record by Examination Portal */}
+              {actionType === "UPDATE_RECORD" && (
+                <div className="space-y-2 animate-in fade-in duration-150">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70">
+                    Select Examination Record to Update
+                  </label>
+                  <p className="text-xs opacity-65 leading-relaxed">
+                    Choose the examination portal heading corresponding to your recent results or revaluation:
+                  </p>
+
+                  {loadingPortals ? (
+                    <div className="py-8 text-center text-xs opacity-60 flex flex-col items-center justify-center gap-2">
+                      <div className="w-5 h-5 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
+                      <span>Loading available examination portals...</span>
+                    </div>
+                  ) : portals.length === 0 ? (
+                    <div
+                      className={`p-4 rounded-2xl border text-xs text-center opacity-70 ${
+                        isObsidian ? "bg-slate-900/40 border-slate-800" : "bg-slate-50 border-slate-200"
+                      }`}
+                    >
+                      No examination portal links have been configured by the administrator yet.
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-2 max-h-52 overflow-y-auto pr-1">
+                      {portals.map((p) => {
+                        const isSelected = selectedPortalId === p.id;
+                        return (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => {
+                              sfx.playMechanicalClick();
+                              setSelectedPortalId(p.id);
+                              setSelectedHeading(p.title);
+                              setErrorMsg("");
+                            }}
+                            className={`p-3 text-left rounded-xl border transition-all text-xs flex items-center justify-between cursor-pointer ${
+                              isSelected
+                                ? isObsidian
+                                  ? "bg-cyan-950/30 border-cyan-500/80 text-white ring-1 ring-cyan-500/50"
+                                  : "bg-blue-50 border-blue-500/80 text-blue-950 ring-1 ring-blue-500/30"
+                                : isObsidian
+                                ? "bg-slate-900/40 border-slate-800/80 text-slate-300 hover:border-slate-700"
+                                : "bg-slate-50/70 border-slate-200/80 text-slate-700 hover:border-slate-300"
+                            }`}
+                          >
+                            <div className="min-w-0 pr-2">
+                              <p className="font-bold text-xs truncate">{p.title}</p>
+                              <p className="text-[10px] opacity-60 font-mono mt-0.5">
+                                Semester {p.semester} • Results Portal
+                              </p>
+                            </div>
+
+                            <div
+                              className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ml-3 ${
+                                isSelected
+                                  ? "border-blue-600 bg-blue-600 dark:border-cyan-400 dark:bg-cyan-400"
+                                  : "border-slate-300 dark:border-slate-700"
+                              }`}
+                            >
+                              {isSelected && (
+                                <span className="w-1.5 h-1.5 rounded-full bg-white dark:bg-slate-900" />
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mode 2: Delete Request */}
+              {actionType === "DELETE_REQUEST" && (
+                <div className="space-y-3 p-4 rounded-2xl border bg-rose-500/5 border-rose-500/20 text-xs animate-in fade-in duration-150">
+                  <div className="flex items-center gap-2 text-rose-500 dark:text-rose-400 font-bold">
+                    <IconShield className="w-4 h-4" />
+                    <span>Request Profile Deletion & Removal</span>
+                  </div>
+                  <p className="opacity-80 leading-relaxed">
+                    Submit a formal deletion request to the administrator. Once reviewed, your profile and marksheet records will be removed from the public portal.
+                  </p>
+                  <div className="p-2.5 rounded-xl bg-slate-900/5 dark:bg-white/5 border border-slate-200/50 dark:border-white/10 text-[11px] text-slate-600 dark:text-slate-300">
+                    💡 A verification captcha is required to confirm account ownership and generate a deletion ticket for the admin.
+                  </div>
+                </div>
+              )}
+
+              {/* Mode 3: Something Went Wrong / Issue Report */}
+              {actionType === "ISSUE_REPORT" && (
+                <div className="space-y-2.5 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider opacity-70">
+                      Describe What Went Wrong
+                    </label>
+                    <span className="text-[10px] opacity-50 font-mono">Required</span>
+                  </div>
+                  <textarea
+                    rows={3}
+                    value={issueDescription}
+                    onChange={(e) => {
+                      setIssueDescription(e.target.value);
+                      setErrorMsg("");
+                    }}
+                    placeholder="e.g. Marksheet updated wrongly, grade mismatch in subjects, please fix it..."
+                    className={`w-full p-3 rounded-xl border text-xs outline-none transition-all resize-none leading-relaxed ${
+                      isObsidian
+                        ? "bg-slate-950/60 border-slate-700 text-white focus:border-amber-400"
+                        : "bg-white border-slate-300 text-slate-900 focus:border-amber-500"
+                    }`}
+                  />
+                  <p className="text-[11px] opacity-60 leading-normal">
+                    Please describe the specific issue. An administrative ticket will be generated with your remarks.
+                  </p>
+                </div>
+              )}
+
+              {/* High Load Cooldown Banner */}
               {cooldownSeconds > 0 && (
                 <div
                   className={`p-3 rounded-xl border text-xs space-y-1.5 animate-in fade-in ${
@@ -419,7 +553,11 @@ export default function RescrapeRequestModal({
               <div className="pt-2">
                 <button
                   type="button"
-                  disabled={loadingPortals || !selectedPortalId || cooldownSeconds > 0}
+                  disabled={
+                    cooldownSeconds > 0 ||
+                    (actionType === "UPDATE_RECORD" && (loadingPortals || !selectedPortalId)) ||
+                    (actionType === "ISSUE_REPORT" && (!issueDescription.trim() || issueDescription.trim().length < 5))
+                  }
                   onClick={handleStartUpdate}
                   className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
                 >
@@ -445,9 +583,11 @@ export default function RescrapeRequestModal({
             /* Step 3: Interactive Captcha Verification */
             <form onSubmit={handleSubmitCaptcha} className="space-y-4">
               <div className="space-y-1">
-                <p className="text-xs opacity-75 leading-relaxed">
-                  Please solve this captcha to verify your identity and create an update ticket for{" "}
-                  <strong>{selectedHeading}</strong>:
+                <p className="text-xs opacity-85 leading-relaxed font-medium">
+                  Verify and creating ticket for admin to see
+                </p>
+                <p className="text-[11px] opacity-60 leading-relaxed">
+                  Please solve this captcha to verify your identity and generate your request ticket:
                 </p>
               </div>
 
@@ -575,7 +715,7 @@ export default function RescrapeRequestModal({
                   className="flex-1 py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 disabled:opacity-50 transition-all cursor-pointer shadow-sm active:scale-[0.98] flex items-center justify-center gap-1.5"
                 >
                   <IconCheck className="w-3.5 h-3.5" />
-                  <span>Submit Verification</span>
+                  <span>Verify to create ticket</span>
                 </button>
               </div>
             </form>
@@ -593,7 +733,11 @@ export default function RescrapeRequestModal({
             <div className="py-6 text-center space-y-4">
               <div
                 className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto border ${
-                  isObsidian
+                  actionType === "DELETE_REQUEST"
+                    ? isObsidian
+                      ? "bg-rose-950/40 border-rose-800/50 text-rose-400"
+                      : "bg-rose-50 border-rose-200 text-rose-700"
+                    : isObsidian
                     ? "bg-emerald-950/40 border-emerald-800/50 text-emerald-400"
                     : "bg-emerald-50 border-emerald-200 text-emerald-700"
                 }`}
@@ -602,24 +746,47 @@ export default function RescrapeRequestModal({
               </div>
 
               <div className="space-y-1.5">
-                <h3 className="text-base font-bold">Admin updated your record</h3>
+                <h3 className="text-base font-bold">
+                  {actionType === "DELETE_REQUEST"
+                    ? "Deletion Request Submitted"
+                    : actionType === "ISSUE_REPORT"
+                    ? "Ticket Created"
+                    : "Admin updated your record"}
+                </h3>
                 <p className="text-xs opacity-75 max-w-sm mx-auto leading-relaxed">
-                  Refresh the website to see the updated results.
+                  {actionType === "DELETE_REQUEST"
+                    ? "deletion request sent to the admin ur profile will be removed from the portal."
+                    : actionType === "ISSUE_REPORT"
+                    ? successMessage || "Ticket created for admin to view and resolve your issue."
+                    : "Refresh the website to see the updated results."}
                 </p>
               </div>
 
               <div className="pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    sfx.playMechanicalClick();
-                    window.location.reload();
-                  }}
-                  className="w-full py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <IconRotateCcw className="w-4 h-4" />
-                  <span>Refresh Website</span>
-                </button>
+                {actionType === "UPDATE_RECORD" ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      window.location.reload();
+                    }}
+                    className="w-full py-2.5 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 text-white shadow-sm active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    <IconRotateCcw className="w-4 h-4" />
+                    <span>Refresh Website</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      sfx.playMechanicalClick();
+                      onClose();
+                    }}
+                    className="w-full py-2.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                  >
+                    Close Window
+                  </button>
+                )}
               </div>
             </div>
           )}

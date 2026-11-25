@@ -1793,8 +1793,14 @@ export async function fetchAvailablePortals(): Promise<StudentPortalOption[]> {
   }
 }
 
+export interface StudentUpdateStartParams {
+  semesterLinkId?: number | null;
+  actionType?: "UPDATE_RECORD" | "DELETE_REQUEST" | "ISSUE_REPORT";
+  description?: string;
+}
+
 export async function startStudentUpdate(
-  semesterLinkId: number,
+  params: number | StudentUpdateStartParams,
   token?: string
 ): Promise<StudentUpdateStartResult> {
   const baseUrl = getApiBase();
@@ -1805,10 +1811,20 @@ export async function startStudentUpdate(
   if (effectiveToken) {
     headers["X-Student-Token"] = effectiveToken;
   }
+
+  const payload =
+    typeof params === "number"
+      ? { semester_link_id: params, action_type: "UPDATE_RECORD" }
+      : {
+          semester_link_id: params.semesterLinkId ?? null,
+          action_type: params.actionType || "UPDATE_RECORD",
+          description: params.description || null,
+        };
+
   const res = await fetch(`${baseUrl}/api/student/update-record/start`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ semester_link_id: semesterLinkId }),
+    body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
   if (data.server_busy) {
@@ -1835,7 +1851,9 @@ export async function refreshStudentUpdateCaptcha(
 export async function submitStudentUpdateCaptcha(
   sessionId: string,
   captcha: string,
-  token?: string
+  token?: string,
+  actionType: "UPDATE_RECORD" | "DELETE_REQUEST" | "ISSUE_REPORT" = "UPDATE_RECORD",
+  description?: string
 ): Promise<StudentUpdateSubmitResult> {
   const baseUrl = getApiBase();
   const effectiveToken = token || getStoredStudentToken();
@@ -1848,7 +1866,12 @@ export async function submitStudentUpdateCaptcha(
   const res = await fetch(`${baseUrl}/api/student/update-record/submit`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ session_id: sessionId, captcha }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      captcha,
+      action_type: actionType,
+      description,
+    }),
   });
   return await res.json();
 }

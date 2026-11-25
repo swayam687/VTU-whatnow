@@ -522,7 +522,9 @@ class StudentPortalOption(BaseModel):
 
 
 class StudentUpdateStartRequest(BaseModel):
-    semester_link_id: int
+    semester_link_id: Optional[int] = None
+    action_type: str = "UPDATE_RECORD"  # "UPDATE_RECORD", "DELETE_REQUEST", "ISSUE_REPORT"
+    description: Optional[str] = None
 
 
 class StudentUpdateStartResponse(BaseModel):
@@ -538,6 +540,9 @@ class StudentUpdateStartResponse(BaseModel):
 class StudentUpdateSubmitRequest(BaseModel):
     session_id: str
     captcha: str
+    action_type: Optional[str] = "UPDATE_RECORD"
+    description: Optional[str] = None
+    semester_link_id: Optional[int] = None
 
 
 class StudentUpdateSubmitResponse(BaseModel):

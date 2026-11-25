@@ -1005,10 +1005,10 @@ export default function StudentDetailModal({
                   <div className="space-y-0.5">
                     <div className="flex items-center gap-1.5 text-xs font-bold">
                       <IconRotateCcw className="w-3.5 h-3.5 text-blue-600 dark:text-cyan-400" />
-                      <span>Need your marksheet updated?</span>
+                      <span>Update Marksheet / Request Changes</span>
                     </div>
                     <p className="text-[11px] opacity-80 leading-relaxed">
-                      Cleared pending subjects in revaluation/re-exam, or missing results? Send an update request to admin.
+                      Update semester results, request profile deletion, or report marksheet issues to administrator.
                     </p>
                   </div>
                   <button
@@ -1020,7 +1020,7 @@ export default function StudentDetailModal({
                     className="px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 shadow-sm flex items-center gap-1.5 transition-transform active:scale-[0.98] cursor-pointer shrink-0 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400"
                   >
                     <IconRotateCcw className="w-3.5 h-3.5" />
-                    <span>Request Update</span>
+                    <span>Update Record</span>
                   </button>
                 </div>
               )}

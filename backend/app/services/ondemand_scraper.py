@@ -626,11 +626,38 @@ class OnDemandScraperManager:
                 with self._lock:
                     self._sessions.pop(session_id, None)
                 await session.close()
-                return {
-                    "ok": False,
-                    "reason": "not_found",
-                    "message": "No updated records found on this examination portal for your USN.",
-                }
+
+                # If crowdsourced target, advance the admin queue so student is not blocked
+                if not session.is_self_scrape:
+                    if getattr(session, "target_id", None):
+                        db = SessionLocal()
+                        try:
+                            target = db.query(ScrapeTarget).filter(ScrapeTarget.id == session.target_id).first()
+                            if target:
+                                usn_list = generate_usn_range(target.start_usn, target.end_usn)
+                                try:
+                                    curr_idx = usn_list.index(session.usn)
+                                    if curr_idx + 1 < len(usn_list):
+                                        target.current_usn_index = usn_list[curr_idx + 1]
+                                    else:
+                                        target.status = "COMPLETED"
+                                        target.completed_at = datetime.utcnow()
+                                except ValueError:
+                                    pass
+                                db.commit()
+                        finally:
+                            db.close()
+                    return {
+                        "ok": True,
+                        "message": "Verification completed successfully.",
+                        "usn": session.student_usn or session.usn,
+                    }
+                else:
+                    return {
+                        "ok": False,
+                        "reason": "not_found",
+                        "message": "No updated records found on this examination portal for your USN.",
+                    }
 
             # Marksheet Extracted Successfully!
             parsed = parse_vtu_html(content)
@@ -640,6 +667,26 @@ class OnDemandScraperManager:
 
                 # Save extracted marksheet into database (intelligent upsert)
                 scraper_worker._save_result(parsed, session.semester)
+
+                # Advance ScrapeTarget index to the next USN in the crowdsourced queue!
+                if getattr(session, "target_id", None):
+                    db = SessionLocal()
+                    try:
+                        target = db.query(ScrapeTarget).filter(ScrapeTarget.id == session.target_id).first()
+                        if target:
+                            usn_list = generate_usn_range(target.start_usn, target.end_usn)
+                            try:
+                                curr_idx = usn_list.index(session.usn)
+                                if curr_idx + 1 < len(usn_list):
+                                    target.current_usn_index = usn_list[curr_idx + 1]
+                                else:
+                                    target.status = "COMPLETED"
+                                    target.completed_at = datetime.utcnow()
+                            except ValueError:
+                                pass
+                            db.commit()
+                    finally:
+                        db.close()
 
                 with self._lock:
                     self._sessions.pop(session_id, None)
