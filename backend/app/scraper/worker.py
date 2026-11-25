@@ -392,16 +392,20 @@ class ScraperWorker:
         db = SessionLocal()
         try:
             usn = parsed["student"]["usn"].strip().upper()
-            name = parsed["student"].get("name", "").strip() or usn
+            scraped_name = parsed["student"].get("name", "").strip()
             branch = extract_branch(usn)
             batch = extract_batch(usn)
 
             student = db.query(Student).filter(Student.usn == usn).first()
             if not student:
                 student = Student(usn=usn)
+                student.name = scraped_name or usn
                 db.add(student)
-
-            student.name = name
+            elif scraped_name and scraped_name != usn:
+                # Update existing student's name if new semester portal has corrected/official spelling
+                student.name = scraped_name
+            elif not student.name:
+                student.name = scraped_name or usn
             student.branch = branch
             student.batch = batch
 

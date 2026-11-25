@@ -198,18 +198,6 @@ def init_db():
             if "faculty" in existing_tables:
                 fac_cols = {c["name"] for c in insp.get_columns("faculty")}
                 if "username" not in fac_cols:
-                    pass
-
-            if "faculty_comparison_logs" in existing_tables:
-                fcomp_cols = {c["name"] for c in insp.get_columns("faculty_comparison_logs")}
-                for col in ["name_a", "name_b"]:
-                    if col not in fcomp_cols:
-                        try:
-                            with engine.begin() as conn:
-                                conn.execute(text(f"ALTER TABLE faculty_comparison_logs ADD COLUMN {col} VARCHAR DEFAULT '';"))
-                            print(f"✅ Added column '{col}' to faculty_comparison_logs table.")
-                        except Exception as col_err:
-                            print(f"⚠️ Could not add column '{col}' to faculty_comparison_logs: {col_err}")
                     try:
                         with engine.begin() as conn:
                             conn.execute(text("ALTER TABLE faculty ADD COLUMN username VARCHAR;"))
@@ -225,6 +213,17 @@ def init_db():
                         print("✅ Added column 'password_hash' to faculty table.")
                     except Exception as col_err:
                         print(f"⚠️ Could not add column 'password_hash' to faculty: {col_err}")
+
+            if "faculty_comparison_logs" in existing_tables:
+                fcomp_cols = {c["name"] for c in insp.get_columns("faculty_comparison_logs")}
+                for col in ["name_a", "name_b"]:
+                    if col not in fcomp_cols:
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(text(f"ALTER TABLE faculty_comparison_logs ADD COLUMN {col} VARCHAR DEFAULT '';"))
+                            print(f"✅ Added column '{col}' to faculty_comparison_logs table.")
+                        except Exception as col_err:
+                            print(f"⚠️ Could not add column '{col}' to faculty_comparison_logs: {col_err}")
 
             # 3. For PostgreSQL (e.g. Supabase on Render), guarantee idempotency with IF NOT EXISTS
             if engine.dialect.name == "postgresql":
