@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { sfx } from "../lib/sfx";
 import { IconInstallApp, IconKey, IconShield } from "./Icons";
-import { DownloadIcon } from "@animateicons/react/lucide";
+import { DownloadIcon, type DownloadIconHandle } from "@animateicons/react/lucide";
 import InstallAppModal from "./InstallAppModal";
 import { AuthSession } from "../lib/api";
 
@@ -29,6 +29,7 @@ export default function Navbar({
 }: NavbarProps) {
   const [muted, setMuted] = useState(false);
   const [isInstallModalOpen, setIsInstallModalOpen] = useState(false);
+  const appNavRef = React.useRef<DownloadIconHandle>(null);
 
   useEffect(() => {
     setMuted(sfx.isMuted);
@@ -170,17 +171,20 @@ export default function Navbar({
           {/* Download App to Homescreen (hidden on small mobile because bottom bar has it) */}
           <button
             onClick={() => {
+              appNavRef.current?.startAnimation();
               sfx.playMechanicalClick();
               setIsInstallModalOpen(true);
             }}
             title="Download app into homescreen for mobile"
-            className={`p-2 rounded-xl border transition-all hidden sm:flex items-center gap-1.5 ${
+            className={`group p-2 rounded-xl border transition-all duration-150 hidden sm:flex items-center gap-1.5 cursor-pointer active:scale-95 ${
               isObsidian
                 ? "bg-slate-900 border-slate-800 text-slate-300 hover:text-white hover:border-slate-700"
                 : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <DownloadIcon size={16} className="text-cyan-400" />
+            <div className="transition-transform duration-150 group-active:scale-90">
+              <DownloadIcon ref={appNavRef} size={16} className="text-cyan-400" />
+            </div>
             <span className="hidden sm:inline text-[11px] font-medium">Get App</span>
           </button>
 

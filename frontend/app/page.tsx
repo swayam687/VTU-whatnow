@@ -42,10 +42,15 @@ import {
 } from "../components/Icons";
 import {
   LayoutGridIcon,
+  type LayoutGridIconHandle,
   NetworkIcon,
+  type NetworkIconHandle,
   ChartColumnIcon,
+  type ChartColumnIconHandle,
   ShieldCheckIcon,
+  type ShieldCheckIconHandle,
   DownloadIcon,
+  type DownloadIconHandle,
 } from "@animateicons/react/lucide";
 import DenseStudentTable from "../components/DenseStudentTable";
 import {
@@ -87,6 +92,13 @@ export default function Dashboard() {
 
   // View state: 'dashboard' | 'topology' | 'backlogs'
   const [currentView, setCurrentView] = useState<"dashboard" | "topology" | "backlogs">("dashboard");
+
+  // AnimateIcons ref handles for tactile click micro-animations
+  const resultsNavRef = React.useRef<LayoutGridIconHandle>(null);
+  const graphNavRef = React.useRef<NetworkIconHandle>(null);
+  const backlogsNavRef = React.useRef<ChartColumnIconHandle>(null);
+  const adminNavRef = React.useRef<ShieldCheckIconHandle>(null);
+  const appNavRef = React.useRef<DownloadIconHandle>(null);
 
   // Display mode: 'grid' (cards) vs 'table' (dense Linear/Notion style)
   const [viewMode, setViewMode] = useState<"grid" | "table">("grid");
@@ -1331,10 +1343,11 @@ export default function Dashboard() {
       >
         <button
           onClick={() => {
+            resultsNavRef.current?.startAnimation();
             sfx.playMechanicalClick();
             setCurrentView("dashboard");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
             currentView === "dashboard"
               ? isObsidian
                 ? "text-cyan-400 font-bold"
@@ -1342,16 +1355,25 @@ export default function Dashboard() {
               : "opacity-70 hover:opacity-100"
           }`}
         >
-          <LayoutGridIcon size={20} />
-          <span className="text-[10px]">Results</span>
+          <div className={`p-1 rounded-lg transition-transform duration-150 group-active:scale-90 ${
+            currentView === "dashboard"
+              ? isObsidian
+                ? "bg-cyan-500/15 border border-cyan-500/25"
+                : "bg-blue-50 border border-blue-200/70"
+              : ""
+          }`}>
+            <LayoutGridIcon ref={resultsNavRef} size={19} />
+          </div>
+          <span className="text-[10px] tracking-tight">Results</span>
         </button>
 
         <button
           onClick={() => {
+            graphNavRef.current?.startAnimation();
             sfx.playSonarChime();
             setCurrentView("topology");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
             currentView === "topology"
               ? isObsidian
                 ? "text-cyan-400 font-bold"
@@ -1359,16 +1381,25 @@ export default function Dashboard() {
               : "opacity-70 hover:opacity-100"
           }`}
         >
-          <NetworkIcon size={20} />
-          <span className="text-[10px]">Graph</span>
+          <div className={`p-1 rounded-lg transition-transform duration-150 group-active:scale-90 ${
+            currentView === "topology"
+              ? isObsidian
+                ? "bg-cyan-500/15 border border-cyan-500/25"
+                : "bg-blue-50 border border-blue-200/70"
+              : ""
+          }`}>
+            <NetworkIcon ref={graphNavRef} size={19} />
+          </div>
+          <span className="text-[10px] tracking-tight">Graph</span>
         </button>
 
         <button
           onClick={() => {
+            backlogsNavRef.current?.startAnimation();
             sfx.playMechanicalClick();
             setCurrentView("backlogs");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+          className={`group flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
             currentView === "backlogs"
               ? isObsidian
                 ? "text-cyan-400 font-bold"
@@ -1376,28 +1407,44 @@ export default function Dashboard() {
               : "opacity-70 hover:opacity-100"
           }`}
         >
-          <ChartColumnIcon size={20} />
-          <span className="text-[10px]">Backlogs</span>
+          <div className={`p-1 rounded-lg transition-transform duration-150 group-active:scale-90 ${
+            currentView === "backlogs"
+              ? isObsidian
+                ? "bg-cyan-500/15 border border-cyan-500/25"
+                : "bg-blue-50 border border-blue-200/70"
+              : ""
+          }`}>
+            <ChartColumnIcon ref={backlogsNavRef} size={19} />
+          </div>
+          <span className="text-[10px] tracking-tight">Backlogs</span>
         </button>
 
         <Link
           href="/admin"
-          onClick={() => sfx.playMechanicalClick()}
-          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-slate-400 hover:text-white"
+          onClick={() => {
+            adminNavRef.current?.startAnimation();
+            sfx.playMechanicalClick();
+          }}
+          className="group flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none active:scale-[0.88]"
         >
-          <ShieldCheckIcon size={20} />
-          <span className="text-[10px]">Admin</span>
+          <div className="p-1 rounded-lg transition-transform duration-150 group-active:scale-90">
+            <ShieldCheckIcon ref={adminNavRef} size={19} />
+          </div>
+          <span className="text-[10px] tracking-tight">Admin</span>
         </Link>
 
         <button
           onClick={() => {
+            appNavRef.current?.startAnimation();
             sfx.playMechanicalClick();
             setIsInstallModalOpen(true);
           }}
-          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-cyan-400 cursor-pointer"
+          className="group flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none active:scale-[0.88]"
         >
-          <DownloadIcon size={20} />
-          <span className="text-[10px]">Get App</span>
+          <div className="p-1 rounded-lg transition-transform duration-150 group-active:scale-90">
+            <DownloadIcon ref={appNavRef} size={19} />
+          </div>
+          <span className="text-[10px] tracking-tight">Get App</span>
         </button>
       </nav>
 
