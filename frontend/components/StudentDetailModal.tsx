@@ -363,7 +363,7 @@ export default function StudentDetailModal({
                 timestamp: Date.now(),
               })
             );
-          } catch {}
+          } catch { }
         }
       }
 
@@ -621,8 +621,8 @@ export default function StudentDetailModal({
         ref={modalRef}
         onClick={(e) => e.stopPropagation()}
         className={`rounded-2xl sm:rounded-3xl border shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden my-auto will-change-transform ${isObsidian
-            ? "bg-[#0b0d11] border-slate-800 text-white"
-            : "bg-white border-slate-200 text-slate-900"
+          ? "bg-[#0b0d11] border-slate-800 text-white"
+          : "bg-white border-slate-200 text-slate-900"
           }`}
       >
         {/* Mobile Swipe-Down Handle & Touch Drag Bar */}
@@ -657,8 +657,8 @@ export default function StudentDetailModal({
             {/* Identicon - Clean avatar box without any overlapping fingerprint text */}
             <div
               className={`transition-all duration-300 ease-out flex-shrink-0 ${isScrambleComplete
-                  ? "opacity-100 scale-100 translate-x-0"
-                  : "opacity-0 scale-75 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
+                ? "opacity-100 scale-100 translate-x-0"
+                : "opacity-0 scale-75 -translate-x-2 pointer-events-none w-0 h-0 overflow-hidden"
                 }`}
             >
               {isScrambleComplete && (
@@ -690,8 +690,8 @@ export default function StudentDetailModal({
                       <span
                         key={idx}
                         className={`inline-block w-4 sm:w-5 text-center font-mono font-bold text-sm sm:text-base tabular-nums transition-colors duration-100 ${item.isLocked
-                            ? "text-cyan-300 font-extrabold"
-                            : "text-amber-400 font-medium animate-pulse"
+                          ? "text-cyan-300 font-extrabold"
+                          : "text-amber-400 font-medium animate-pulse"
                           }`}
                       >
                         {item.char}
@@ -762,10 +762,10 @@ export default function StudentDetailModal({
                 onToggleCompare(usn);
               }}
               className={`p-1.5 sm:p-2 rounded-xl text-xs font-semibold flex items-center gap-1 border transition-all ${compareUsns.includes(usn)
-                  ? "bg-blue-600 text-white border-blue-600 font-bold"
-                  : isObsidian
-                    ? "bg-slate-900 text-slate-300 border-slate-800"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                ? "bg-blue-600 text-white border-blue-600 font-bold"
+                : isObsidian
+                  ? "bg-slate-900 text-slate-300 border-slate-800"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                 }`}
             >
               <IconCompare className="w-3.5 h-3.5" />
@@ -850,8 +850,8 @@ export default function StudentDetailModal({
                 {/* 2. Percentage */}
                 <div
                   className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isObsidian
-                      ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
-                      : "bg-blue-50/60 border-blue-100 text-blue-700"
+                    ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-300"
+                    : "bg-blue-50/60 border-blue-100 text-blue-700"
                     }`}
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
@@ -870,16 +870,16 @@ export default function StudentDetailModal({
                   return (
                     <div
                       className={`p-2.5 rounded-xl border flex flex-col justify-center min-w-0 ${isHidden
+                        ? isObsidian
+                          ? "bg-slate-900/60 border-slate-800 text-slate-400"
+                          : "bg-slate-50 border-slate-200 text-slate-600"
+                        : hasBacklogs
                           ? isObsidian
-                            ? "bg-slate-900/60 border-slate-800 text-slate-400"
-                            : "bg-slate-50 border-slate-200 text-slate-600"
-                          : hasBacklogs
-                            ? isObsidian
-                              ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
-                              : "bg-rose-50 border-rose-200 text-rose-700"
-                            : isObsidian
-                              ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
-                              : "bg-emerald-50 border-emerald-200 text-emerald-700"
+                            ? "bg-rose-950/30 border-rose-800/60 text-rose-400"
+                            : "bg-rose-50 border-rose-200 text-rose-700"
+                          : isObsidian
+                            ? "bg-emerald-950/30 border-emerald-800/60 text-emerald-400"
+                            : "bg-emerald-50 border-emerald-200 text-emerald-700"
                         }`}
                     >
                       <p
@@ -901,9 +901,8 @@ export default function StudentDetailModal({
 
                 {/* 4. Credits (Protected by Captcha Verification Gate) */}
                 <div
-                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${
-                    isObsidian ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-300" : "bg-indigo-50/60 border-indigo-100 text-indigo-700"
-                  }`}
+                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${isObsidian ? "bg-indigo-950/20 border-indigo-800/40 text-indigo-300" : "bg-indigo-50/60 border-indigo-100 text-indigo-700"
+                    }`}
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     Credits
@@ -943,9 +942,8 @@ export default function StudentDetailModal({
 
                 {/* 5. SGPA (Protected by Captcha Verification Gate) */}
                 <div
-                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${
-                    isObsidian ? "bg-emerald-950/20 border-emerald-800/40 text-emerald-300" : "bg-emerald-50/60 border-emerald-100 text-emerald-700"
-                  }`}
+                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${isObsidian ? "bg-emerald-950/20 border-emerald-800/40 text-emerald-300" : "bg-emerald-50/60 border-emerald-100 text-emerald-700"
+                    }`}
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     SGPA
@@ -983,9 +981,8 @@ export default function StudentDetailModal({
 
                 {/* 6. CGPA (Protected by Captcha Verification Gate) */}
                 <div
-                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${
-                    isObsidian ? "bg-purple-950/20 border-purple-800/40 text-purple-300" : "bg-purple-50/60 border-purple-100 text-purple-700"
-                  }`}
+                  className={`relative p-2.5 rounded-xl border flex flex-col justify-center min-w-0 overflow-hidden ${isObsidian ? "bg-purple-950/20 border-purple-800/40 text-purple-300" : "bg-purple-50/60 border-purple-100 text-purple-700"
+                    }`}
                 >
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     CGPA
@@ -1025,11 +1022,10 @@ export default function StudentDetailModal({
               {/* Weekly Profile Insights (Non-creepy, crowdsourced captcha verification gate) */}
               {insights && (
                 <div
-                  className={`p-3 sm:p-4 rounded-2xl border transition-all ${
-                    isObsidian
-                      ? "bg-slate-950/60 border-slate-800/90 text-white"
-                      : "bg-slate-50/80 border-slate-200/90 text-slate-900 shadow-xs"
-                  }`}
+                  className={`p-3 sm:p-4 rounded-2xl border transition-all ${isObsidian
+                    ? "bg-slate-950/60 border-slate-800/90 text-white"
+                    : "bg-slate-50/80 border-slate-200/90 text-slate-900 shadow-xs"
+                    }`}
                 >
                   <div className="flex items-center justify-between gap-2 mb-2.5">
                     <div className="flex items-center gap-2">
@@ -1050,9 +1046,8 @@ export default function StudentDetailModal({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     {/* Metric 1: Marksheet Views */}
                     <div
-                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${
-                        isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
-                      }`}
+                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
@@ -1108,9 +1103,8 @@ export default function StudentDetailModal({
 
                     {/* Metric 2: Peer Comparisons */}
                     <div
-                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${
-                        isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
-                      }`}
+                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
@@ -1209,11 +1203,10 @@ export default function StudentDetailModal({
                     <button
                       disabled={isComparingLoading}
                       onClick={() => onCompareWithMe(student)}
-                      className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${
-                        isComparingLoading
-                          ? "bg-blue-600/80 text-white cursor-wait opacity-90"
-                          : "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 cursor-pointer"
-                      }`}
+                      className={`w-full sm:w-auto px-4 py-2 rounded-xl text-xs font-semibold shadow-sm flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-blue-500 dark:focus-visible:ring-cyan-400 ${isComparingLoading
+                        ? "bg-blue-600/80 text-white cursor-wait opacity-90"
+                        : "bg-slate-900 hover:bg-slate-800 text-white dark:bg-white dark:text-slate-950 dark:hover:bg-slate-100 cursor-pointer"
+                        }`}
                     >
                       {isComparingLoading ? (
                         <>
@@ -1246,8 +1239,8 @@ export default function StudentDetailModal({
               {isMyVerifiedProfile && (
                 <div
                   className={`p-3 sm:p-3.5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 ${isObsidian
-                      ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-200"
-                      : "bg-blue-50/70 border-blue-200 text-blue-900"
+                    ? "bg-cyan-950/20 border-cyan-800/40 text-cyan-200"
+                    : "bg-blue-50/70 border-blue-200 text-blue-900"
                     }`}
                 >
                   <div className="space-y-0.5">
@@ -1352,18 +1345,18 @@ export default function StudentDetailModal({
                           );
                           const credits = isNcmc ? 0 : (m.credits ?? (
                             m.subject_code.includes("MAT") || m.subject_code.includes("PHY") || m.subject_code.includes("CHE") || m.subject_code.includes("PLC") ? 4 :
-                            m.subject_code.includes("CED") || m.subject_code.includes("AIA") || m.subject_code.includes("ESC") || m.subject_code.includes("EIT") ? 3 : 1
+                              m.subject_code.includes("CED") || m.subject_code.includes("AIA") || m.subject_code.includes("ESC") || m.subject_code.includes("EIT") ? 3 : 1
                           ));
                           const grade = m.grade || (
                             isNcmc
                               ? (m.status === "P" && m.total >= 40 ? "PP" : "NP")
                               : m.status !== "P" || m.total < 40 ? "F"
-                              : m.total >= 90 ? "O"
-                              : m.total >= 80 ? "A+"
-                              : m.total >= 70 ? "A"
-                              : m.total >= 60 ? "B+"
-                              : m.total >= 55 ? "B"
-                              : m.total >= 50 ? "C" : "P"
+                                : m.total >= 90 ? "O"
+                                  : m.total >= 80 ? "A+"
+                                    : m.total >= 70 ? "A"
+                                      : m.total >= 60 ? "B+"
+                                        : m.total >= 55 ? "B"
+                                          : m.total >= 50 ? "C" : "P"
                           );
 
                           return (
@@ -1406,10 +1399,10 @@ export default function StudentDetailModal({
                               <td className="py-2 px-2 text-center font-mono font-bold text-xs">
                                 <span className={
                                   grade === "O" ? "text-amber-400" :
-                                  grade === "A+" || grade === "A" ? "text-emerald-400" :
-                                  grade === "B+" || grade === "B" ? "text-cyan-400" :
-                                  grade === "C" || grade === "P" || grade === "PP" ? "text-indigo-400" :
-                                  "text-rose-400"
+                                    grade === "A+" || grade === "A" ? "text-emerald-400" :
+                                      grade === "B+" || grade === "B" ? "text-cyan-400" :
+                                        grade === "C" || grade === "P" || grade === "PP" ? "text-indigo-400" :
+                                          "text-rose-400"
                                 }>
                                   {grade}
                                 </span>
@@ -1417,12 +1410,12 @@ export default function StudentDetailModal({
                               <td className="py-2 px-3 text-right whitespace-nowrap">
                                 <span
                                   className={`inline-block font-semibold px-2 py-0.5 rounded text-[10px] border ${m.status === "P"
-                                      ? isObsidian
-                                        ? "bg-emerald-950 text-emerald-400 border-emerald-800"
-                                        : "bg-emerald-50 text-emerald-700 border-emerald-200"
-                                      : isObsidian
-                                        ? "bg-rose-950 text-rose-400 border-rose-800"
-                                        : "bg-rose-50 text-rose-700 border-rose-200"
+                                    ? isObsidian
+                                      ? "bg-emerald-950 text-emerald-400 border-emerald-800"
+                                      : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                                    : isObsidian
+                                      ? "bg-rose-950 text-rose-400 border-rose-800"
+                                      : "bg-rose-50 text-rose-700 border-rose-200"
                                     }`}
                                 >
                                   {m.status === "P" ? "PASS" : "F"}
@@ -1444,11 +1437,10 @@ export default function StudentDetailModal({
 
                 {/* Educational Note on 2025 Scheme Credits & GPA */}
                 <div
-                  className={`mt-2.5 p-2.5 rounded-xl border text-[11px] flex items-start gap-2.5 ${
-                    isObsidian
-                      ? "bg-slate-900/40 border-slate-800 text-slate-400"
-                      : "bg-slate-50 border-slate-200 text-slate-600"
-                  }`}
+                  className={`mt-2.5 p-2.5 rounded-xl border text-[11px] flex items-start gap-2.5 ${isObsidian
+                    ? "bg-slate-900/40 border-slate-800 text-slate-400"
+                    : "bg-slate-50 border-slate-200 text-slate-600"
+                    }`}
                 >
                   <span className="text-base select-none">📊</span>
                   <div className="space-y-0.5">
@@ -1481,10 +1473,10 @@ export default function StudentDetailModal({
             }}
             disabled={!hasPrev || !onNavigatePrev}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${hasPrev && onNavigatePrev
-                ? isObsidian
-                  ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
-                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
-                : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
+              ? isObsidian
+                ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
+                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
+              : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
               }`}
             title="View previous student (or press Left Arrow)"
           >
@@ -1497,8 +1489,8 @@ export default function StudentDetailModal({
             type="button"
             onClick={handleModalClose}
             className={`flex-1 max-w-[220px] inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm active:scale-95 cursor-pointer ${isObsidian
-                ? "bg-white/10 hover:bg-white/15 text-white border border-white/15 hover:border-white/25 shadow-black/40"
-                : "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/10"
+              ? "bg-white/10 hover:bg-white/15 text-white border border-white/15 hover:border-white/25 shadow-black/40"
+              : "bg-slate-900 hover:bg-slate-800 text-white shadow-slate-900/10"
               }`}
             title="Close marksheet and return to list"
           >
@@ -1522,10 +1514,10 @@ export default function StudentDetailModal({
             }}
             disabled={!hasNext || !onNavigateNext}
             className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border transition-all ${hasNext && onNavigateNext
-                ? isObsidian
-                  ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
-                  : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
-                : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
+              ? isObsidian
+                ? "bg-slate-900 hover:bg-slate-800 text-slate-200 border-slate-700/80 active:scale-95 cursor-pointer"
+                : "bg-white hover:bg-slate-100 text-slate-700 border-slate-200 active:scale-95 cursor-pointer shadow-xs"
+              : "opacity-30 border-transparent cursor-not-allowed text-slate-400"
               }`}
             title="View next student (or press Right Arrow)"
           >
@@ -1564,9 +1556,8 @@ export default function StudentDetailModal({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className={`w-full max-w-sm rounded-2xl sm:rounded-3xl border shadow-2xl overflow-hidden p-5 sm:p-6 transition-all ${
-              isObsidian ? "bg-[#0c0e12] border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
-            }`}
+            className={`w-full max-w-sm rounded-2xl sm:rounded-3xl border shadow-2xl overflow-hidden p-5 sm:p-6 transition-all ${isObsidian ? "bg-[#0c0e12] border-slate-800 text-white" : "bg-white border-slate-200 text-slate-900"
+              }`}
           >
             {/* Header */}
             <div className="flex items-start justify-between gap-3 mb-4">
@@ -1620,9 +1611,8 @@ export default function StudentDetailModal({
               <form onSubmit={handleSubmitCaptcha} className="space-y-4">
                 {/* Captcha Image */}
                 {captchaBase64 && (
-                  <div className={`p-3 rounded-xl border flex flex-col items-center gap-2 ${
-                    isObsidian ? "bg-slate-900/80 border-slate-800" : "bg-slate-50 border-slate-200"
-                  }`}>
+                  <div className={`p-3 rounded-xl border flex flex-col items-center gap-2 ${isObsidian ? "bg-slate-900/80 border-slate-800" : "bg-slate-50 border-slate-200"
+                    }`}>
                     <div className="flex items-center justify-between w-full text-[10px] opacity-60 font-mono">
                       <span>CHALLENGE CHECKSUM</span>
                       <button
@@ -1663,11 +1653,10 @@ export default function StudentDetailModal({
                     autoCorrect="off"
                     spellCheck={false}
                     required
-                    className={`w-full px-4 py-2.5 text-base font-mono text-center tracking-widest rounded-xl border outline-none transition-colors ${
-                      isObsidian
-                        ? "bg-slate-900 border-slate-700 text-white focus:border-cyan-400"
-                        : "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500"
-                    }`}
+                    className={`w-full px-4 py-2.5 text-base font-mono text-center tracking-widest rounded-xl border outline-none transition-colors ${isObsidian
+                      ? "bg-slate-900 border-slate-700 text-white focus:border-cyan-400"
+                      : "bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-500"
+                      }`}
                   />
                 </div>
 

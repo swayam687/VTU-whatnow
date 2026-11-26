@@ -197,6 +197,25 @@ export default function AdminPanel() {
     if (!adminKey) return;
     setAdjustingUsn(usn);
     sfx.playMechanicalClick();
+
+    // Optimistic UI update: instantly update local state so the number changes right away
+    setAdminInsights((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((item) => {
+          if (item.usn.toUpperCase() === usn.toUpperCase()) {
+            return {
+              ...item,
+              views_this_week: Math.max(0, item.views_this_week + (viewsDelta || 0)),
+              comparisons_this_week: Math.max(0, item.comparisons_this_week + (compsDelta || 0)),
+            };
+          }
+          return item;
+        }),
+      };
+    });
+
     try {
       await updateAdminInsightsOffset(adminKey, usn, {
         views_offset_delta: viewsDelta,
@@ -205,6 +224,7 @@ export default function AdminPanel() {
       await loadAdminInsights(insightsSearch);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : "Failed to adjust insights");
+      await loadAdminInsights(insightsSearch);
     } finally {
       setAdjustingUsn(null);
     }
@@ -2452,11 +2472,10 @@ export default function AdminPanel() {
                     sfx.playClick();
                     setRecordsVisibilityFilter(f.id as "all" | "visible" | "hidden" | "verified");
                   }}
-                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                    recordsVisibilityFilter === f.id
-                      ? "bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950 shadow-xs"
-                      : "bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 border border-transparent dark:border-slate-800"
-                  }`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${recordsVisibilityFilter === f.id
+                    ? "bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950 shadow-xs"
+                    : "bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 border border-transparent dark:border-slate-800"
+                    }`}
                 >
                   {f.label}
                 </button>
@@ -2563,11 +2582,10 @@ export default function AdminPanel() {
                 return (
                   <div
                     key={s.usn}
-                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 ${
-                      s.is_hidden
-                        ? "bg-amber-950/10 border-amber-500/30 dark:bg-amber-950/20"
-                        : "bg-white dark:bg-[#0b0d11] border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
-                    }`}
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 ${s.is_hidden
+                      ? "bg-amber-950/10 border-amber-500/30 dark:bg-amber-950/20"
+                      : "bg-white dark:bg-[#0b0d11] border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
+                      }`}
                   >
                     {/* Student Profile Info Section */}
                     <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
@@ -2593,11 +2611,10 @@ export default function AdminPanel() {
                             {s.branch}
                           </span>
                           <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
-                              hasBacklogs
-                                ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
-                                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
-                            }`}
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${hasBacklogs
+                              ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
+                              : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                              }`}
                           >
                             {hasBacklogs ? `${s.total_backlogs} BL` : "All Clear"}
                           </span>
@@ -2795,11 +2812,10 @@ export default function AdminPanel() {
                         type="button"
                         onClick={() => handleToggleVisibility(s.usn, !s.is_hidden)}
                         title={s.is_hidden ? `Unhide ${s.name} (${s.usn})` : `Hide ${s.name} (${s.usn})`}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
-                          s.is_hidden
-                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                            : "bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
-                        }`}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${s.is_hidden
+                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                          : "bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
+                          }`}
                       >
                         {s.is_hidden ? "✅ Unhide" : "🚫 Hide"}
                       </button>
@@ -4225,11 +4241,10 @@ export default function AdminPanel() {
                   sfx.playClick();
                   setFacultyAuditsSubTab("logins");
                 }}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                  facultyAuditsSubTab === "logins"
-                    ? "bg-cyan-600 text-white shadow-xs"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                }`}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${facultyAuditsSubTab === "logins"
+                  ? "bg-cyan-600 text-white shadow-xs"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
               >
                 Faculty Logins ({facultyAuditsData?.login_logs.length || 0})
               </button>
@@ -4239,11 +4254,10 @@ export default function AdminPanel() {
                   sfx.playClick();
                   setFacultyAuditsSubTab("comparisons");
                 }}
-                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
-                  facultyAuditsSubTab === "comparisons"
-                    ? "bg-cyan-600 text-white shadow-xs"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
-                }`}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${facultyAuditsSubTab === "comparisons"
+                  ? "bg-cyan-600 text-white shadow-xs"
+                  : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white"
+                  }`}
               >
                 Faculty Comparisons ({facultyAuditsData?.comparison_logs.length || 0})
               </button>

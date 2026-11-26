@@ -3,6 +3,7 @@ import os
 import time
 import secrets
 import asyncio
+import hashlib
 from pathlib import Path
 
 if sys.platform == "win32":
@@ -3207,7 +3208,7 @@ def get_admin_insights(
         query = query.filter(or_(Student.usn.ilike(term), Student.name.ilike(term)))
 
     # Sort verified first, then by last_login_at or updated_at
-    students = query.order_by(desc(Student.insights_verified), desc(Student.insights_verified_at)).limit(100).all()
+    students = query.order_by(desc(Student.insights_verified), desc(Student.insights_verified_at)).limit(2000).all()
 
     iso_year, iso_week, _ = datetime.utcnow().isocalendar()
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
