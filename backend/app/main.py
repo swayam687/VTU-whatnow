@@ -233,7 +233,7 @@ def init_db():
                 for col_name, col_type in [
                     ("custom_views_offset", "INTEGER DEFAULT 0"),
                     ("custom_comparisons_offset", "INTEGER DEFAULT 0"),
-                    ("insights_verified", "BOOLEAN DEFAULT 0"),
+                    ("insights_verified", "BOOLEAN DEFAULT FALSE"),
                     ("insights_verified_at", "TIMESTAMP"),
                     ("insights_last_ip", "VARCHAR DEFAULT ''"),
                 ]:
@@ -575,7 +575,7 @@ def _prune_expired_captcha_sessions():
         verified_secure_stats_sessions.pop(k, None)
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])
 async def root():
     return {
         "service": "VTU WhatNow API",
@@ -585,7 +585,7 @@ async def root():
     }
 
 
-@app.get("/api/health")
+@app.api_route("/api/health", methods=["GET", "HEAD"])
 async def health():
     return {"status": "ok", "service": "vtuwhatnow"}
 
