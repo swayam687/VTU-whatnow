@@ -2,10 +2,10 @@ import sys
 import os
 import time
 import secrets
+import asyncio
 from pathlib import Path
 
 if sys.platform == "win32":
-    import asyncio
     try:
         asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     except Exception:
