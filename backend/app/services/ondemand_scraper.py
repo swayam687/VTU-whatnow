@@ -1065,6 +1065,16 @@ class OnDemandScraperManager:
         finally:
             db.close()
 
+    def has_active_sessions(self) -> bool:
+        """Quick check under lock whether there are in-flight sessions or pending recycling."""
+        with self._lock:
+            return len(self._sessions) > 0 or self._sessions_served >= 100
+
+    async def cleanup_expired_sessions(self):
+        """Periodically invoked from background lifespan task to purge abandoned browser contexts."""
+        if self.has_active_sessions() and self._worker_loop and self._worker_loop.is_running:
+            await self._worker_loop.run(self._cleanup_expired())
+
     async def cancel_session(self, session_id: str) -> dict:
         """Explicitly cancels an active verification session and releases semaphore slot immediately."""
         return await self._worker_loop.run(

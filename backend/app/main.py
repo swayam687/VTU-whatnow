@@ -452,15 +452,39 @@ def init_db():
 async def lifespan(app: FastAPI):
     # Execute database schema check synchronously before accepting traffic
     init_db()
-    yield
+
+    # Periodic background task to purge abandoned verification sessions every 60s
+    cleanup_stop_event = asyncio.Event()
+
+    async def _periodic_cleanup():
+        while not cleanup_stop_event.is_set():
+            try:
+                await asyncio.wait_for(cleanup_stop_event.wait(), timeout=60.0)
+                break
+            except asyncio.TimeoutError:
+                try:
+                    await ondemand_scraper.cleanup_expired_sessions()
+                except Exception:
+                    pass
+
+    cleanup_task = asyncio.create_task(_periodic_cleanup())
     try:
-        await ondemand_scraper.shutdown()
-    except Exception as e:
-        print(f"⚠️ Notice during ondemand_scraper shutdown: {e}")
-    try:
-        engine.dispose()
-    except Exception:
-        pass
+        yield
+    finally:
+        cleanup_stop_event.set()
+        cleanup_task.cancel()
+        try:
+            await cleanup_task
+        except (asyncio.CancelledError, Exception):
+            pass
+        try:
+            await ondemand_scraper.shutdown()
+        except Exception as e:
+            print(f"⚠️ Notice during ondemand_scraper shutdown: {e}")
+        try:
+            engine.dispose()
+        except Exception:
+            pass
 
 app = FastAPI(title="VTU WhatNow API", version="1.0.0", lifespan=lifespan)
 

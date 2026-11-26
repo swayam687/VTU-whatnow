@@ -34,7 +34,6 @@ import {
   IconKey,
   IconLock,
   IconBolt,
-  IconTrophy,
   IconArrowRight,
   IconFileText,
   IconGrid,
@@ -787,11 +786,14 @@ export default function Dashboard() {
                 }`}
               >
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex items-start sm:items-center gap-3.5">
-                    <div className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border ${
-                      isObsidian ? "bg-white/5 border-white/10 text-slate-300" : "bg-slate-50 border-slate-200 text-slate-700"
-                    }`}>
-                      <IconTrophy className="w-5 h-5" />
+                  <div className="flex items-start sm:items-center gap-3.5 sm:gap-4">
+                    <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl overflow-hidden shrink-0 border border-slate-200/80 dark:border-white/10 bg-black flex items-center justify-center shadow-xs">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src="/preview-badge.jpg"
+                        alt="Rankings Preview"
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
@@ -809,7 +811,7 @@ export default function Dashboard() {
                       <h2 className="font-bold text-base sm:text-lg tracking-tight">
                         Check your branch ranking and scores
                       </h2>
-                      <p className="text-xs opacity-65 max-w-xl">
+                      <p className="text-xs opacity-65 max-w-xl leading-relaxed">
                         Sign in with your USN to unlock your campus rank, complete subject breakdown, and private peer comparisons.
                       </p>
                     </div>
