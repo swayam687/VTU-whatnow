@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Link from "next/link";
 import {
   ScrapeStatus,
@@ -74,6 +74,8 @@ import {
   IconSettings,
   IconLock,
   IconRotateCcw,
+  IconEye,
+  IconCompare,
 } from "../../components/Icons";
 import { sfx } from "../../lib/sfx";
 import Identicon from "../../components/Identicon";
@@ -236,7 +238,7 @@ export default function AdminPanel() {
   const [missingFilter, setMissingFilter] = useState<"all" | "pending" | "resolved">("pending");
 
   // Records visibility filter & direct toggle
-  const [recordsVisibilityFilter, setRecordsVisibilityFilter] = useState<"all" | "visible" | "hidden">("all");
+  const [recordsVisibilityFilter, setRecordsVisibilityFilter] = useState<"all" | "visible" | "hidden" | "verified">("all");
   const [directUsnToToggle, setDirectUsnToToggle] = useState<string>("");
   const [directUsnLoading, setDirectUsnLoading] = useState<boolean>(false);
 
@@ -1198,13 +1200,33 @@ export default function AdminPanel() {
     setSingleUsn(`1RM25${code}001`);
   };
 
-  const filteredStoredStudents = allStudents.filter((s) => {
-    if (recordsVisibilityFilter === "visible" && s.is_hidden) return false;
-    if (recordsVisibilityFilter === "hidden" && !s.is_hidden) return false;
-    if (!studentSearch.trim()) return true;
-    const q = studentSearch.toLowerCase().trim();
-    return s.name.toLowerCase().includes(q) || s.usn.toLowerCase().includes(q) || s.branch.toLowerCase().includes(q);
-  });
+  const insightsByUsn = useMemo(() => {
+    const map = new Map<string, AdminInsightsItem>();
+    if (adminInsights?.items) {
+      for (const item of adminInsights.items) {
+        map.set(item.usn.toUpperCase(), item);
+      }
+    }
+    return map;
+  }, [adminInsights]);
+
+  const filteredStoredStudents = useMemo(() => {
+    return allStudents.filter((s) => {
+      if (recordsVisibilityFilter === "visible" && s.is_hidden) return false;
+      if (recordsVisibilityFilter === "hidden" && !s.is_hidden) return false;
+      if (recordsVisibilityFilter === "verified") {
+        const ins = insightsByUsn.get(s.usn.toUpperCase());
+        if (!ins || !ins.verified) return false;
+      }
+      if (!studentSearch.trim()) return true;
+      const q = studentSearch.toLowerCase().trim();
+      return (
+        s.name.toLowerCase().includes(q) ||
+        s.usn.toLowerCase().includes(q) ||
+        s.branch.toLowerCase().includes(q)
+      );
+    });
+  }, [allStudents, recordsVisibilityFilter, studentSearch, insightsByUsn]);
 
   const progressPercent =
     status.total_count > 0 ? Math.round((status.processed_count / status.total_count) * 100) : 0;
@@ -2371,283 +2393,70 @@ export default function AdminPanel() {
       )}
 
       {/* ------------------------------------------------------------- */}
-      {/* TAB 3: STUDENT RECORDS MANAGEMENT                             */}
+      {/* TAB 3: UNIFIED STUDENT RECORDS & INSIGHTS DASHBOARD           */}
       {/* ------------------------------------------------------------- */}
       {activeTab === "records" && (
-        <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-4">
-          {/* Quick Direct USN Visibility Controller */}
-          <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-2.5">
+        <div className="bg-white dark:bg-[#0c0e12] rounded-2xl sm:rounded-3xl border border-slate-200/90 dark:border-slate-800 p-4 sm:p-6 shadow-xs space-y-5">
+          {/* Top Hero & Live Metric Summary (Student Dashboard Style) */}
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-2 border-b border-slate-100 dark:border-slate-800/80">
             <div>
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                <IconShield className="w-4 h-4 text-slate-700 dark:text-slate-300" />
-                <span>On-Demand USN Visibility Controller (Hide &amp; Unhide Specific USN)</span>
-              </h3>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                Enter any specific student USN to instantly hide them from public view (revoking any active login session), or restore/unhide their data.
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse" />
+                <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                  <span>Student Records &amp; Intelligence Hub</span>
+                </h3>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-xl">
+                Manage live visibility, synchronized comparison credits, verification timestamps, and weekly profile view &amp; peer comparison metrics.
               </p>
             </div>
 
+            {/* Live Metrics Chips */}
             <div className="flex items-center gap-2 flex-wrap">
-              <input
-                type="text"
-                value={directUsnToToggle}
-                onChange={(e) => setDirectUsnToToggle(e.target.value.toUpperCase())}
-                placeholder="Enter exact USN (e.g. 1RM25CD052)..."
-                className="px-3 py-1.5 text-xs font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white outline-none w-64 focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500"
-              />
-              <button
-                type="button"
-                disabled={!directUsnToToggle.trim() || directUsnLoading}
-                onClick={async () => {
-                  if (!directUsnToToggle.trim()) return;
-                  setDirectUsnLoading(true);
-                  await handleToggleVisibility(directUsnToToggle.trim(), true);
-                  setDirectUsnLoading(false);
-                }}
-                className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-amber-600 hover:bg-amber-700 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-              >
-                🚫 Hide USN
-              </button>
-              <button
-                type="button"
-                disabled={!directUsnToToggle.trim() || directUsnLoading}
-                onClick={async () => {
-                  if (!directUsnToToggle.trim()) return;
-                  setDirectUsnLoading(true);
-                  await handleToggleVisibility(directUsnToToggle.trim(), false);
-                  setDirectUsnLoading(false);
-                }}
-                className="px-3.5 py-1.5 text-xs font-bold rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
-              >
-                ✅ Unhide USN
-              </button>
-            </div>
-          </div>
-
-          {/* Student Profile Insights & Verification Activity Controller */}
-          <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-3">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-              <div>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-                  <IconUsers className="w-4 h-4 text-cyan-500" />
-                  <span>Profile Insights &amp; Verification Activity (Views &amp; Peer Compares)</span>
-                </h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                  Monitor if students clicked &amp; verified their weekly insights (with timestamp), and dynamically increase or decrease views and comparison counts.
-                </p>
+              <div className="px-3 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 flex items-center gap-2">
+                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">Total</span>
+                <span className="font-mono font-extrabold text-xs text-slate-900 dark:text-white">{allStudents.length}</span>
               </div>
-
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
-                  ✅ {adminInsights?.total_verified || 0} Verified Students
+              <div className="px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                <span className="text-[10px] uppercase font-bold">Verified</span>
+                <span className="font-mono font-extrabold text-xs">
+                  {adminInsights?.total_verified ?? allStudents.filter((s) => insightsByUsn.get(s.usn.toUpperCase())?.verified).length}
+                </span>
+              </div>
+              <div className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center gap-2 text-amber-600 dark:text-amber-400">
+                <span className="text-[10px] uppercase font-bold">Hidden</span>
+                <span className="font-mono font-extrabold text-xs">
+                  {allStudents.filter((s) => s.is_hidden).length}
                 </span>
               </div>
             </div>
-
-            {/* Search and Refresh Filter */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="relative flex-1 min-w-[200px] max-w-sm">
-                <input
-                  type="text"
-                  value={insightsSearch}
-                  onChange={(e) => {
-                    setInsightsSearch(e.target.value);
-                    loadAdminInsights(e.target.value);
-                  }}
-                  placeholder="Filter by student name or USN..."
-                  className="w-full pl-8 pr-3 py-1.5 text-xs font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
-                />
-                <span className="absolute left-2.5 top-2 text-slate-400">
-                  <IconSearch className="w-3.5 h-3.5" />
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => loadAdminInsights(insightsSearch)}
-                disabled={adminInsightsLoading}
-                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
-              >
-                <IconRotateCcw className={`w-3.5 h-3.5 ${adminInsightsLoading ? "animate-spin" : ""}`} />
-                <span>Refresh Insights</span>
-              </button>
-            </div>
-
-            {/* Insights Table */}
-            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-100 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
-                  <tr>
-                    <th className="py-2 px-3">Student USN &amp; Name</th>
-                    <th className="py-2 px-3">Verification Status &amp; Time</th>
-                    <th className="py-2 px-3 text-center">Weekly Views</th>
-                    <th className="py-2 px-3 text-center">Peer Compares</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
-                  {adminInsightsLoading && !adminInsights ? (
-                    <tr>
-                      <td colSpan={4} className="py-8 text-center text-slate-400">
-                        Loading insights and verification logs...
-                      </td>
-                    </tr>
-                  ) : !adminInsights || adminInsights.items.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="py-6 text-center text-slate-400">
-                        No student insights found.
-                      </td>
-                    </tr>
-                  ) : (
-                    adminInsights.items.map((st) => (
-                      <tr key={st.usn} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
-                        <td className="py-2 px-3">
-                          <p className="font-bold text-slate-900 dark:text-white font-mono">{st.usn}</p>
-                          <p className="text-[11px] font-sans text-slate-500 truncate max-w-[180px]">{st.name}</p>
-                        </td>
-
-                        <td className="py-2 px-3">
-                          {st.verified ? (
-                            <div className="space-y-0.5">
-                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
-                                <span>✅ Verified</span>
-                              </span>
-                              {st.verified_at && (
-                                <p className="text-[10px] text-slate-400 font-sans">
-                                  {new Date(st.verified_at).toLocaleString([], {
-                                    dateStyle: "medium",
-                                    timeStyle: "short",
-                                  })}
-                                </p>
-                              )}
-                              {st.last_ip && (
-                                <p className="text-[9px] text-slate-500 font-mono">IP: {st.last_ip}</p>
-                              )}
-                            </div>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-                              <span>⏳ Unverified</span>
-                            </span>
-                          )}
-                        </td>
-
-                        {/* Views Adjuster */}
-                        <td className="py-2 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <span className="font-extrabold text-cyan-600 dark:text-cyan-400 min-w-[28px] tabular-nums">
-                              {st.views_this_week}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, -5, undefined)}
-                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Decrease views by 5"
-                              >
-                                -5
-                              </button>
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, -1, undefined)}
-                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Decrease views by 1"
-                              >
-                                -1
-                              </button>
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, 1, undefined)}
-                                className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Increase views by 1"
-                              >
-                                +1
-                              </button>
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, 5, undefined)}
-                                className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Increase views by 5"
-                              >
-                                +5
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-
-                        {/* Compares Adjuster */}
-                        <td className="py-2 px-3 text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <span className="font-extrabold text-indigo-600 dark:text-indigo-400 min-w-[28px] tabular-nums">
-                              {st.comparisons_this_week}
-                            </span>
-                            <div className="flex items-center gap-1">
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, undefined, -5)}
-                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Decrease comparisons by 5"
-                              >
-                                -5
-                              </button>
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, undefined, -1)}
-                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Decrease comparisons by 1"
-                              >
-                                -1
-                              </button>
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, undefined, 1)}
-                                className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Increase comparisons by 1"
-                              >
-                                +1
-                              </button>
-                              <button
-                                type="button"
-                                disabled={adjustingUsn === st.usn}
-                                onClick={() => handleAdjustInsights(st.usn, undefined, 5)}
-                                className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
-                                title="Increase comparisons by 5"
-                              >
-                                +5
-                              </button>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
+          {/* Unified Action & Filter Toolbar */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 flex-wrap">
+            {/* Filter Pills */}
             <div className="flex items-center gap-1.5 flex-wrap">
               {[
                 { id: "all", label: `All Records (${allStudents.length})` },
                 { id: "visible", label: `Visible (${allStudents.filter((s) => !s.is_hidden).length})` },
-                { id: "hidden", label: `Hidden / Deleted (${allStudents.filter((s) => s.is_hidden).length})` },
+                { id: "hidden", label: `Hidden (${allStudents.filter((s) => s.is_hidden).length})` },
+                {
+                  id: "verified",
+                  label: `Verified (${adminInsights?.total_verified ?? allStudents.filter((s) => insightsByUsn.get(s.usn.toUpperCase())?.verified).length})`,
+                },
               ].map((f) => (
                 <button
                   key={f.id}
                   type="button"
                   onClick={() => {
                     sfx.playClick();
-                    setRecordsVisibilityFilter(f.id as "all" | "visible" | "hidden");
+                    setRecordsVisibilityFilter(f.id as "all" | "visible" | "hidden" | "verified");
                   }}
-                  className={`px-3 py-1 text-xs font-semibold rounded-lg transition-colors cursor-pointer ${recordsVisibilityFilter === f.id
-                    ? "bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700"
-                    }`}
+                  className={`px-3 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                    recordsVisibilityFilter === f.id
+                      ? "bg-slate-900 text-white dark:bg-cyan-500 dark:text-slate-950 shadow-xs"
+                      : "bg-slate-100 dark:bg-slate-900/80 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 border border-transparent dark:border-slate-800"
+                  }`}
                 >
                   {f.label}
                 </button>
@@ -2659,101 +2468,294 @@ export default function AdminPanel() {
                 disabled={syncingCredits}
                 onClick={handleSyncCreditsRealtime}
                 title="Fetch live comparison credits for all students in real-time from database"
-                className="px-2.5 py-1 text-xs font-bold rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
               >
-                <IconRotateCcw className={`w-3 h-3 ${syncingCredits ? "animate-spin text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-400"}`} />
-                <span>{syncingCredits ? "Syncing..." : "🔄 Sync Credits Live"}</span>
+                <IconRotateCcw className={`w-3.5 h-3.5 ${syncingCredits ? "animate-spin text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-400"}`} />
+                <span>{syncingCredits ? "Syncing..." : "Sync Credits"}</span>
                 {lastCreditsSyncTime && (
-                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium hidden md:inline">
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-mono font-medium hidden lg:inline">
                     • {lastCreditsSyncTime}
                   </span>
                 )}
               </button>
+
+              {/* Refresh Insights Button */}
+              <button
+                type="button"
+                disabled={adminInsightsLoading}
+                onClick={() => loadAdminInsights(insightsSearch)}
+                title="Refresh insights and verification activity timestamps"
+                className="px-3 py-1.5 text-xs font-bold rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200 shadow-2xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+              >
+                <IconRotateCcw className={`w-3.5 h-3.5 ${adminInsightsLoading ? "animate-spin text-cyan-600 dark:text-cyan-400" : "text-slate-600 dark:text-slate-400"}`} />
+                <span>{adminInsightsLoading ? "Refreshing..." : "Refresh Insights"}</span>
+              </button>
             </div>
 
-            <div className="relative w-full sm:w-64">
-              <input
-                type="text"
-                value={studentSearch}
-                onChange={(e) => setStudentSearch(e.target.value)}
-                placeholder="Search USN, name, or branch..."
-                className="w-full pl-8 pr-3 py-2 sm:py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-base sm:text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500"
-              />
-              <span className="absolute left-2.5 top-2.5 text-slate-400">
-                <IconSearch className="w-3.5 h-3.5" />
-              </span>
+            {/* Search Input with Instant USN Quick Toggle */}
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:w-72">
+                <input
+                  type="text"
+                  value={studentSearch}
+                  onChange={(e) => {
+                    setStudentSearch(e.target.value);
+                    setDirectUsnToToggle(e.target.value.toUpperCase());
+                  }}
+                  placeholder="Search USN, name, or branch..."
+                  className="w-full pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 text-slate-900 dark:text-white text-xs focus:outline-none focus:ring-2 focus:ring-slate-900 dark:focus:ring-cyan-500 font-mono"
+                />
+                <span className="absolute left-2.5 top-2 text-slate-400">
+                  <IconSearch className="w-3.5 h-3.5" />
+                </span>
+              </div>
+
+              {/* Quick direct toggle button if exact USN entered */}
+              {studentSearch.trim().length >= 9 && (
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    disabled={directUsnLoading}
+                    onClick={async () => {
+                      setDirectUsnLoading(true);
+                      await handleToggleVisibility(studentSearch.trim().toUpperCase(), true);
+                      setDirectUsnLoading(false);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-amber-600 hover:bg-amber-700 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                    title="Directly hide this USN"
+                  >
+                    Hide
+                  </button>
+                  <button
+                    type="button"
+                    disabled={directUsnLoading}
+                    onClick={async () => {
+                      setDirectUsnLoading(true);
+                      await handleToggleVisibility(studentSearch.trim().toUpperCase(), false);
+                      setDirectUsnLoading(false);
+                    }}
+                    className="px-2.5 py-1 text-[11px] font-bold rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all shadow-xs disabled:opacity-50 cursor-pointer"
+                    title="Directly unhide this USN"
+                  >
+                    Unhide
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
+          {/* Student Dashboard-Styled List of Student Records */}
           {filteredStoredStudents.length === 0 ? (
-            <p className="text-center py-12 text-xs text-slate-400 dark:text-slate-500">
-              {studentSearch ? "No students matching your search criteria." : "No student records currently stored."}
-            </p>
+            <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-slate-200 dark:border-slate-800">
+              <p className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+                {studentSearch ? "No students matching your search criteria." : "No student records currently stored."}
+              </p>
+              <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+                Try adjusting your search query or switching filters above.
+              </p>
+            </div>
           ) : (
-            <div className="border border-slate-200 dark:border-slate-800 rounded-2xl overflow-hidden divide-y divide-slate-100 dark:divide-slate-800/80 max-h-[500px] overflow-y-auto">
-              {filteredStoredStudents.map((s) => (
-                <div
-                  key={s.usn}
-                  className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 hover:bg-slate-50/60 dark:hover:bg-slate-900/40 transition-colors"
-                >
-                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
-                    <Identicon
-                      usn={s.usn}
-                      percentage={s.percentage}
-                      totalBacklogs={s.total_backlogs}
-                      size={36}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                        <span className="font-bold text-slate-900 dark:text-white text-xs sm:text-sm truncate">{s.name}</span>
-                        <span className="text-[10px] font-bold text-slate-500 dark:text-slate-400 px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 uppercase">
-                          {s.branch}
+            <div className="space-y-3 max-h-[640px] overflow-y-auto pr-1">
+              {filteredStoredStudents.map((s) => {
+                const ins = insightsByUsn.get(s.usn.toUpperCase());
+                const hasBacklogs = s.total_backlogs > 0;
+
+                return (
+                  <div
+                    key={s.usn}
+                    className={`p-3.5 sm:p-4 rounded-2xl border transition-all flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 ${
+                      s.is_hidden
+                        ? "bg-amber-950/10 border-amber-500/30 dark:bg-amber-950/20"
+                        : "bg-white dark:bg-[#0b0d11] border-slate-200/90 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 shadow-xs"
+                    }`}
+                  >
+                    {/* Student Profile Info Section */}
+                    <div className="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
+                      <div className="shrink-0">
+                        <Identicon
+                          usn={s.usn}
+                          percentage={s.percentage}
+                          totalBacklogs={s.total_backlogs}
+                          customPixelArt={s.avatar_pixel_art}
+                          size={42}
+                        />
+                      </div>
+
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <span className="font-bold text-slate-900 dark:text-white text-sm sm:text-base tracking-tight truncate">
+                            {s.name}
+                          </span>
+                          <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-cyan-300">
+                            {s.usn}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                            {s.branch}
+                          </span>
+                          <span
+                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                              hasBacklogs
+                                ? "bg-rose-50 dark:bg-rose-950/40 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800"
+                                : "bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800"
+                            }`}
+                          >
+                            {hasBacklogs ? `${s.total_backlogs} BL` : "All Clear"}
+                          </span>
+                          {s.is_hidden && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-300">
+                              Hidden
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 flex-wrap">
+                          <span className="font-mono font-bold text-slate-900 dark:text-slate-200">
+                            {s.percentage ? `${s.percentage.toFixed(1)}%` : "N/A"}
+                          </span>
+                          <span>•</span>
+                          <span className="font-mono text-[11px]">
+                            {s.total_marks || 0} / {s.max_marks || 0}
+                          </span>
+
+                          {/* Verification Audit Status */}
+                          <span>•</span>
+                          {ins?.verified ? (
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                              <span>✅ Verified</span>
+                              {ins.verified_at && (
+                                <span className="font-mono font-medium text-slate-300">
+                                  {formatDateTime(ins.verified_at).full}
+                                </span>
+                              )}
+                              {ins.last_ip && (
+                                <span className="font-mono text-[9px] text-slate-400">
+                                  IP: {ins.last_ip}
+                                </span>
+                              )}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-medium bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400">
+                              ⏳ Unverified
+                            </span>
+                          )}
+
+                          {s.github_url && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400">
+                              GitHub
+                            </span>
+                          )}
+                          {s.linkedin_url && (
+                            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-cyan-50 dark:bg-cyan-950/40 text-cyan-600 dark:text-cyan-400">
+                              LinkedIn
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Interactive Admin Controls Toolbar */}
+                    <div className="flex items-center justify-between xl:justify-end gap-2 flex-wrap pt-2.5 xl:pt-0 border-t xl:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
+                      {/* Weekly Views Adjuster */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                        <IconEye className="w-3.5 h-3.5 text-cyan-500 shrink-0" />
+                        <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">
+                          Views
                         </span>
-                        {s.is_hidden && (
-                          <span className="text-[10px] font-bold text-amber-700 dark:text-amber-300 bg-amber-100 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 px-1.5 py-0.2 rounded uppercase">
-                            Hidden
-                          </span>
-                        )}
+                        <span className="font-mono font-extrabold text-xs text-cyan-600 dark:text-cyan-400 tabular-nums px-1 min-w-[20px] text-center">
+                          {ins?.views_this_week ?? 0}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, -5, undefined)}
+                            className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Decrease views by 5"
+                          >
+                            -5
+                          </button>
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, -1, undefined)}
+                            className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Decrease views by 1"
+                          >
+                            -1
+                          </button>
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, 1, undefined)}
+                            className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-[10px] font-mono font-bold disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Increase views by 1"
+                          >
+                            +1
+                          </button>
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, 5, undefined)}
+                            className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-[10px] font-mono font-bold disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Increase views by 5"
+                          >
+                            +5
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span className="font-mono text-xs text-slate-400 dark:text-slate-500">{s.usn}</span>
-                        {s.github_url && (
-                          <span className="text-[10px] text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 rounded font-mono">
-                            GitHub
-                          </span>
-                        )}
-                        {s.linkedin_url && (
-                          <span className="text-[10px] text-cyan-600 dark:text-cyan-400 bg-cyan-50 dark:bg-cyan-950/40 px-1.5 py-0.2 rounded font-mono">
-                            LinkedIn
-                          </span>
-                        )}
+
+                      {/* Peer Compares Adjuster */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
+                        <IconCompare className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                        <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">
+                          Compares
+                        </span>
+                        <span className="font-mono font-extrabold text-xs text-indigo-600 dark:text-indigo-400 tabular-nums px-1 min-w-[20px] text-center">
+                          {ins?.comparisons_this_week ?? 0}
+                        </span>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, undefined, -5)}
+                            className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Decrease compares by 5"
+                          >
+                            -5
+                          </button>
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, undefined, -1)}
+                            className="px-1.5 py-0.5 rounded bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-200 dark:hover:bg-slate-700 text-[10px] font-mono font-bold text-slate-700 dark:text-slate-300 disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Decrease compares by 1"
+                          >
+                            -1
+                          </button>
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, undefined, 1)}
+                            className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[10px] font-mono font-bold disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Increase compares by 1"
+                          >
+                            +1
+                          </button>
+                          <button
+                            type="button"
+                            disabled={adjustingUsn === s.usn}
+                            onClick={() => handleAdjustInsights(s.usn, undefined, 5)}
+                            className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[10px] font-mono font-bold disabled:opacity-40 cursor-pointer transition-colors"
+                            title="Increase compares by 5"
+                          >
+                            +5
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-2 sm:gap-3 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 shrink-0">
-                    <div className="text-left sm:text-right">
-                      <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 dark:text-white block">
-                        {s.percentage ? `${s.percentage.toFixed(1)}%` : "N/A"}
-                      </span>
-                      <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500">
-                        {s.total_marks || 0} / {s.max_marks || 0}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span
-                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${s.total_backlogs > 0
-                          ? "bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800"
-                          : "bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
-                          }`}
-                      >
-                        {s.total_backlogs === 0 ? "0 BL" : `${s.total_backlogs} BL`}
-                      </span>
-
-                      {/* Comparison Credits Control (Tactile Mobile-Friendly Pill) */}
-                      <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-900/90 px-2.5 py-1 rounded-xl border border-slate-300 dark:border-slate-700/80 shadow-2xs shrink-0">
-                        <span className="text-[10px] font-mono font-bold text-slate-700 dark:text-cyan-300 uppercase tracking-tight">
+                      {/* Comparison Credits Adjuster */}
+                      <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/90 px-2 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs shrink-0">
+                        <span className="text-[10px] font-mono font-bold text-slate-600 dark:text-slate-400 uppercase">
                           Credits
                         </span>
                         <button
@@ -2761,7 +2763,7 @@ export default function AdminPanel() {
                           onClick={() => handleUpdateCredits(s.usn, -1)}
                           disabled={(s.comparison_credits ?? 2) <= 0}
                           title="Decrease credits by 1"
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                          className="w-5 h-5 rounded-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer transition-colors active:scale-95"
                         >
                           -
                         </button>
@@ -2776,30 +2778,33 @@ export default function AdminPanel() {
                               handleUpdateCredits(s.usn, undefined, val);
                             }
                           }}
-                          className="w-7 text-center text-xs font-mono font-extrabold bg-transparent border-0 outline-none text-slate-900 dark:text-cyan-200 p-0 tabular-nums"
+                          className="w-6 text-center text-xs font-mono font-extrabold bg-transparent border-0 outline-none text-slate-900 dark:text-cyan-200 p-0 tabular-nums"
                         />
                         <button
                           type="button"
                           onClick={() => handleUpdateCredits(s.usn, 1)}
                           title="Increase credits by 1"
-                          className="w-6 h-6 rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors shadow-2xs active:scale-95"
+                          className="w-5 h-5 rounded-md bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 flex items-center justify-center text-xs font-bold text-slate-800 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer transition-colors active:scale-95"
                         >
                           +
                         </button>
                       </div>
 
+                      {/* Hide/Unhide Toggle */}
                       <button
                         type="button"
                         onClick={() => handleToggleVisibility(s.usn, !s.is_hidden)}
-                        title={s.is_hidden ? `Unhide ${s.name} (${s.usn}) - Restore to public view` : `Hide ${s.name} (${s.usn}) - Remove from public view`}
-                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${s.is_hidden
-                          ? "bg-emerald-600 hover:bg-emerald-700 text-white"
-                          : "bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
-                          }`}
+                        title={s.is_hidden ? `Unhide ${s.name} (${s.usn})` : `Hide ${s.name} (${s.usn})`}
+                        className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer ${
+                          s.is_hidden
+                            ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                            : "bg-amber-100 dark:bg-amber-950/60 hover:bg-amber-200 dark:hover:bg-amber-900/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-800"
+                        }`}
                       >
-                        {s.is_hidden ? "✅ Unhide" : "🚫 Hide USN"}
+                        {s.is_hidden ? "✅ Unhide" : "🚫 Hide"}
                       </button>
 
+                      {/* Socials Modal */}
                       <button
                         type="button"
                         onClick={() => handleOpenEditSocials(s)}
@@ -2809,6 +2814,7 @@ export default function AdminPanel() {
                         Socials
                       </button>
 
+                      {/* Delete Student Record */}
                       <button
                         type="button"
                         onClick={() => handleDeleteStudent(s.usn)}
@@ -2819,8 +2825,8 @@ export default function AdminPanel() {
                       </button>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

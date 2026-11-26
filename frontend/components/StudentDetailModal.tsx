@@ -236,6 +236,10 @@ export default function StudentDetailModal({
   const [lastVerifiedComparisons, setLastVerifiedComparisons] = useState(0);
   const [fromViewsCount, setFromViewsCount] = useState(0);
   const [fromComparisonsCount, setFromComparisonsCount] = useState(0);
+  const [unlockedCredits, setUnlockedCredits] = useState(false);
+  const [unlockedSgpa, setUnlockedSgpa] = useState(false);
+  const [unlockedCgpa, setUnlockedCgpa] = useState(false);
+  const [verificationTarget, setVerificationTarget] = useState<"credits" | "sgpa" | "cgpa" | "insights">("credits");
 
   // Fetch insights and check previous verification status on USN load
   useEffect(() => {
@@ -261,8 +265,8 @@ export default function StudentDetailModal({
             setFromViewsCount(prevViews);
             setFromComparisonsCount(prevComps);
 
-            // If new activity occurred since last check, keep locked to show trend arrow & re-verify
-            if (data.views_this_week > prevViews || data.comparisons_this_week > prevComps) {
+            // If new activity occurred since last check or never verified, keep locked to show trend arrow & re-verify
+            if (data.views_this_week > prevViews || data.comparisons_this_week > prevComps || prevViews === 0) {
               setInsightsUnlocked(false);
             } else {
               setInsightsUnlocked(true);
@@ -286,6 +290,9 @@ export default function StudentDetailModal({
   // Re-blur stats whenever student USN changes, navigating to next/prev, or modal opens/closes
   useEffect(() => {
     setUnlockedStats(null);
+    setUnlockedCredits(false);
+    setUnlockedSgpa(false);
+    setUnlockedCgpa(false);
     setIsVerificationModalOpen(false);
     setCaptchaSessionId(null);
     setCaptchaBase64(null);
@@ -293,8 +300,9 @@ export default function StudentDetailModal({
     setCaptchaError(null);
   }, [usn, isOpen]);
 
-  const handleOpenVerification = async () => {
+  const handleOpenVerification = async (target: "credits" | "sgpa" | "cgpa" | "insights" = "credits") => {
     sfx.playMechanicalClick();
+    setVerificationTarget(target);
     setIsVerificationModalOpen(true);
     setIsCaptchaLoading(true);
     setCaptchaError(null);
@@ -330,27 +338,33 @@ export default function StudentDetailModal({
 
     try {
       await submitAnalyticsCaptcha(captchaSessionId, captchaInput.trim(), usn);
-      // Session validated on VTU exam portal! Now fetch secure stats with session_id
-      const stats = await getSecureStats(usn, captchaSessionId);
-      setUnlockedStats(stats);
 
-      // Also unlock insights with progressive dynamic counting animation
-      if (insights) {
-        setFromViewsCount(lastVerifiedViews);
-        setFromComparisonsCount(lastVerifiedComparisons);
-        setLastVerifiedViews(insights.views_this_week);
-        setLastVerifiedComparisons(insights.comparisons_this_week);
-        setInsightsUnlocked(true);
-        try {
-          localStorage.setItem(
-            `vtu_insights_${usn.trim().toUpperCase()}`,
-            JSON.stringify({
-              views: insights.views_this_week,
-              comparisons: insights.comparisons_this_week,
-              timestamp: Date.now(),
-            })
-          );
-        } catch {}
+      if (verificationTarget === "credits" || verificationTarget === "sgpa" || verificationTarget === "cgpa") {
+        // ONLY unlock the specific stat requested (credits OR sgpa OR cgpa)
+        const stats = await getSecureStats(usn, captchaSessionId);
+        setUnlockedStats(stats);
+        if (verificationTarget === "credits") setUnlockedCredits(true);
+        if (verificationTarget === "sgpa") setUnlockedSgpa(true);
+        if (verificationTarget === "cgpa") setUnlockedCgpa(true);
+      } else if (verificationTarget === "insights") {
+        // ONLY unlock Weekly Activity & Peer Interest with dynamic counter
+        if (insights) {
+          setFromViewsCount(lastVerifiedViews);
+          setFromComparisonsCount(lastVerifiedComparisons);
+          setLastVerifiedViews(insights.views_this_week);
+          setLastVerifiedComparisons(insights.comparisons_this_week);
+          setInsightsUnlocked(true);
+          try {
+            localStorage.setItem(
+              `vtu_insights_${usn.trim().toUpperCase()}`,
+              JSON.stringify({
+                views: insights.views_this_week,
+                comparisons: insights.comparisons_this_week,
+                timestamp: Date.now(),
+              })
+            );
+          } catch {}
+        }
       }
 
       setIsVerificationModalOpen(false);
@@ -359,7 +373,7 @@ export default function StudentDetailModal({
       const msg = err instanceof Error ? err.message : "Verification code incorrect. Please try again.";
       setCaptchaError(msg);
       // Refresh captcha on failure
-      handleOpenVerification();
+      handleOpenVerification(verificationTarget);
     } finally {
       setIsSubmittingCaptcha(false);
     }
@@ -894,7 +908,7 @@ export default function StudentDetailModal({
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     Credits
                   </p>
-                  {unlockedStats && unlockedStats.usn === student.usn ? (
+                  {unlockedCredits && unlockedStats && unlockedStats.usn === student.usn ? (
                     <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
                       {unlockedStats.is_hidden ? (
                         <span className="text-amber-400 text-xs">Hidden</span>
@@ -910,7 +924,7 @@ export default function StudentDetailModal({
                   ) : (
                     <button
                       type="button"
-                      onClick={handleOpenVerification}
+                      onClick={() => handleOpenVerification("credits")}
                       className="relative w-full group mt-0.5 cursor-pointer outline-none"
                       title="Click to solve security captcha and view verified credits"
                     >
@@ -936,7 +950,7 @@ export default function StudentDetailModal({
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     SGPA
                   </p>
-                  {unlockedStats && unlockedStats.usn === student.usn ? (
+                  {unlockedSgpa && unlockedStats && unlockedStats.usn === student.usn ? (
                     <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
                       {unlockedStats.is_hidden ? (
                         <span className="text-amber-400 text-xs">Hidden</span>
@@ -950,7 +964,7 @@ export default function StudentDetailModal({
                   ) : (
                     <button
                       type="button"
-                      onClick={handleOpenVerification}
+                      onClick={() => handleOpenVerification("sgpa")}
                       className="relative w-full group mt-0.5 cursor-pointer outline-none"
                       title="Click to solve security captcha and view verified SGPA"
                     >
@@ -976,7 +990,7 @@ export default function StudentDetailModal({
                   <p className="text-[10px] uppercase font-semibold opacity-80 tracking-wider truncate">
                     CGPA
                   </p>
-                  {unlockedStats && unlockedStats.usn === student.usn ? (
+                  {unlockedCgpa && unlockedStats && unlockedStats.usn === student.usn ? (
                     <p className="text-xs sm:text-sm font-bold font-mono mt-0.5 tabular-nums truncate">
                       {unlockedStats.is_hidden ? (
                         <span className="text-amber-400 text-xs">Hidden</span>
@@ -990,7 +1004,7 @@ export default function StudentDetailModal({
                   ) : (
                     <button
                       type="button"
-                      onClick={handleOpenVerification}
+                      onClick={() => handleOpenVerification("cgpa")}
                       className="relative w-full group mt-0.5 cursor-pointer outline-none"
                       title="Click to solve security captcha and view verified CGPA"
                     >
@@ -1071,7 +1085,7 @@ export default function StudentDetailModal({
                         ) : (
                           <button
                             type="button"
-                            onClick={handleOpenVerification}
+                            onClick={() => handleOpenVerification("insights")}
                             className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/10 hover:bg-cyan-950/20 transition-all flex items-center justify-between cursor-pointer"
                             title="Complete quick security check to view private marksheet views"
                           >
@@ -1129,7 +1143,7 @@ export default function StudentDetailModal({
                         ) : (
                           <button
                             type="button"
-                            onClick={handleOpenVerification}
+                            onClick={() => handleOpenVerification("insights")}
                             className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-indigo-500/30 hover:border-indigo-400/60 bg-indigo-950/10 hover:bg-indigo-950/20 transition-all flex items-center justify-between cursor-pointer"
                             title="Complete quick security check to view peer comparisons"
                           >
@@ -1589,7 +1603,7 @@ export default function StudentDetailModal({
                 <span>{captchaError}</span>
                 <button
                   type="button"
-                  onClick={handleOpenVerification}
+                  onClick={() => handleOpenVerification(verificationTarget)}
                   className="font-bold underline ml-2 text-[11px] cursor-pointer shrink-0"
                 >
                   Retry
@@ -1613,7 +1627,7 @@ export default function StudentDetailModal({
                       <span>CHALLENGE CHECKSUM</span>
                       <button
                         type="button"
-                        onClick={handleOpenVerification}
+                        onClick={() => handleOpenVerification(verificationTarget)}
                         className="text-cyan-400 hover:text-cyan-300 font-semibold flex items-center gap-1 cursor-pointer"
                       >
                         <IconRotateCcw className="w-3 h-3" />
