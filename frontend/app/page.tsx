@@ -1333,12 +1333,13 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* Mobile Bottom Navigation Bar (Thumb Zone) */}
+      {/* Mobile Bottom Navigation Bar (Thumb Zone) - Compact Slimline */}
       <nav
-        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-2 py-1.5 flex items-center justify-around transition-colors ${
+        aria-label="Mobile Navigation"
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around transition-colors ${
           isObsidian
             ? "bg-[#08090a]/95 border-slate-800/80 text-slate-400"
-            : "bg-white/95 border-slate-200/80 text-slate-500 shadow-lg"
+            : "bg-white/95 border-slate-200/80 text-slate-500 shadow-sm"
         }`}
       >
         <button
@@ -1347,24 +1348,18 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("dashboard");
           }}
-          className={`group flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
             currentView === "dashboard"
               ? isObsidian
-                ? "text-cyan-400 font-bold"
-                : "text-blue-600 font-bold"
-              : "opacity-70 hover:opacity-100"
+                ? "text-cyan-400 font-semibold"
+                : "text-blue-600 font-semibold"
+              : "opacity-60 hover:opacity-100"
           }`}
         >
-          <div className={`p-1 rounded-lg transition-transform duration-150 group-active:scale-90 ${
-            currentView === "dashboard"
-              ? isObsidian
-                ? "bg-cyan-500/15 border border-cyan-500/25"
-                : "bg-blue-50 border border-blue-200/70"
-              : ""
-          }`}>
-            <LayoutGridIcon ref={resultsNavRef} size={19} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
+            <LayoutGridIcon ref={resultsNavRef} size={17} />
           </div>
-          <span className="text-[10px] tracking-tight">Results</span>
+          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Results</span>
         </button>
 
         <button
@@ -1373,24 +1368,18 @@ export default function Dashboard() {
             sfx.playSonarChime();
             setCurrentView("topology");
           }}
-          className={`group flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
             currentView === "topology"
               ? isObsidian
-                ? "text-cyan-400 font-bold"
-                : "text-blue-600 font-bold"
-              : "opacity-70 hover:opacity-100"
+                ? "text-cyan-400 font-semibold"
+                : "text-blue-600 font-semibold"
+              : "opacity-60 hover:opacity-100"
           }`}
         >
-          <div className={`p-1 rounded-lg transition-transform duration-150 group-active:scale-90 ${
-            currentView === "topology"
-              ? isObsidian
-                ? "bg-cyan-500/15 border border-cyan-500/25"
-                : "bg-blue-50 border border-blue-200/70"
-              : ""
-          }`}>
-            <NetworkIcon ref={graphNavRef} size={19} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
+            <NetworkIcon ref={graphNavRef} size={17} />
           </div>
-          <span className="text-[10px] tracking-tight">Graph</span>
+          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Graph</span>
         </button>
 
         <button
@@ -1399,24 +1388,18 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("backlogs");
           }}
-          className={`group flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
             currentView === "backlogs"
               ? isObsidian
-                ? "text-cyan-400 font-bold"
-                : "text-blue-600 font-bold"
-              : "opacity-70 hover:opacity-100"
+                ? "text-cyan-400 font-semibold"
+                : "text-blue-600 font-semibold"
+              : "opacity-60 hover:opacity-100"
           }`}
         >
-          <div className={`p-1 rounded-lg transition-transform duration-150 group-active:scale-90 ${
-            currentView === "backlogs"
-              ? isObsidian
-                ? "bg-cyan-500/15 border border-cyan-500/25"
-                : "bg-blue-50 border border-blue-200/70"
-              : ""
-          }`}>
-            <ChartColumnIcon ref={backlogsNavRef} size={19} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
+            <ChartColumnIcon ref={backlogsNavRef} size={17} />
           </div>
-          <span className="text-[10px] tracking-tight">Backlogs</span>
+          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Backlogs</span>
         </button>
 
         <Link
@@ -1425,12 +1408,12 @@ export default function Dashboard() {
             adminNavRef.current?.startAnimation();
             sfx.playMechanicalClick();
           }}
-          className="group flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none active:scale-[0.88]"
+          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none active:scale-[0.88]"
         >
-          <div className="p-1 rounded-lg transition-transform duration-150 group-active:scale-90">
-            <ShieldCheckIcon ref={adminNavRef} size={19} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
+            <ShieldCheckIcon ref={adminNavRef} size={17} />
           </div>
-          <span className="text-[10px] tracking-tight">Admin</span>
+          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Admin</span>
         </Link>
 
         <button
@@ -1439,12 +1422,12 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setIsInstallModalOpen(true);
           }}
-          className="group flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none active:scale-[0.88]"
+          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none active:scale-[0.88]"
         >
-          <div className="p-1 rounded-lg transition-transform duration-150 group-active:scale-90">
-            <DownloadIcon ref={appNavRef} size={19} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
+            <DownloadIcon ref={appNavRef} size={17} />
           </div>
-          <span className="text-[10px] tracking-tight">Get App</span>
+          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Get App</span>
         </button>
       </nav>
 
