@@ -1536,7 +1536,8 @@ export async function requestAnalyticsCaptcha(targetUsn?: string): Promise<{
 
 export async function submitAnalyticsCaptcha(
   sessionId: string,
-  captchaCode: string
+  captchaCode: string,
+  targetUsn?: string
 ): Promise<{ ok: boolean; session_id: string; message: string }> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const token = getStoredStudentToken();
@@ -1545,7 +1546,11 @@ export async function submitAnalyticsCaptcha(
   const res = await fetch(`${API_BASE}/api/analytics/submit-captcha`, {
     method: "POST",
     headers,
-    body: JSON.stringify({ session_id: sessionId, captcha: captchaCode }),
+    body: JSON.stringify({
+      session_id: sessionId,
+      captcha: captchaCode,
+      usn: targetUsn ? targetUsn.trim().toUpperCase() : undefined,
+    }),
   });
 
   const data = await res.json().catch(() => ({}));
@@ -1562,6 +1567,10 @@ export interface StudentInsights {
   views_this_week: number;
   comparisons_this_week: number;
   period: string;
+  verified?: boolean;
+  verified_at?: string | null;
+  custom_views_offset?: number;
+  custom_comparisons_offset?: number;
 }
 
 export async function fetchStudentInsights(usn: string): Promise<StudentInsights> {
@@ -1576,6 +1585,67 @@ export async function fetchStudentInsights(usn: string): Promise<StudentInsights
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
     throw new Error(data.detail || "Failed to load profile insights");
+  }
+  return res.json();
+}
+
+export interface AdminInsightsItem {
+  usn: string;
+  name: string;
+  branch: string;
+  percentage: number;
+  verified: boolean;
+  verified_at: string | null;
+  views_this_week: number;
+  comparisons_this_week: number;
+  custom_views_offset: number;
+  custom_comparisons_offset: number;
+  last_ip: string;
+}
+
+export interface AdminInsightsResponse {
+  ok: boolean;
+  total_verified: number;
+  items: AdminInsightsItem[];
+}
+
+export async function fetchAdminInsights(
+  adminKey: string,
+  search?: string
+): Promise<AdminInsightsResponse> {
+  const params = search && search.trim() ? `?search=${encodeURIComponent(search.trim())}` : "";
+  const res = await fetch(`${API_BASE}/api/admin/insights${params}`, {
+    headers: { "X-Admin-Key": adminKey },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to load admin insights");
+  }
+  return res.json();
+}
+
+export async function updateAdminInsightsOffset(
+  adminKey: string,
+  usn: string,
+  payload: {
+    views_offset_delta?: number;
+    comparisons_offset_delta?: number;
+    set_views_offset?: number;
+    set_comparisons_offset?: number;
+  }
+): Promise<{ ok: boolean; usn: string; custom_views_offset: number; custom_comparisons_offset: number; message: string }> {
+  const res = await fetch(`${API_BASE}/api/admin/students/${encodeURIComponent(usn)}/insights-offset`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Admin-Key": adminKey,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to update insights offset");
   }
   return res.json();
 }

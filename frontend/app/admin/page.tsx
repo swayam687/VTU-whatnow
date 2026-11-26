@@ -52,6 +52,10 @@ import {
   fetchLiveCreditsSync,
   fetchAdminFacultyAudits,
   FacultyAuditsData,
+  fetchAdminInsights,
+  updateAdminInsightsOffset,
+  AdminInsightsResponse,
+  AdminInsightsItem,
 } from "../../lib/api";
 import {
   IconSearch,
@@ -163,6 +167,46 @@ export default function AdminPanel() {
     }
   };
 
+
+  // Profile Insights & Verifications State
+  const [adminInsights, setAdminInsights] = useState<AdminInsightsResponse | null>(null);
+  const [adminInsightsLoading, setAdminInsightsLoading] = useState(false);
+  const [insightsSearch, setInsightsSearch] = useState("");
+  const [adjustingUsn, setAdjustingUsn] = useState<string | null>(null);
+
+  const loadAdminInsights = async (search?: string) => {
+    if (!adminKey) return;
+    setAdminInsightsLoading(true);
+    try {
+      const data = await fetchAdminInsights(adminKey, search);
+      setAdminInsights(data);
+    } catch {
+      // ignore
+    } finally {
+      setAdminInsightsLoading(false);
+    }
+  };
+
+  const handleAdjustInsights = async (
+    usn: string,
+    viewsDelta?: number,
+    compsDelta?: number
+  ) => {
+    if (!adminKey) return;
+    setAdjustingUsn(usn);
+    sfx.playMechanicalClick();
+    try {
+      await updateAdminInsightsOffset(adminKey, usn, {
+        views_offset_delta: viewsDelta,
+        comparisons_offset_delta: compsDelta,
+      });
+      await loadAdminInsights(insightsSearch);
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : "Failed to adjust insights");
+    } finally {
+      setAdjustingUsn(null);
+    }
+  };
 
   // Re-scrape / Revaluation Requests state
   const [rescrapeRequests, setRescrapeRequests] = useState<RescrapeRequestRecord[]>([]);
@@ -875,6 +919,8 @@ export default function AdminPanel() {
         loadComparisonLogs();
       } else if (activeTab === "faculty_audits") {
         loadFacultyAudits();
+      } else if (activeTab === "records") {
+        loadAdminInsights();
       }
     }
   }, [isAuthenticated, activeTab, disputeFilter, rescrapeFilter, logsSubTab, facultyAuditsSubTab]);
@@ -2375,6 +2421,212 @@ export default function AdminPanel() {
               >
                 ✅ Unhide USN
               </button>
+            </div>
+          </div>
+
+          {/* Student Profile Insights & Verification Activity Controller */}
+          <div className="p-4 rounded-2xl bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                  <IconUsers className="w-4 h-4 text-cyan-500" />
+                  <span>Profile Insights &amp; Verification Activity (Views &amp; Peer Compares)</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                  Monitor if students clicked &amp; verified their weekly insights (with timestamp), and dynamically increase or decrease views and comparison counts.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono px-2.5 py-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 font-bold">
+                  ✅ {adminInsights?.total_verified || 0} Verified Students
+                </span>
+              </div>
+            </div>
+
+            {/* Search and Refresh Filter */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative flex-1 min-w-[200px] max-w-sm">
+                <input
+                  type="text"
+                  value={insightsSearch}
+                  onChange={(e) => {
+                    setInsightsSearch(e.target.value);
+                    loadAdminInsights(e.target.value);
+                  }}
+                  placeholder="Filter by student name or USN..."
+                  className="w-full pl-8 pr-3 py-1.5 text-xs font-mono rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-cyan-500"
+                />
+                <span className="absolute left-2.5 top-2 text-slate-400">
+                  <IconSearch className="w-3.5 h-3.5" />
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => loadAdminInsights(insightsSearch)}
+                disabled={adminInsightsLoading}
+                className="px-3 py-1.5 text-xs font-semibold rounded-xl bg-slate-200 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-700 flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <IconRotateCcw className={`w-3.5 h-3.5 ${adminInsightsLoading ? "animate-spin" : ""}`} />
+                <span>Refresh Insights</span>
+              </button>
+            </div>
+
+            {/* Insights Table */}
+            <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[380px] overflow-y-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-100 dark:bg-slate-900/90 text-slate-600 dark:text-slate-400 font-semibold border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
+                  <tr>
+                    <th className="py-2 px-3">Student USN &amp; Name</th>
+                    <th className="py-2 px-3">Verification Status &amp; Time</th>
+                    <th className="py-2 px-3 text-center">Weekly Views</th>
+                    <th className="py-2 px-3 text-center">Peer Compares</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-800/60 font-mono">
+                  {adminInsightsLoading && !adminInsights ? (
+                    <tr>
+                      <td colSpan={4} className="py-8 text-center text-slate-400">
+                        Loading insights and verification logs...
+                      </td>
+                    </tr>
+                  ) : !adminInsights || adminInsights.items.length === 0 ? (
+                    <tr>
+                      <td colSpan={4} className="py-6 text-center text-slate-400">
+                        No student insights found.
+                      </td>
+                    </tr>
+                  ) : (
+                    adminInsights.items.map((st) => (
+                      <tr key={st.usn} className="hover:bg-slate-50/80 dark:hover:bg-slate-900/30 transition-colors">
+                        <td className="py-2 px-3">
+                          <p className="font-bold text-slate-900 dark:text-white font-mono">{st.usn}</p>
+                          <p className="text-[11px] font-sans text-slate-500 truncate max-w-[180px]">{st.name}</p>
+                        </td>
+
+                        <td className="py-2 px-3">
+                          {st.verified ? (
+                            <div className="space-y-0.5">
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400">
+                                <span>✅ Verified</span>
+                              </span>
+                              {st.verified_at && (
+                                <p className="text-[10px] text-slate-400 font-sans">
+                                  {new Date(st.verified_at).toLocaleString([], {
+                                    dateStyle: "medium",
+                                    timeStyle: "short",
+                                  })}
+                                </p>
+                              )}
+                              {st.last_ip && (
+                                <p className="text-[9px] text-slate-500 font-mono">IP: {st.last_ip}</p>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-200/50 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                              <span>⏳ Unverified</span>
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Views Adjuster */}
+                        <td className="py-2 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className="font-extrabold text-cyan-600 dark:text-cyan-400 min-w-[28px] tabular-nums">
+                              {st.views_this_week}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, -5, undefined)}
+                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Decrease views by 5"
+                              >
+                                -5
+                              </button>
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, -1, undefined)}
+                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Decrease views by 1"
+                              >
+                                -1
+                              </button>
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, 1, undefined)}
+                                className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Increase views by 1"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, 5, undefined)}
+                                className="px-1.5 py-0.5 rounded bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Increase views by 5"
+                              >
+                                +5
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* Compares Adjuster */}
+                        <td className="py-2 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <span className="font-extrabold text-indigo-600 dark:text-indigo-400 min-w-[28px] tabular-nums">
+                              {st.comparisons_this_week}
+                            </span>
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, undefined, -5)}
+                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Decrease comparisons by 5"
+                              >
+                                -5
+                              </button>
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, undefined, -1)}
+                                className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Decrease comparisons by 1"
+                              >
+                                -1
+                              </button>
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, undefined, 1)}
+                                className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Increase comparisons by 1"
+                              >
+                                +1
+                              </button>
+                              <button
+                                type="button"
+                                disabled={adjustingUsn === st.usn}
+                                onClick={() => handleAdjustInsights(st.usn, undefined, 5)}
+                                className="px-1.5 py-0.5 rounded bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-400 text-[10px] font-bold transition-colors disabled:opacity-40 cursor-pointer"
+                                title="Increase comparisons by 5"
+                              >
+                                +5
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
 

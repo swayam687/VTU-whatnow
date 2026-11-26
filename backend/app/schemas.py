@@ -457,6 +457,14 @@ class CompareCaptchaChallengeResponse(BaseModel):
 class CompareCaptchaSubmitRequest(BaseModel):
     session_id: str
     captcha: str
+    usn: Optional[str] = None
+
+
+class AdminInsightsOffsetRequest(BaseModel):
+    views_offset_delta: Optional[int] = None
+    comparisons_offset_delta: Optional[int] = None
+    set_views_offset: Optional[int] = None
+    set_comparisons_offset: Optional[int] = None
 
 
 class AdminCreditUpdateRequest(BaseModel):

@@ -105,6 +105,7 @@ from .schemas import (
     LoginGateSubmitResponse,
     CompareCaptchaChallengeResponse,
     CompareCaptchaSubmitRequest,
+    AdminInsightsOffsetRequest,
     AdminCreditUpdateRequest,
     SessionCancelRequest,
     SecureStatsRequest,
@@ -226,6 +227,23 @@ def init_db():
                         except Exception as col_err:
                             print(f"⚠️ Could not add column '{col}' to faculty_comparison_logs: {col_err}")
 
+            if "students" in existing_tables:
+                student_cols = {c["name"] for c in insp.get_columns("students")}
+                for col_name, col_type in [
+                    ("custom_views_offset", "INTEGER DEFAULT 0"),
+                    ("custom_comparisons_offset", "INTEGER DEFAULT 0"),
+                    ("insights_verified", "BOOLEAN DEFAULT 0"),
+                    ("insights_verified_at", "TIMESTAMP"),
+                    ("insights_last_ip", "VARCHAR DEFAULT ''"),
+                ]:
+                    if col_name not in student_cols:
+                        try:
+                            with engine.begin() as conn:
+                                conn.execute(text(f"ALTER TABLE students ADD COLUMN {col_name} {col_type};"))
+                            print(f"✅ Added column '{col_name}' to students table.")
+                        except Exception as col_err:
+                            print(f"⚠️ Could not add column '{col_name}' to students: {col_err}")
+
             # 3. For PostgreSQL (e.g. Supabase on Render), guarantee idempotency with IF NOT EXISTS
             if engine.dialect.name == "postgresql":
                 for col_name, col_def in [
@@ -240,6 +258,11 @@ def init_db():
                     ("allow_comparison", "BOOLEAN DEFAULT TRUE"),
                     ("is_hidden", "BOOLEAN DEFAULT FALSE"),
                     ("comparison_credits", "INTEGER DEFAULT 2"),
+                    ("custom_views_offset", "INTEGER DEFAULT 0"),
+                    ("custom_comparisons_offset", "INTEGER DEFAULT 0"),
+                    ("insights_verified", "BOOLEAN DEFAULT FALSE"),
+                    ("insights_verified_at", "TIMESTAMP"),
+                    ("insights_last_ip", "VARCHAR DEFAULT ''"),
                 ]:
                     try:
                         with engine.begin() as conn:
@@ -2643,6 +2666,30 @@ async def submit_analytics_captcha(
                 user_student.comparison_credits = (user_student.comparison_credits or 0) + 1
                 db.commit()
 
+        # Mark student's profile insights as verified with exact date, time, and IP
+        target_usn_to_mark = (req.usn or current_usn or res.get("target_usn") or "").strip().upper()
+        if target_usn_to_mark:
+            target_st = db.query(Student).filter(Student.usn == target_usn_to_mark).first()
+            if target_st:
+                target_st.insights_verified = True
+                target_st.insights_verified_at = datetime.utcnow()
+                target_st.insights_last_ip = client_ip
+                db.commit()
+
+            # Record in user_captcha_logs for admin auditing
+            try:
+                c_log = UserCaptchaLog(
+                    user_usn=target_usn_to_mark,
+                    target_usn=res.get("target_usn") or "TARGET_USN",
+                    vtu_link=res.get("portal_url") or "",
+                    action="insights_verification",
+                    ip_address=client_ip,
+                )
+                db.add(c_log)
+                db.commit()
+            except Exception:
+                pass
+
         return {
             "ok": True,
             "session_id": req.session_id,
@@ -3130,15 +3177,123 @@ def get_student_insights(
     base_views = 28 + (h % 30) + rank_boost * 2
     base_comparisons = 7 + ((h >> 4) % 11) + (rank_boost // 2)
 
-    total_views = base_views + real_views
-    total_comparisons = base_comparisons + real_comparisons
+    total_views = max(0, base_views + real_views + (student.custom_views_offset or 0))
+    total_comparisons = max(0, base_comparisons + real_comparisons + (student.custom_comparisons_offset or 0))
 
     return {
         "ok": True,
         "usn": clean_usn,
         "views_this_week": total_views,
         "comparisons_this_week": total_comparisons,
-        "period": "Last 7 days"
+        "period": "Last 7 days",
+        "verified": bool(student.insights_verified),
+        "verified_at": to_utc_iso(student.insights_verified_at),
+        "custom_views_offset": student.custom_views_offset or 0,
+        "custom_comparisons_offset": student.custom_comparisons_offset or 0,
+    }
+
+
+@app.get("/api/admin/insights", dependencies=[Depends(require_admin)])
+def get_admin_insights(
+    search: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """
+    Admin portal endpoint to inspect student verification timestamps and views/comparisons data.
+    """
+    query = db.query(Student).filter(Student.is_hidden == False)
+    if search and search.strip():
+        term = f"%{search.strip().upper()}%"
+        query = query.filter(or_(Student.usn.ilike(term), Student.name.ilike(term)))
+
+    # Sort verified first, then by last_login_at or updated_at
+    students = query.order_by(desc(Student.insights_verified), desc(Student.insights_verified_at)).limit(100).all()
+
+    iso_year, iso_week, _ = datetime.utcnow().isocalendar()
+    seven_days_ago = datetime.utcnow() - timedelta(days=7)
+
+    items = []
+    for s in students:
+        seed_str = f"{s.usn}-{iso_year}-{iso_week}"
+        h = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+        rank_boost = int((s.percentage or 60.0) / 10.0)
+        base_views = 28 + (h % 30) + rank_boost * 2
+        base_comparisons = 7 + ((h >> 4) % 11) + (rank_boost // 2)
+
+        try:
+            real_views = db.query(StudentViewLog).filter(
+                StudentViewLog.usn == s.usn,
+                StudentViewLog.viewed_at >= seven_days_ago
+            ).count()
+        except Exception:
+            real_views = 0
+
+        try:
+            real_comparisons = db.query(ComparisonLog).filter(
+                or_(ComparisonLog.student1_usn == s.usn, ComparisonLog.student2_usn == s.usn),
+                ComparisonLog.compared_at >= seven_days_ago
+            ).count()
+        except Exception:
+            real_comparisons = 0
+
+        total_v = max(0, base_views + real_views + (s.custom_views_offset or 0))
+        total_c = max(0, base_comparisons + real_comparisons + (s.custom_comparisons_offset or 0))
+
+        items.append({
+            "usn": s.usn,
+            "name": s.name or "Student",
+            "branch": s.branch or "",
+            "percentage": s.percentage or 0.0,
+            "verified": bool(s.insights_verified),
+            "verified_at": to_utc_iso(s.insights_verified_at),
+            "views_this_week": total_v,
+            "comparisons_this_week": total_c,
+            "custom_views_offset": s.custom_views_offset or 0,
+            "custom_comparisons_offset": s.custom_comparisons_offset or 0,
+            "last_ip": s.insights_last_ip or "",
+        })
+
+    total_verified = db.query(Student).filter(Student.insights_verified == True).count()
+
+    return {
+        "ok": True,
+        "total_verified": total_verified,
+        "items": items,
+    }
+
+
+@app.patch("/api/admin/students/{usn}/insights-offset", dependencies=[Depends(require_admin)])
+def update_student_insights_offset(
+    usn: str,
+    req: AdminInsightsOffsetRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Allows admin to increase, decrease, or set custom views and comparison counts for any student.
+    """
+    clean_usn = usn.strip().upper()
+    student = db.query(Student).filter(Student.usn == clean_usn).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found.")
+
+    if req.views_offset_delta is not None:
+        student.custom_views_offset = (student.custom_views_offset or 0) + req.views_offset_delta
+    elif req.set_views_offset is not None:
+        student.custom_views_offset = req.set_views_offset
+
+    if req.comparisons_offset_delta is not None:
+        student.custom_comparisons_offset = (student.custom_comparisons_offset or 0) + req.comparisons_offset_delta
+    elif req.set_comparisons_offset is not None:
+        student.custom_comparisons_offset = req.set_comparisons_offset
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "usn": clean_usn,
+        "custom_views_offset": student.custom_views_offset or 0,
+        "custom_comparisons_offset": student.custom_comparisons_offset or 0,
+        "message": f"Successfully updated insights offset for {clean_usn}."
     }
 
 

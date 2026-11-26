@@ -29,6 +29,13 @@ class Student(Base):
     avatar_pixel_art = Column(String, nullable=True, default="")  # 10x10 custom pixel art matrix
     comparison_credits = Column(Integer, default=2, nullable=False)
 
+    # Profile Insights & Verification Activity
+    custom_views_offset = Column(Integer, default=0)
+    custom_comparisons_offset = Column(Integer, default=0)
+    insights_verified = Column(Boolean, default=False)
+    insights_verified_at = Column(DateTime, nullable=True)
+    insights_last_ip = Column(String, nullable=True, default="")
+
     # Student Privacy Controls
     show_my_name = Column(Boolean, default=True)
     show_my_marks = Column(Boolean, default=True)

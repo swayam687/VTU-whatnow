@@ -329,7 +329,7 @@ export default function StudentDetailModal({
     setCaptchaError(null);
 
     try {
-      await submitAnalyticsCaptcha(captchaSessionId, captchaInput.trim());
+      await submitAnalyticsCaptcha(captchaSessionId, captchaInput.trim(), usn);
       // Session validated on VTU exam portal! Now fetch secure stats with session_id
       const stats = await getSecureStats(usn, captchaSessionId);
       setUnlockedStats(stats);
@@ -1046,9 +1046,11 @@ export default function StudentDetailModal({
                           <span>Marksheet Views</span>
                         </div>
                         {insights.views_this_week > lastVerifiedViews && lastVerifiedViews > 0 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 animate-pulse">
-                            <span>↑</span>
-                            <span>+{insights.views_this_week - lastVerifiedViews} new</span>
+                          <span
+                            className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-xs shadow-emerald-500/20 animate-bounce"
+                            title="New activity recorded"
+                          >
+                            ↑
                           </span>
                         )}
                       </div>
@@ -1070,12 +1072,16 @@ export default function StudentDetailModal({
                           <button
                             type="button"
                             onClick={handleOpenVerification}
-                            className="relative w-full group py-1.5 px-2.5 rounded-lg border border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/10 hover:bg-cyan-950/20 transition-all flex items-center justify-between cursor-pointer"
+                            className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/10 hover:bg-cyan-950/20 transition-all flex items-center justify-between cursor-pointer"
                             title="Complete quick security check to view private marksheet views"
                           >
-                            <div className="flex items-center gap-1.5 filter blur-xs select-none opacity-30 font-mono font-bold text-sm">
-                              <span>{insights.views_this_week}</span>
-                              <span className="text-[10px] font-normal">views this week</span>
+                            <div className="flex items-center gap-2 select-none pointer-events-none">
+                              <span className="font-mono font-black text-sm tracking-widest text-slate-400/50 filter blur-[3px]">
+                                ••
+                              </span>
+                              <span className="text-[11px] font-medium opacity-60">
+                                views this week
+                              </span>
                             </div>
                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
                               <IconLock className="w-2.5 h-2.5 text-cyan-400" />
@@ -1098,9 +1104,11 @@ export default function StudentDetailModal({
                           <span>Peer Comparisons</span>
                         </div>
                         {insights.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0 && (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 animate-pulse">
-                            <span>↑</span>
-                            <span>+{insights.comparisons_this_week - lastVerifiedComparisons} new</span>
+                          <span
+                            className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 shadow-xs shadow-indigo-500/20 animate-bounce"
+                            title="New comparison recorded"
+                          >
+                            ↑
                           </span>
                         )}
                       </div>
@@ -1122,12 +1130,16 @@ export default function StudentDetailModal({
                           <button
                             type="button"
                             onClick={handleOpenVerification}
-                            className="relative w-full group py-1.5 px-2.5 rounded-lg border border-dashed border-indigo-500/30 hover:border-indigo-400/60 bg-indigo-950/10 hover:bg-indigo-950/20 transition-all flex items-center justify-between cursor-pointer"
+                            className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-indigo-500/30 hover:border-indigo-400/60 bg-indigo-950/10 hover:bg-indigo-950/20 transition-all flex items-center justify-between cursor-pointer"
                             title="Complete quick security check to view peer comparisons"
                           >
-                            <div className="flex items-center gap-1.5 filter blur-xs select-none opacity-30 font-mono font-bold text-sm">
-                              <span>{insights.comparisons_this_week}</span>
-                              <span className="text-[10px] font-normal">compared with you</span>
+                            <div className="flex items-center gap-2 select-none pointer-events-none">
+                              <span className="font-mono font-black text-sm tracking-widest text-slate-400/50 filter blur-[3px]">
+                                ••
+                              </span>
+                              <span className="text-[11px] font-medium opacity-60">
+                                compared with you
+                              </span>
                             </div>
                             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
                               <IconLock className="w-2.5 h-2.5 text-indigo-400" />
@@ -1139,13 +1151,15 @@ export default function StudentDetailModal({
                     </div>
                   </div>
 
-                  {/* Privacy Footer & Future Feature Hook */}
-                  <div className="mt-2.5 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[10px] opacity-55 font-mono">
-                    <span className="flex items-center gap-1">
-                      <IconShield className="w-3 h-3 text-cyan-400" />
-                      <span>Anonymized privacy mode active</span>
+                  {/* Future Feature Hook: Who compared you with themselves list */}
+                  <div className="mt-2.5 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
+                      <IconUsers className="w-3.5 h-3.5 text-cyan-400" />
+                      <span>Who compared you with themselves list</span>
+                    </div>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold">
+                      Coming Soon
                     </span>
-                    <span>Detailed peer breakdown coming soon</span>
                   </div>
                 </div>
               )}
