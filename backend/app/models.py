@@ -141,6 +141,16 @@ class ComparisonLog(Base):
     ip_address = Column(String, nullable=True, default="")
 
 
+class StudentViewLog(Base):
+    __tablename__ = "student_view_logs"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    usn = Column(String, index=True, nullable=False)
+    viewer_ip = Column(String, nullable=True)
+    viewer_usn = Column(String, nullable=True)
+    viewed_at = Column(DateTime, default=datetime.utcnow)
+
+
 class MissingUSNReport(Base):
     __tablename__ = "missing_usn_reports"
 

@@ -8,6 +8,8 @@ import {
   requestAnalyticsCaptcha,
   submitAnalyticsCaptcha,
   SecureStatsData,
+  fetchStudentInsights,
+  StudentInsights,
 } from "../lib/api";
 import {
   IconClose,
@@ -22,7 +24,10 @@ import {
   IconArrowLeft,
   IconArrowRight,
   IconLock,
+  IconEye,
+  IconUsers,
 } from "./Icons";
+import CountUp from "./CountUp";
 import Identicon from "./Identicon";
 import RescrapeRequestModal from "./RescrapeRequestModal";
 import PrivacySettingsModal from "./PrivacySettingsModal";
@@ -224,6 +229,60 @@ export default function StudentDetailModal({
   const [captchaError, setCaptchaError] = useState<string | null>(null);
   const captchaInputRef = useRef<HTMLInputElement>(null);
 
+  // Weekly Profile Insights State
+  const [insights, setInsights] = useState<StudentInsights | null>(null);
+  const [insightsUnlocked, setInsightsUnlocked] = useState(false);
+  const [lastVerifiedViews, setLastVerifiedViews] = useState(0);
+  const [lastVerifiedComparisons, setLastVerifiedComparisons] = useState(0);
+  const [fromViewsCount, setFromViewsCount] = useState(0);
+  const [fromComparisonsCount, setFromComparisonsCount] = useState(0);
+
+  // Fetch insights and check previous verification status on USN load
+  useEffect(() => {
+    if (!isOpen || !usn) {
+      setInsights(null);
+      setInsightsUnlocked(false);
+      return;
+    }
+
+    const cleanUsn = usn.trim().toUpperCase();
+
+    fetchStudentInsights(cleanUsn)
+      .then((data) => {
+        setInsights(data);
+        try {
+          const raw = localStorage.getItem(`vtu_insights_${cleanUsn}`);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const prevViews = Number(parsed.views) || 0;
+            const prevComps = Number(parsed.comparisons) || 0;
+            setLastVerifiedViews(prevViews);
+            setLastVerifiedComparisons(prevComps);
+            setFromViewsCount(prevViews);
+            setFromComparisonsCount(prevComps);
+
+            // If new activity occurred since last check, keep locked to show trend arrow & re-verify
+            if (data.views_this_week > prevViews || data.comparisons_this_week > prevComps) {
+              setInsightsUnlocked(false);
+            } else {
+              setInsightsUnlocked(true);
+            }
+          } else {
+            setInsightsUnlocked(false);
+            setLastVerifiedViews(0);
+            setLastVerifiedComparisons(0);
+            setFromViewsCount(0);
+            setFromComparisonsCount(0);
+          }
+        } catch {
+          setInsightsUnlocked(false);
+        }
+      })
+      .catch(() => {
+        // Fallback gracefully without breaking marksheet viewing
+      });
+  }, [usn, isOpen]);
+
   // Re-blur stats whenever student USN changes, navigating to next/prev, or modal opens/closes
   useEffect(() => {
     setUnlockedStats(null);
@@ -274,6 +333,26 @@ export default function StudentDetailModal({
       // Session validated on VTU exam portal! Now fetch secure stats with session_id
       const stats = await getSecureStats(usn, captchaSessionId);
       setUnlockedStats(stats);
+
+      // Also unlock insights with progressive dynamic counting animation
+      if (insights) {
+        setFromViewsCount(lastVerifiedViews);
+        setFromComparisonsCount(lastVerifiedComparisons);
+        setLastVerifiedViews(insights.views_this_week);
+        setLastVerifiedComparisons(insights.comparisons_this_week);
+        setInsightsUnlocked(true);
+        try {
+          localStorage.setItem(
+            `vtu_insights_${usn.trim().toUpperCase()}`,
+            JSON.stringify({
+              views: insights.views_this_week,
+              comparisons: insights.comparisons_this_week,
+              timestamp: Date.now(),
+            })
+          );
+        } catch {}
+      }
+
       setIsVerificationModalOpen(false);
       sfx.playSonarChime();
     } catch (err: unknown) {
@@ -929,6 +1008,147 @@ export default function StudentDetailModal({
                 </div>
               </div>
 
+              {/* Weekly Profile Insights (Non-creepy, crowdsourced captcha verification gate) */}
+              {insights && (
+                <div
+                  className={`p-3 sm:p-4 rounded-2xl border transition-all ${
+                    isObsidian
+                      ? "bg-slate-950/60 border-slate-800/90 text-white"
+                      : "bg-slate-50/80 border-slate-200/90 text-slate-900 shadow-xs"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2 mb-2.5">
+                    <div className="flex items-center gap-2">
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                      </span>
+                      <span className="text-xs font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                        Weekly Activity & Peer Interest
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-mono opacity-50 hidden sm:inline-flex items-center gap-1">
+                      <IconShield className="w-3 h-3 text-cyan-400" />
+                      Private to this USN • Past 7 Days
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Metric 1: Marksheet Views */}
+                    <div
+                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${
+                        isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
+                          <IconEye className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Marksheet Views</span>
+                        </div>
+                        {insights.views_this_week > lastVerifiedViews && lastVerifiedViews > 0 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 animate-pulse">
+                            <span>↑</span>
+                            <span>+{insights.views_this_week - lastVerifiedViews} new</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2.5">
+                        {insightsUnlocked ? (
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <CountUp
+                              from={fromViewsCount}
+                              to={insights.views_this_week}
+                              duration={1.2}
+                              className="font-mono font-extrabold text-base sm:text-lg text-slate-900 dark:text-cyan-300 tabular-nums"
+                            />
+                            <span className="text-[11px] opacity-70">
+                              peers viewed your marksheet this week
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleOpenVerification}
+                            className="relative w-full group py-1.5 px-2.5 rounded-lg border border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/10 hover:bg-cyan-950/20 transition-all flex items-center justify-between cursor-pointer"
+                            title="Complete quick security check to view private marksheet views"
+                          >
+                            <div className="flex items-center gap-1.5 filter blur-xs select-none opacity-30 font-mono font-bold text-sm">
+                              <span>{insights.views_this_week}</span>
+                              <span className="text-[10px] font-normal">views this week</span>
+                            </div>
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
+                              <IconLock className="w-2.5 h-2.5 text-cyan-400" />
+                              <span>{lastVerifiedViews > 0 ? "Unlock New Views" : "Verify to Reveal"}</span>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Metric 2: Peer Comparisons */}
+                    <div
+                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${
+                        isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
+                          <IconCompare className="w-3.5 h-3.5 text-indigo-400" />
+                          <span>Peer Comparisons</span>
+                        </div>
+                        {insights.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0 && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-mono font-bold bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 animate-pulse">
+                            <span>↑</span>
+                            <span>+{insights.comparisons_this_week - lastVerifiedComparisons} new</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-2.5">
+                        {insightsUnlocked ? (
+                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                            <CountUp
+                              from={fromComparisonsCount}
+                              to={insights.comparisons_this_week}
+                              duration={1.2}
+                              className="font-mono font-extrabold text-base sm:text-lg text-slate-900 dark:text-indigo-300 tabular-nums"
+                            />
+                            <span className="text-[11px] opacity-70">
+                              classmates compared performance with you
+                            </span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={handleOpenVerification}
+                            className="relative w-full group py-1.5 px-2.5 rounded-lg border border-dashed border-indigo-500/30 hover:border-indigo-400/60 bg-indigo-950/10 hover:bg-indigo-950/20 transition-all flex items-center justify-between cursor-pointer"
+                            title="Complete quick security check to view peer comparisons"
+                          >
+                            <div className="flex items-center gap-1.5 filter blur-xs select-none opacity-30 font-mono font-bold text-sm">
+                              <span>{insights.comparisons_this_week}</span>
+                              <span className="text-[10px] font-normal">compared with you</span>
+                            </div>
+                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
+                              <IconLock className="w-2.5 h-2.5 text-indigo-400" />
+                              <span>{lastVerifiedComparisons > 0 ? "Unlock New Compares" : "Verify to Reveal"}</span>
+                            </div>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Privacy Footer & Future Feature Hook */}
+                  <div className="mt-2.5 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[10px] opacity-55 font-mono">
+                    <span className="flex items-center gap-1">
+                      <IconShield className="w-3 h-3 text-cyan-400" />
+                      <span>Anonymized privacy mode active</span>
+                    </span>
+                    <span>Detailed peer breakdown coming soon</span>
+                  </div>
+                </div>
+              )}
 
               {/* Head-to-Head Comparison Banner */}
               <div

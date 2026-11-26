@@ -1556,6 +1556,30 @@ export async function submitAnalyticsCaptcha(
   return data;
 }
 
+export interface StudentInsights {
+  ok: boolean;
+  usn: string;
+  views_this_week: number;
+  comparisons_this_week: number;
+  period: string;
+}
+
+export async function fetchStudentInsights(usn: string): Promise<StudentInsights> {
+  const headers: Record<string, string> = {};
+  const token = getStoredStudentToken();
+  if (token) headers["X-Student-Token"] = token;
+
+  const res = await fetch(`${API_BASE}/api/students/${encodeURIComponent(usn)}/insights`, {
+    headers,
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.detail || "Failed to load profile insights");
+  }
+  return res.json();
+}
+
 export async function cancelOnDemandCaptcha(sessionId: string): Promise<void> {
   if (!sessionId) return;
   try {
