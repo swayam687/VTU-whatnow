@@ -892,7 +892,7 @@ export default function Dashboard() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search student name or USN (e.g. 1RM25CS..., 1RM25CD...)"
-                  className={`w-full h-9 pl-9 pr-24 sm:pr-28 rounded-xl border text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`w-full h-9 pl-9 pr-24 sm:pr-28 rounded-xl border text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     isObsidian
                       ? "bg-slate-950 border-slate-800 text-white placeholder-slate-500"
                       : "bg-slate-50/70 border-slate-200 text-slate-900"
@@ -1336,7 +1336,7 @@ export default function Dashboard() {
       {/* Mobile Bottom Navigation Bar (Thumb Zone) - Compact Slimline */}
       <nav
         aria-label="Mobile Navigation"
-        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around transition-colors ${
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around transition-colors touch-manipulation ${
           isObsidian
             ? "bg-[#08090a]/95 border-slate-800/80 text-slate-400"
             : "bg-white/95 border-slate-200/80 text-slate-500 shadow-sm"
@@ -1348,7 +1348,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("dashboard");
           }}
-          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.88] ${
             currentView === "dashboard"
               ? isObsidian
                 ? "text-cyan-400 font-semibold"
@@ -1368,7 +1368,7 @@ export default function Dashboard() {
             sfx.playSonarChime();
             setCurrentView("topology");
           }}
-          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.88] ${
             currentView === "topology"
               ? isObsidian
                 ? "text-cyan-400 font-semibold"
@@ -1388,7 +1388,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("backlogs");
           }}
-          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.88] ${
             currentView === "backlogs"
               ? isObsidian
                 ? "text-cyan-400 font-semibold"
@@ -1408,7 +1408,7 @@ export default function Dashboard() {
             adminNavRef.current?.startAnimation();
             sfx.playMechanicalClick();
           }}
-          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none active:scale-[0.88]"
+          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none touch-manipulation active:scale-[0.88]"
         >
           <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
             <ShieldCheckIcon ref={adminNavRef} size={17} />
@@ -1422,7 +1422,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setIsInstallModalOpen(true);
           }}
-          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none active:scale-[0.88]"
+          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none touch-manipulation active:scale-[0.88]"
         >
           <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
             <DownloadIcon ref={appNavRef} size={17} />

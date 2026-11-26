@@ -419,10 +419,10 @@ export default function CampusGraph({
         </div>
 
         {/* Filter Toolbar */}
-        <div className="flex flex-wrap items-center gap-2 text-xs">
+        <div className="flex flex-wrap items-center gap-2 text-xs max-w-full">
           {/* Branch filter */}
           <div
-            className={`flex items-center gap-1 p-1 rounded-xl border ${
+            className={`flex items-center gap-1 p-1 rounded-xl border max-w-full overflow-x-auto ${
               isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-100 border-slate-200"
             }`}
           >
@@ -433,7 +433,7 @@ export default function CampusGraph({
                   sfx.playMechanicalClick();
                   setFilterBranch(b);
                 }}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all touch-manipulation whitespace-nowrap ${
                   filterBranch === b
                     ? isObsidian
                       ? "bg-cyan-500 text-slate-950 font-bold"
@@ -448,7 +448,7 @@ export default function CampusGraph({
 
           {/* Mode toggle */}
           <div
-            className={`flex items-center gap-1 p-1 rounded-xl border ${
+            className={`flex items-center gap-1 p-1 rounded-xl border touch-manipulation ${
               isObsidian ? "bg-slate-900/60 border-slate-800" : "bg-slate-100 border-slate-200"
             }`}
           >
@@ -459,7 +459,7 @@ export default function CampusGraph({
                   sfx.playMechanicalClick();
                   setFilterMode(m);
                 }}
-                className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-bold transition-all ${
+                className={`px-2.5 py-1 rounded-lg text-[10px] uppercase font-bold transition-all touch-manipulation ${
                   filterMode === m
                     ? "bg-amber-500 text-slate-950 font-bold"
                     : "opacity-60 hover:opacity-100"
