@@ -287,6 +287,34 @@ export default function StudentDetailModal({
       });
   }, [usn, isOpen]);
 
+  // Live monitoring: automatically re-blur Weekly Activity whenever the view or comparison count goes up
+  useEffect(() => {
+    if (!isOpen || !usn) return;
+    const cleanUsn = usn.trim().toUpperCase();
+
+    const pollInterval = setInterval(() => {
+      fetchStudentInsights(cleanUsn)
+        .then((latest) => {
+          setInsights((current) => {
+            if (!current) return latest;
+            // If view count or comparison count increased since last verified, auto-blur immediately
+            if (
+              (latest.views_this_week > lastVerifiedViews && lastVerifiedViews > 0) ||
+              (latest.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0)
+            ) {
+              setFromViewsCount(lastVerifiedViews);
+              setFromComparisonsCount(lastVerifiedComparisons);
+              setInsightsUnlocked(false);
+            }
+            return latest;
+          });
+        })
+        .catch(() => {});
+    }, 8000);
+
+    return () => clearInterval(pollInterval);
+  }, [isOpen, usn, lastVerifiedViews, lastVerifiedComparisons]);
+
   // Re-blur stats whenever student USN changes, navigating to next/prev, or modal opens/closes
   useEffect(() => {
     setUnlockedStats(null);
@@ -340,14 +368,14 @@ export default function StudentDetailModal({
       await submitAnalyticsCaptcha(captchaSessionId, captchaInput.trim(), usn);
 
       if (verificationTarget === "credits" || verificationTarget === "sgpa" || verificationTarget === "cgpa") {
-        // ONLY unlock the specific stat requested (credits OR sgpa OR cgpa)
+        // Verifying one unlocks all three academic metrics: Credits, SGPA, and CGPA together
         const stats = await getSecureStats(usn, captchaSessionId);
         setUnlockedStats(stats);
-        if (verificationTarget === "credits") setUnlockedCredits(true);
-        if (verificationTarget === "sgpa") setUnlockedSgpa(true);
-        if (verificationTarget === "cgpa") setUnlockedCgpa(true);
+        setUnlockedCredits(true);
+        setUnlockedSgpa(true);
+        setUnlockedCgpa(true);
       } else if (verificationTarget === "insights") {
-        // ONLY unlock Weekly Activity & Peer Interest with dynamic counter
+        // ONLY unlock Weekly Activity with dynamic counter
         if (insights) {
           setFromViewsCount(lastVerifiedViews);
           setFromComparisonsCount(lastVerifiedComparisons);
@@ -1019,159 +1047,6 @@ export default function StudentDetailModal({
                 </div>
               </div>
 
-              {/* Weekly Profile Insights (Non-creepy, crowdsourced captcha verification gate) */}
-              {insights && (
-                <div
-                  className={`p-3 sm:p-4 rounded-2xl border transition-all ${isObsidian
-                    ? "bg-slate-950/60 border-slate-800/90 text-white"
-                    : "bg-slate-50/80 border-slate-200/90 text-slate-900 shadow-xs"
-                    }`}
-                >
-                  <div className="flex items-center justify-between gap-2 mb-2.5">
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
-                      </span>
-                      <span className="text-xs font-bold tracking-tight text-slate-900 dark:text-slate-100">
-                        Weekly Activity & Peer Interest
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-mono opacity-50 hidden sm:inline-flex items-center gap-1">
-                      <IconShield className="w-3 h-3 text-cyan-400" />
-                      Private to this USN • Past 7 Days
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    {/* Metric 1: Marksheet Views */}
-                    <div
-                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
-                          <IconEye className="w-3.5 h-3.5 text-cyan-400" />
-                          <span>Marksheet Views</span>
-                        </div>
-                        {insights.views_this_week > lastVerifiedViews && lastVerifiedViews > 0 && (
-                          <span
-                            className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-xs shadow-emerald-500/20 animate-bounce"
-                            title="New activity recorded"
-                          >
-                            ↑
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2.5">
-                        {insightsUnlocked ? (
-                          <div className="flex items-baseline gap-1.5 flex-wrap">
-                            <CountUp
-                              from={fromViewsCount}
-                              to={insights.views_this_week}
-                              duration={1.2}
-                              className="font-mono font-extrabold text-base sm:text-lg text-slate-900 dark:text-cyan-300 tabular-nums"
-                            />
-                            <span className="text-[11px] opacity-70">
-                              peers viewed your marksheet this week
-                            </span>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenVerification("insights")}
-                            className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/10 hover:bg-cyan-950/20 transition-all flex items-center justify-between cursor-pointer"
-                            title="Complete quick security check to view private marksheet views"
-                          >
-                            <div className="flex items-center gap-2 select-none pointer-events-none">
-                              <span className="font-mono font-black text-sm tracking-widest text-slate-400/50 filter blur-[3px]">
-                                ••
-                              </span>
-                              <span className="text-[11px] font-medium opacity-60">
-                                views this week
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
-                              <IconLock className="w-2.5 h-2.5 text-cyan-400" />
-                              <span>{lastVerifiedViews > 0 ? "Unlock New Views" : "Verify to Reveal"}</span>
-                            </div>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Metric 2: Peer Comparisons */}
-                    <div
-                      className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
-                        }`}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
-                          <IconCompare className="w-3.5 h-3.5 text-indigo-400" />
-                          <span>Peer Comparisons</span>
-                        </div>
-                        {insights.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0 && (
-                          <span
-                            className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 shadow-xs shadow-indigo-500/20 animate-bounce"
-                            title="New comparison recorded"
-                          >
-                            ↑
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2.5">
-                        {insightsUnlocked ? (
-                          <div className="flex items-baseline gap-1.5 flex-wrap">
-                            <CountUp
-                              from={fromComparisonsCount}
-                              to={insights.comparisons_this_week}
-                              duration={1.2}
-                              className="font-mono font-extrabold text-base sm:text-lg text-slate-900 dark:text-indigo-300 tabular-nums"
-                            />
-                            <span className="text-[11px] opacity-70">
-                              classmates compared performance with you
-                            </span>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => handleOpenVerification("insights")}
-                            className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-indigo-500/30 hover:border-indigo-400/60 bg-indigo-950/10 hover:bg-indigo-950/20 transition-all flex items-center justify-between cursor-pointer"
-                            title="Complete quick security check to view peer comparisons"
-                          >
-                            <div className="flex items-center gap-2 select-none pointer-events-none">
-                              <span className="font-mono font-black text-sm tracking-widest text-slate-400/50 filter blur-[3px]">
-                                ••
-                              </span>
-                              <span className="text-[11px] font-medium opacity-60">
-                                compared with you
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
-                              <IconLock className="w-2.5 h-2.5 text-indigo-400" />
-                              <span>{lastVerifiedComparisons > 0 ? "Unlock New Compares" : "Verify to Reveal"}</span>
-                            </div>
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Future Feature Hook: Who compared you with themselves list */}
-                  <div className="mt-2.5 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[11px]">
-                    <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
-                      <IconUsers className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Who compared you with themselves list</span>
-                    </div>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold">
-                      Coming Soon
-                    </span>
-                  </div>
-                </div>
-              )}
-
               {/* Head-to-Head Comparison Banner */}
               <div
                 className={`p-3 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-2.5 ${isObsidian ? "bg-white/[0.03] border-white/10" : "bg-slate-50 border-slate-200/80"
@@ -1452,6 +1327,159 @@ export default function StudentDetailModal({
                     </p>
                   </div>
                 </div>
+
+                {/* Weekly Profile Insights (Non-creepy, crowdsourced captcha verification gate) */}
+                {insights && (
+                  <div
+                    className={`mt-3 p-3 sm:p-4 rounded-2xl border transition-all ${isObsidian
+                      ? "bg-slate-950/60 border-slate-800/90 text-white"
+                      : "bg-slate-50/80 border-slate-200/90 text-slate-900 shadow-xs"
+                      }`}
+                  >
+                    <div className="flex items-center justify-between gap-2 mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="relative flex h-2 w-2">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75" />
+                          <span className="relative inline-flex rounded-full h-2 w-2 bg-cyan-500" />
+                        </span>
+                        <span className="text-xs font-bold tracking-tight text-slate-900 dark:text-slate-100">
+                          Weekly Activity
+                        </span>
+                      </div>
+                      <span className="text-[10px] font-mono opacity-50 hidden sm:inline-flex items-center gap-1">
+                        <IconShield className="w-3 h-3 text-cyan-400" />
+                        Private to this USN • Past 7 Days
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                      {/* Metric 1: Marksheet Views */}
+                      <div
+                        className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
+                            <IconEye className="w-3.5 h-3.5 text-cyan-400" />
+                            <span>Marksheet Views</span>
+                          </div>
+                          {insights.views_this_week > lastVerifiedViews && lastVerifiedViews > 0 && (
+                            <span
+                              className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 shadow-xs shadow-emerald-500/20 animate-bounce"
+                              title="New activity recorded"
+                            >
+                              ↑
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-2.5">
+                          {insightsUnlocked ? (
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <CountUp
+                                from={fromViewsCount}
+                                to={insights.views_this_week}
+                                duration={1.2}
+                                className="font-mono font-extrabold text-base sm:text-lg text-slate-900 dark:text-cyan-300 tabular-nums"
+                              />
+                              <span className="text-[11px] opacity-70">
+                                peers viewed your marksheet this week
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenVerification("insights")}
+                              className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-cyan-500/30 hover:border-cyan-400/60 bg-cyan-950/10 hover:bg-cyan-950/20 transition-all flex items-center justify-between cursor-pointer"
+                              title="Complete quick security check to view private marksheet views"
+                            >
+                              <div className="flex items-center gap-2 select-none pointer-events-none">
+                                <span className="font-mono font-black text-sm tracking-widest text-slate-400/50 filter blur-[3px]">
+                                  ••
+                                </span>
+                                <span className="text-[11px] font-medium opacity-60">
+                                  views this week
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
+                                <IconLock className="w-2.5 h-2.5 text-cyan-400" />
+                                <span>{lastVerifiedViews > 0 ? "Unlock New Views" : "Verify to Reveal"}</span>
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Metric 2: Peer Comparisons */}
+                      <div
+                        className={`p-3 rounded-xl border relative overflow-hidden flex flex-col justify-between ${isObsidian ? "bg-[#0c0e12] border-slate-800/80" : "bg-white border-slate-200"
+                          }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold opacity-75">
+                            <IconCompare className="w-3.5 h-3.5 text-indigo-400" />
+                            <span>Peer Comparisons</span>
+                          </div>
+                          {insights.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0 && (
+                            <span
+                              className="inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-mono font-bold bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 shadow-xs shadow-indigo-500/20 animate-bounce"
+                              title="New comparison recorded"
+                            >
+                              ↑
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="mt-2.5">
+                          {insightsUnlocked ? (
+                            <div className="flex items-baseline gap-1.5 flex-wrap">
+                              <CountUp
+                                from={fromComparisonsCount}
+                                to={insights.comparisons_this_week}
+                                duration={1.2}
+                                className="font-mono font-extrabold text-base sm:text-lg text-slate-900 dark:text-indigo-300 tabular-nums"
+                              />
+                              <span className="text-[11px] opacity-70">
+                                classmates compared performance with you
+                              </span>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => handleOpenVerification("insights")}
+                              className="relative w-full group py-2 px-2.5 rounded-lg border border-dashed border-indigo-500/30 hover:border-indigo-400/60 bg-indigo-950/10 hover:bg-indigo-950/20 transition-all flex items-center justify-between cursor-pointer"
+                              title="Complete quick security check to view peer comparisons"
+                            >
+                              <div className="flex items-center gap-2 select-none pointer-events-none">
+                                <span className="font-mono font-black text-sm tracking-widest text-slate-400/50 filter blur-[3px]">
+                                  ••
+                                </span>
+                                <span className="text-[11px] font-medium opacity-60">
+                                  compared with you
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-indigo-500/15 text-indigo-300 font-semibold text-[10px] group-hover:scale-105 transition-transform">
+                                <IconLock className="w-2.5 h-2.5 text-indigo-400" />
+                                <span>{lastVerifiedComparisons > 0 ? "Unlock New Compares" : "Verify to Reveal"}</span>
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Future Feature Hook: Who compared you with themselves list */}
+                    <div className="mt-2.5 pt-2 border-t border-slate-800/40 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
+                        <IconUsers className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Who compared you with themselves list</span>
+                      </div>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-slate-200/60 dark:bg-slate-800/80 text-slate-500 dark:text-slate-400 font-semibold">
+                        Coming Soon
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}

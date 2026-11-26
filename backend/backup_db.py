@@ -31,6 +31,12 @@ TABLES_TO_BACKUP = [
     "comparison_logs",
     "missing_usn_reports",
     "rescrape_requests",
+    "student_view_logs",
+    "user_captcha_logs",
+    "scrape_targets",
+    "faculty",
+    "faculty_login_logs",
+    "faculty_comparison_logs",
 ]
 
 

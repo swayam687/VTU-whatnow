@@ -768,9 +768,11 @@ export default function Dashboard() {
                     {students.length > 0 && (
                       <button
                         onClick={() => {
-                          const topper = students[0];
-                          if (topper && topper.usn.toUpperCase() !== studentSession.usn.toUpperCase()) {
-                            handleCompareWithMe(topper);
+                          const topperCandidate = (toppers && toppers.length > 0)
+                            ? toppers[0]
+                            : (students.find((s) => s.total_backlogs === 0) || students[0]);
+                          if (topperCandidate && topperCandidate.usn.toUpperCase() !== studentSession.usn.toUpperCase()) {
+                            handleCompareWithMe(topperCandidate);
                           }
                         }}
                         className={`flex-1 sm:flex-none px-3.5 py-2 rounded-xl text-xs font-medium border transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] ${
@@ -1091,7 +1093,7 @@ export default function Dashboard() {
                       <StudentCard
                         key={s.usn}
                         student={s}
-                        rank={sortBy === "percentage" && !search ? idx + 1 : undefined}
+                        rank={sortBy === "percentage" && !search && s.total_backlogs === 0 ? idx + 1 : undefined}
                         isSelectedForCompare={compareUsns.includes(s.usn)}
                         onToggleCompare={() => handleToggleCompare(s.usn)}
                         onOpenDetail={(e) => { handleOpenDetail(s.usn, e); }}
@@ -1333,10 +1335,10 @@ export default function Dashboard() {
         );
       })()}
 
-      {/* Mobile Bottom Navigation Bar (Thumb Zone) - Compact Slimline */}
+      {/* Mobile Bottom Navigation Bar (Thumb Zone) */}
       <nav
         aria-label="Mobile Navigation"
-        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-1 py-1 pb-[calc(0.25rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around transition-colors touch-manipulation ${
+        className={`lg:hidden fixed bottom-0 left-0 right-0 z-30 backdrop-blur-lg border-t px-2 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] flex items-center justify-around transition-colors touch-manipulation min-h-[3.5rem] ${
           isObsidian
             ? "bg-[#08090a]/95 border-slate-800/80 text-slate-400"
             : "bg-white/95 border-slate-200/80 text-slate-500 shadow-sm"
@@ -1348,7 +1350,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("dashboard");
           }}
-          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.92] ${
             currentView === "dashboard"
               ? isObsidian
                 ? "text-cyan-400 font-semibold"
@@ -1356,10 +1358,10 @@ export default function Dashboard() {
               : "opacity-60 hover:opacity-100"
           }`}
         >
-          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
-            <LayoutGridIcon ref={resultsNavRef} size={17} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-95">
+            <LayoutGridIcon ref={resultsNavRef} size={20} />
           </div>
-          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Results</span>
+          <span className="text-[10px] font-medium tracking-tight mt-1 leading-tight">Results</span>
         </button>
 
         <button
@@ -1368,7 +1370,7 @@ export default function Dashboard() {
             sfx.playSonarChime();
             setCurrentView("topology");
           }}
-          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.92] ${
             currentView === "topology"
               ? isObsidian
                 ? "text-cyan-400 font-semibold"
@@ -1376,10 +1378,10 @@ export default function Dashboard() {
               : "opacity-60 hover:opacity-100"
           }`}
         >
-          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
-            <NetworkIcon ref={graphNavRef} size={17} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-95">
+            <NetworkIcon ref={graphNavRef} size={20} />
           </div>
-          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Graph</span>
+          <span className="text-[10px] font-medium tracking-tight mt-1 leading-tight">Graph</span>
         </button>
 
         <button
@@ -1388,7 +1390,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("backlogs");
           }}
-          className={`group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.88] ${
+          className={`group flex flex-col items-center justify-center py-1 px-3 rounded-lg transition-all duration-150 cursor-pointer select-none touch-manipulation active:scale-[0.92] ${
             currentView === "backlogs"
               ? isObsidian
                 ? "text-cyan-400 font-semibold"
@@ -1396,10 +1398,10 @@ export default function Dashboard() {
               : "opacity-60 hover:opacity-100"
           }`}
         >
-          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
-            <ChartColumnIcon ref={backlogsNavRef} size={17} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-95">
+            <ChartColumnIcon ref={backlogsNavRef} size={20} />
           </div>
-          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Backlogs</span>
+          <span className="text-[10px] font-medium tracking-tight mt-1 leading-tight">Backlogs</span>
         </button>
 
         <Link
@@ -1408,12 +1410,12 @@ export default function Dashboard() {
             adminNavRef.current?.startAnimation();
             sfx.playMechanicalClick();
           }}
-          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none touch-manipulation active:scale-[0.88]"
+          className="group flex flex-col items-center justify-center py-1 px-3 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-slate-400 hover:text-white select-none touch-manipulation active:scale-[0.92]"
         >
-          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
-            <ShieldCheckIcon ref={adminNavRef} size={17} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-95">
+            <ShieldCheckIcon ref={adminNavRef} size={20} />
           </div>
-          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Admin</span>
+          <span className="text-[10px] font-medium tracking-tight mt-1 leading-tight">Admin</span>
         </Link>
 
         <button
@@ -1422,12 +1424,12 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setIsInstallModalOpen(true);
           }}
-          className="group flex flex-col items-center justify-center py-0.5 px-2 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none touch-manipulation active:scale-[0.88]"
+          className="group flex flex-col items-center justify-center py-1 px-3 rounded-lg opacity-60 hover:opacity-100 transition-all duration-150 text-cyan-400 cursor-pointer select-none touch-manipulation active:scale-[0.92]"
         >
-          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-90">
-            <DownloadIcon ref={appNavRef} size={17} />
+          <div className="relative flex items-center justify-center transition-transform duration-150 group-active:scale-95">
+            <DownloadIcon ref={appNavRef} size={20} />
           </div>
-          <span className="text-[9px] tracking-tight mt-0.5 leading-none">Get App</span>
+          <span className="text-[10px] font-medium tracking-tight mt-1 leading-tight">Get App</span>
         </button>
       </nav>
 

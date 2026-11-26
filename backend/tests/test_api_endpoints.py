@@ -216,7 +216,9 @@ class TestAPIEndpoints(unittest.TestCase):
 
     def test_cancel_student_record_update(self):
         req = SessionCancelRequest(session_id="dummy_test_session_id")
-        res = asyncio.run(cancel_student_record_update(req))
+        with patch("app.main.ondemand_scraper.cancel_session", new_callable=AsyncMock) as mock_cancel:
+            mock_cancel.return_value = {"ok": True, "message": "Cancelled"}
+            res = asyncio.run(cancel_student_record_update(req))
         self.assertTrue(res.get("ok"))
         self.assertIn("cancelled", res.get("message", "").lower())
 

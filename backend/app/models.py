@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Boolean, Index
 from sqlalchemy.orm import relationship, synonym
 from .database import Base
 from .services.subject_catalog import get_catalog_subject_name
@@ -150,12 +150,15 @@ class ComparisonLog(Base):
 
 class StudentViewLog(Base):
     __tablename__ = "student_view_logs"
+    __table_args__ = (
+        Index("ix_student_view_logs_usn_viewed_at", "usn", "viewed_at"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     usn = Column(String, index=True, nullable=False)
     viewer_ip = Column(String, nullable=True)
     viewer_usn = Column(String, nullable=True)
-    viewed_at = Column(DateTime, default=datetime.utcnow)
+    viewed_at = Column(DateTime, default=datetime.utcnow, index=True)
 
 
 class MissingUSNReport(Base):

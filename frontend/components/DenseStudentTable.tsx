@@ -68,9 +68,17 @@ export default function DenseStudentTable({
         case "percentage":
         case "rank":
         default:
-          valA = a.percentage;
-          valB = b.percentage;
-          break;
+          // Merit rank: students with 0 active backlogs always take priority
+          if (a.total_backlogs !== b.total_backlogs) {
+            return a.total_backlogs - b.total_backlogs;
+          }
+          if (a.percentage !== b.percentage) {
+            return sortOrder === "asc" ? a.percentage - b.percentage : b.percentage - a.percentage;
+          }
+          if (a.total_marks !== b.total_marks) {
+            return sortOrder === "asc" ? a.total_marks - b.total_marks : b.total_marks - a.total_marks;
+          }
+          return a.usn.localeCompare(b.usn);
       }
 
       if (valA < valB) return sortOrder === "asc" ? -1 : 1;
@@ -78,6 +86,18 @@ export default function DenseStudentTable({
       return 0;
     });
   }, [students, sortField, sortOrder]);
+
+  const meritRankMap = React.useMemo(() => {
+    let meritRankCounter = 0;
+    const map = new Map<string, number>();
+    for (const s of sortedStudents) {
+      if (s.total_backlogs === 0) {
+        meritRankCounter++;
+        map.set(s.usn, meritRankCounter);
+      }
+    }
+    return map;
+  }, [sortedStudents]);
 
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
@@ -193,47 +213,54 @@ export default function DenseStudentTable({
               const isSelected = compareUsns.includes(s.usn);
               const isMyProfile = myUsn && s.usn.toUpperCase() === myUsn.toUpperCase();
               const hasBacklogs = s.total_backlogs > 0;
-              const rankNumber = index + 1;
+              const rankNumber = meritRankMap.get(s.usn);
 
               return (
-                <tr
-                  key={s.usn}
-                  onClick={(e) => onOpenDetail(s.usn, e)}
-                  style={{ animationDelay: `${Math.min(index * 16, 320)}ms` }}
-                  className={`table-row-stagger cursor-pointer transition-colors group ${
-                    isMyProfile
-                      ? isObsidian
-                        ? "bg-amber-950/20 hover:bg-amber-950/30"
-                        : "bg-amber-50/50 hover:bg-amber-50/80"
-                      : isSelected
-                      ? isObsidian
-                        ? "bg-blue-950/20 hover:bg-blue-950/30"
-                        : "bg-blue-50/40 hover:bg-blue-50/70"
-                      : isObsidian
-                      ? "hover:bg-white/[0.03]"
-                      : "hover:bg-slate-50/80"
-                  }`}
-                >
-                  {/* Rank Column */}
-                  <td className="py-2.5 px-3 text-center text-xs">
-                    {rankNumber === 1 ? (
-                      <span className="w-5 h-5 rounded-full inline-flex items-center justify-center font-bold bg-amber-500 text-slate-950 text-[10px]">
-                        1
-                      </span>
-                    ) : rankNumber === 2 ? (
-                      <span className="w-5 h-5 rounded-full inline-flex items-center justify-center font-bold bg-slate-300 dark:bg-slate-600 text-slate-900 dark:text-white text-[10px]">
-                        2
-                      </span>
-                    ) : rankNumber === 3 ? (
-                      <span className="w-5 h-5 rounded-full inline-flex items-center justify-center font-bold bg-amber-700/80 text-white text-[10px]">
-                        3
-                      </span>
-                    ) : (
-                      <span className="text-slate-400 text-xs font-semibold">
-                        {rankNumber}
-                      </span>
-                    )}
-                  </td>
+                  <tr
+                    key={s.usn}
+                    onClick={(e) => onOpenDetail(s.usn, e)}
+                    style={{ animationDelay: `${Math.min(index * 16, 320)}ms` }}
+                    className={`table-row-stagger cursor-pointer transition-colors group ${
+                      isMyProfile
+                        ? isObsidian
+                          ? "bg-amber-950/20 hover:bg-amber-950/30"
+                          : "bg-amber-50/50 hover:bg-amber-50/80"
+                        : isSelected
+                        ? isObsidian
+                          ? "bg-blue-950/20 hover:bg-blue-950/30"
+                          : "bg-blue-50/40 hover:bg-blue-50/70"
+                        : isObsidian
+                        ? "hover:bg-white/[0.03]"
+                        : "hover:bg-slate-50/80"
+                    }`}
+                  >
+                    {/* Rank Column */}
+                    <td className="py-2.5 px-3 text-center text-xs">
+                      {rankNumber === 1 ? (
+                        <span className="w-5 h-5 rounded-full inline-flex items-center justify-center font-bold bg-amber-500 text-slate-950 text-[10px]">
+                          1
+                        </span>
+                      ) : rankNumber === 2 ? (
+                        <span className="w-5 h-5 rounded-full inline-flex items-center justify-center font-bold bg-slate-300 dark:bg-slate-600 text-slate-900 dark:text-white text-[10px]">
+                          2
+                        </span>
+                      ) : rankNumber === 3 ? (
+                        <span className="w-5 h-5 rounded-full inline-flex items-center justify-center font-bold bg-amber-700/80 text-white text-[10px]">
+                          3
+                        </span>
+                      ) : rankNumber !== undefined ? (
+                        <span className="text-slate-400 text-xs font-semibold">
+                          {rankNumber}
+                        </span>
+                      ) : (
+                        <span
+                          className="text-slate-400/60 dark:text-slate-600 text-xs font-semibold select-none"
+                          title="Ineligible for merit rank due to pending backlogs"
+                        >
+                          —
+                        </span>
+                      )}
+                    </td>
 
                   {/* USN with Avatar */}
                   <td className="py-2.5 px-3">

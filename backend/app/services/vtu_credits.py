@@ -237,11 +237,36 @@ def calculate_student_credits_and_gpa(marks: List[Any]) -> Dict[str, Any]:
             "total_credits": sem_academic_credits,
         }
 
-        total_weighted_points += sem_weighted_points
-        total_academic_credits += sem_academic_credits
-        total_earned_credits += sem_earned_credits
+    # Cumulative Degree CGPA & Credits:
+    # Deduplicate distinct academic courses across semesters so re-attempts update the course grade
+    # rather than inflating the denominator with duplicate credits.
+    effective_courses: Dict[str, Tuple[int, int, str, int]] = {}
+    for m in marks:
+        code = (getattr(m, "subject_code", "") or "").strip().upper()
+        if not code:
+            continue
+        tot = int(getattr(m, "total", 0) or 0)
+        status = (getattr(m, "status", "P") or "P").strip().upper()
+        credits, is_ncmc, _ = get_course_credit_info(code)
+        if is_ncmc or credits <= 0:
+            continue
+        _, grade_point = get_vtu_grade(tot, status, is_ncmc=is_ncmc)
+        if code not in effective_courses:
+            effective_courses[code] = (credits, grade_point, status, tot)
+        else:
+            prev_credits, prev_gp, prev_st, prev_tot = effective_courses[code]
+            if status in ("P", "PASS") and prev_st not in ("P", "PASS"):
+                effective_courses[code] = (credits, grade_point, status, tot)
+            elif status in ("P", "PASS") and prev_st in ("P", "PASS") and tot > prev_tot:
+                effective_courses[code] = (credits, grade_point, status, tot)
+            elif status not in ("P", "PASS") and prev_st not in ("P", "PASS") and tot > prev_tot:
+                effective_courses[code] = (credits, grade_point, status, tot)
 
-    cgpa = round(total_weighted_points / total_academic_credits, 2) if total_academic_credits > 0 else 0.0
+    cum_weighted_points = sum(c * gp for c, gp, _, _ in effective_courses.values())
+    cum_academic_credits = sum(c for c, _, _, _ in effective_courses.values())
+    cum_earned_credits = sum(c for c, _, st, tot in effective_courses.values() if st in ("P", "PASS") and tot >= 40)
+
+    cgpa = round(cum_weighted_points / cum_academic_credits, 2) if cum_academic_credits > 0 else 0.0
 
     # Get SGPA of most recent semester, or default to cgpa
     latest_sem = max(sem_groups.keys(), key=lambda s: int(s) if s.isdigit() else 1, default="1")
@@ -250,7 +275,7 @@ def calculate_student_credits_and_gpa(marks: List[Any]) -> Dict[str, Any]:
     return {
         "sgpa": latest_sgpa,
         "cgpa": cgpa,
-        "credits_earned": total_earned_credits,
-        "total_credits": total_academic_credits,
+        "credits_earned": cum_earned_credits if effective_courses else 0,
+        "total_credits": cum_academic_credits if effective_courses else 0,
         "semesters": sem_results,
     }

@@ -28,6 +28,7 @@ from ..models import Student, Subject, Mark, RescrapeRequest
 from .parser import parse_vtu_html
 from ..services.job_manager import job_manager
 from ..services.subject_catalog import get_catalog_subject_name
+from ..services.vtu_credits import calculate_student_credits_and_gpa
 
 BRANCH_MAP = {
     "CS": "CSE",
@@ -470,23 +471,29 @@ class ScraperWorker:
             if all_marks:
                 effective_subjects = {}
                 for m in all_marks:
-                    code = m.subject_code.strip().upper()
+                    code = (m.subject_code or "").strip().upper()
+                    if not code:
+                        continue
+                    st = (m.status or "").strip().upper()
                     if code not in effective_subjects:
                         effective_subjects[code] = m
                     else:
                         existing = effective_subjects[code]
-                        if m.status == "P" and existing.status != "P":
+                        ext_st = (existing.status or "").strip().upper()
+                        if st in ("P", "PASS") and ext_st not in ("P", "PASS"):
                             effective_subjects[code] = m
-                        elif m.status == "P" and existing.status == "P" and m.total > existing.total:
+                        elif st in ("P", "PASS") and ext_st in ("P", "PASS") and (m.total or 0) > (existing.total or 0):
                             effective_subjects[code] = m
-                        elif m.status != "P" and existing.status != "P" and m.total > existing.total:
+                        elif st not in ("P", "PASS") and ext_st not in ("P", "PASS") and (m.total or 0) > (existing.total or 0):
                             effective_subjects[code] = m
 
                 final_marks = list(effective_subjects.values())
-                student.total_marks = sum(m.total for m in final_marks)
-                student.max_marks = sum(m.max_marks for m in final_marks)
-                student.total_backlogs = sum(1 for m in final_marks if m.status in ("F", "A"))
+                student.total_marks = sum(m.total or 0 for m in final_marks)
+                student.max_marks = sum(m.max_marks or 0 for m in final_marks)
+                student.total_backlogs = sum(1 for m in final_marks if (m.status or "").strip().upper() in ("F", "A", "AB", "W", "NE", "FAIL", "ABSENT"))
                 student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
+                gpa_info = calculate_student_credits_and_gpa(all_marks)
+                student.cgpa = gpa_info.get("cgpa", 0.0)
             else:
                 student.total_marks = parsed["total_marks"]
                 student.max_marks = parsed["max_marks"]

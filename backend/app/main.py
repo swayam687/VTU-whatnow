@@ -486,6 +486,7 @@ def init_db():
             ("idx_students_cgpa", "CREATE INDEX IF NOT EXISTS idx_students_cgpa ON students (cgpa);"),
             ("idx_students_backlogs", "CREATE INDEX IF NOT EXISTS idx_students_backlogs ON students (total_backlogs);"),
             ("idx_students_hidden", "CREATE INDEX IF NOT EXISTS idx_students_hidden ON students (is_hidden);"),
+            ("idx_student_view_logs_usn_viewed", "CREATE INDEX IF NOT EXISTS idx_student_view_logs_usn_viewed ON student_view_logs (usn, viewed_at);"),
         ]
         for idx_name, idx_stmt in indices_to_ensure:
             try:
@@ -1583,13 +1584,54 @@ def get_admin_semester_audit(db: Session = Depends(get_db)):
     )
 
 
+def is_failed_status(status: Optional[str]) -> bool:
+    if not status:
+        return False
+    st = status.strip().upper()
+    return st in ("F", "A", "AB", "W", "NE", "FAIL", "ABSENT")
+
+
+def is_passed_status(status: Optional[str]) -> bool:
+    if not status:
+        return False
+    st = status.strip().upper()
+    return st in ("P", "PASS")
+
+
+def get_effective_student_marks(marks_list: List[Mark]) -> Dict[str, Mark]:
+    """
+    Deduplicates student marks across multiple semesters / re-attempts by distinct subject code.
+    Precedence:
+    1. A passed attempt ('P') supersedes any failed attempt ('F', 'A', etc.).
+    2. Higher marks take precedence between attempts of equal pass/fail status.
+    """
+    effective: Dict[str, Mark] = {}
+    for m in marks_list:
+        code = (m.subject_code or "").strip().upper()
+        if not code:
+            continue
+        st = (m.status or "").strip().upper()
+        if code not in effective:
+            effective[code] = m
+        else:
+            existing = effective[code]
+            ext_st = (existing.status or "").strip().upper()
+            if is_passed_status(st) and not is_passed_status(ext_st):
+                effective[code] = m
+            elif is_passed_status(st) and is_passed_status(ext_st) and (m.total or 0) > (existing.total or 0):
+                effective[code] = m
+            elif not is_passed_status(st) and not is_passed_status(ext_st) and (m.total or 0) > (existing.total or 0):
+                effective[code] = m
+    return effective
+
+
 @app.post("/api/admin/recalculate-cumulative-totals", dependencies=[Depends(require_admin)])
 def recalculate_cumulative_totals(
     usn: Optional[str] = Query(None, description="Optional single USN to recalculate, or omit for all students"),
     db: Session = Depends(get_db)
 ):
     """
-    Recalculates cumulative degree totals, percentages, and backlogs from scratch
+    Recalculates cumulative degree totals, percentages, CGPA, and backlogs from scratch
     using the distinct-subject deduplication algorithm across all available semesters in the database.
     Fixes legacy records where multi-semester max_marks were frozen at 800/900.
     """
@@ -1604,25 +1646,14 @@ def recalculate_cumulative_totals(
         if not all_marks:
             continue
 
-        effective_subjects = {}
-        for m in all_marks:
-            code = m.subject_code.strip().upper()
-            if code not in effective_subjects:
-                effective_subjects[code] = m
-            else:
-                existing = effective_subjects[code]
-                if m.status == "P" and existing.status != "P":
-                    effective_subjects[code] = m
-                elif m.status == "P" and existing.status == "P" and m.total > existing.total:
-                    effective_subjects[code] = m
-                elif m.status != "P" and existing.status != "P" and m.total > existing.total:
-                    effective_subjects[code] = m
-
+        effective_subjects = get_effective_student_marks(all_marks)
         final_marks = list(effective_subjects.values())
-        student.total_marks = sum(m.total for m in final_marks)
-        student.max_marks = sum(m.max_marks for m in final_marks)
-        student.total_backlogs = sum(1 for m in final_marks if m.status in ("F", "A"))
+        student.total_marks = sum(m.total or 0 for m in final_marks)
+        student.max_marks = sum(m.max_marks or 0 for m in final_marks)
+        student.total_backlogs = sum(1 for m in final_marks if is_failed_status(m.status))
         student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
+        gpa_info = calculate_student_credits_and_gpa(all_marks)
+        student.cgpa = gpa_info.get("cgpa", 0.0)
         updated_count += 1
 
     db.commit()
@@ -2309,11 +2340,19 @@ def get_students(
     if sort_key == "usn":
         query = query.order_by(Student.usn.asc())
     elif sort_key == "backlogs":
-        query = query.order_by(Student.total_backlogs.asc(), Student.percentage.desc())
+        query = query.order_by(Student.total_backlogs.asc(), Student.percentage.desc(), Student.total_marks.desc(), Student.usn.asc())
     elif sort_key == "recent":
-        query = query.order_by(Student.updated_at.desc())
+        query = query.order_by(Student.updated_at.desc(), Student.usn.asc())
     else:
-        query = query.order_by(Student.percentage.desc(), Student.total_marks.desc())
+        # Standard VTU academic merit ranking: candidates with 0 active backlogs rank first,
+        # ordered deterministically by percentage, total marks, CGPA, and USN.
+        query = query.order_by(
+            Student.total_backlogs.asc(),
+            Student.percentage.desc(),
+            Student.total_marks.desc(),
+            Student.cgpa.desc(),
+            Student.usn.asc()
+        )
 
     # User rule:
     # Public visitors can only view Top 3 per branch and Top 5 campus-wide.
@@ -3131,6 +3170,17 @@ def get_student(
     return serialize_student(student, current_usn, is_admin=is_admin, is_faculty=is_faculty)
 
 
+def compute_baseline_weekly_activity(usn: str, percentage: Optional[float] = 60.0) -> Tuple[int, int]:
+    """Computes a deterministic weekly baseline for profile views and peer comparisons using ISO week and USN hash."""
+    iso_year, iso_week, _ = datetime.utcnow().isocalendar()
+    seed_str = f"{usn.strip().upper()}-{iso_year}-{iso_week}"
+    h = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
+    rank_boost = int((percentage or 60.0) / 10.0)
+    base_views = 28 + (h % 30) + rank_boost * 2
+    base_comparisons = 7 + ((h >> 4) % 11) + (rank_boost // 2)
+    return base_views, base_comparisons
+
+
 @app.get("/api/students/{usn}/insights")
 def get_student_insights(
     usn: str,
@@ -3168,15 +3218,7 @@ def get_student_insights(
     except Exception:
         real_views = 0
 
-    # Deterministic weekly baseline (using ISO calendar week and USN hash)
-    import hashlib
-    iso_year, iso_week, _ = datetime.utcnow().isocalendar()
-    seed_str = f"{clean_usn}-{iso_year}-{iso_week}"
-    h = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-
-    rank_boost = int((student.percentage or 60.0) / 10.0)
-    base_views = 28 + (h % 30) + rank_boost * 2
-    base_comparisons = 7 + ((h >> 4) % 11) + (rank_boost // 2)
+    base_views, base_comparisons = compute_baseline_weekly_activity(clean_usn, student.percentage)
 
     total_views = max(0, base_views + real_views + (student.custom_views_offset or 0))
     total_comparisons = max(0, base_comparisons + real_comparisons + (student.custom_comparisons_offset or 0))
@@ -3210,16 +3252,11 @@ def get_admin_insights(
     # Sort verified first, then by last_login_at or updated_at
     students = query.order_by(desc(Student.insights_verified), desc(Student.insights_verified_at)).limit(2000).all()
 
-    iso_year, iso_week, _ = datetime.utcnow().isocalendar()
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
 
     items = []
     for s in students:
-        seed_str = f"{s.usn}-{iso_year}-{iso_week}"
-        h = int(hashlib.md5(seed_str.encode()).hexdigest()[:8], 16)
-        rank_boost = int((s.percentage or 60.0) / 10.0)
-        base_views = 28 + (h % 30) + rank_boost * 2
-        base_comparisons = 7 + ((h >> 4) % 11) + (rank_boost // 2)
+        base_views, base_comparisons = compute_baseline_weekly_activity(s.usn, s.percentage)
 
         try:
             real_views = db.query(StudentViewLog).filter(
@@ -3433,25 +3470,14 @@ def upsert_student_marks(
     # Recalculate student statistics across all distinct subjects
     all_marks = db.query(Mark).filter(Mark.usn == clean_usn).all()
     if all_marks:
-        effective_subjects = {}
-        for m in all_marks:
-            code = m.subject_code.strip().upper()
-            if code not in effective_subjects:
-                effective_subjects[code] = m
-            else:
-                existing = effective_subjects[code]
-                if m.status == "P" and existing.status != "P":
-                    effective_subjects[code] = m
-                elif m.status == "P" and existing.status == "P" and m.total > existing.total:
-                    effective_subjects[code] = m
-                elif m.status != "P" and existing.status != "P" and m.total > existing.total:
-                    effective_subjects[code] = m
-
+        effective_subjects = get_effective_student_marks(all_marks)
         final_marks = list(effective_subjects.values())
-        student.total_marks = sum(m.total for m in final_marks)
-        student.max_marks = sum(m.max_marks for m in final_marks)
-        student.total_backlogs = sum(1 for m in final_marks if m.status in ("F", "A"))
+        student.total_marks = sum(m.total or 0 for m in final_marks)
+        student.max_marks = sum(m.max_marks or 0 for m in final_marks)
+        student.total_backlogs = sum(1 for m in final_marks if is_failed_status(m.status))
         student.percentage = round((student.total_marks / student.max_marks * 100), 2) if student.max_marks > 0 else 0.0
+        gpa_info = calculate_student_credits_and_gpa(all_marks)
+        student.cgpa = gpa_info.get("cgpa", 0.0)
 
     db.commit()
     db.refresh(student)
@@ -3535,35 +3561,81 @@ def get_leaderboard(
     limit: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db)
 ):
-    query = db.query(Student).filter((Student.is_hidden == False) | (Student.is_hidden == None))
+    query = db.query(Student).filter(
+        (Student.is_hidden == False) | (Student.is_hidden == None),
+        Student.total_marks > 0
+    )
     if branch and branch.upper() != "ALL":
         query = query.filter(Student.branch == branch.upper())
     
-    toppers = query.order_by(Student.percentage.desc(), Student.total_marks.desc()).limit(limit).all()
+    # Leaderboard strictly ranks all-clear candidates (0 backlogs) first
+    toppers = (
+        query.filter(Student.total_backlogs == 0)
+        .order_by(
+            Student.percentage.desc(),
+            Student.total_marks.desc(),
+            Student.cgpa.desc(),
+            Student.usn.asc()
+        )
+        .limit(limit)
+        .all()
+    )
+    if not toppers:
+        toppers = (
+            query.order_by(
+                Student.total_backlogs.asc(),
+                Student.percentage.desc(),
+                Student.total_marks.desc(),
+                Student.cgpa.desc(),
+                Student.usn.asc()
+            )
+            .limit(limit)
+            .all()
+        )
     return toppers
 
 
-@app.get("/api/analytics/backlogs", response_model=BacklogAnalytics)
-def get_backlog_analytics(db: Session = Depends(get_db)):
-    """Computes branch-wise and subject-wise backlog mortality analytics."""
-    students = db.query(Student).filter((Student.is_hidden == False) | (Student.is_hidden == None)).all()
-    marks = db.query(Mark).all()
+def compute_backlog_analytics(
+    students: List[Student],
+    db: Session,
+    limit_subjects: Optional[int] = 15
+) -> BacklogAnalytics:
+    """
+    Computes mathematically rigorous branch-wise and subject-wise backlog analytics.
+    Deduplicates re-attempts across semesters so that cleared subjects are never
+    falsely reported as active backlogs.
+    """
     subjects = {s.code: s.name for s in db.query(Subject).all()}
-    student_branch_map = {s.usn: s.branch for s in students}
+    student_usns = [s.usn for s in students]
 
-    total_failed_papers = sum(1 for m in marks if m.status in ("F", "A"))
+    # Pre-fetch all marks for the target students only
+    marks = db.query(Mark).filter(Mark.usn.in_(student_usns)).all() if student_usns else []
 
-    # 1. Overall subject statistics
-    overall_subj_counts: dict = {}
+    marks_by_usn: Dict[str, List[Mark]] = {}
     for m in marks:
-        code = m.subject_code
-        if code not in overall_subj_counts:
-            overall_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
-        overall_subj_counts[code]["total"] += 1
-        if m.status in ("F", "A"):
-            overall_subj_counts[code]["fail"] += 1
-        elif m.status == "P":
-            overall_subj_counts[code]["pass"] += 1
+        marks_by_usn.setdefault(m.usn, []).append(m)
+
+    # Compute effective (deduplicated) subject marks per student
+    student_effective_map: Dict[str, Dict[str, Mark]] = {}
+    for s in students:
+        s_marks = marks_by_usn.get(s.usn, [])
+        student_effective_map[s.usn] = get_effective_student_marks(s_marks)
+
+    # Total active pending papers across all included students
+    total_failed_papers = sum(s.total_backlogs for s in students)
+
+    # 1. Overall subject statistics across ALL branches
+    overall_subj_counts: Dict[str, Dict[str, int]] = {}
+    for s in students:
+        effective = student_effective_map.get(s.usn, {})
+        for code, m in effective.items():
+            if code not in overall_subj_counts:
+                overall_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
+            overall_subj_counts[code]["total"] += 1
+            if is_failed_status(m.status):
+                overall_subj_counts[code]["fail"] += 1
+            elif is_passed_status(m.status):
+                overall_subj_counts[code]["pass"] += 1
 
     overall_deadliest: List[SubjectBacklogStat] = []
     for code, stats in overall_subj_counts.items():
@@ -3581,40 +3653,31 @@ def get_backlog_analytics(db: Session = Depends(get_db)):
     overall_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
 
     # 2. Branch-wise statistics
-    branch_students_map: dict = {}
+    branch_students_map: Dict[str, List[Student]] = {}
     for s in students:
-        b = s.branch or "OTHER"
-        if b not in branch_students_map:
-            branch_students_map[b] = []
-        branch_students_map[b].append(s)
-
-    branch_marks_map: dict = {}
-    for m in marks:
-        b = student_branch_map.get(m.usn, "OTHER")
-        if b not in branch_marks_map:
-            branch_marks_map[b] = []
-        branch_marks_map[b].append(m)
+        b = (s.branch or "OTHER").strip().upper()
+        branch_students_map.setdefault(b, []).append(s)
 
     branch_summaries: List[BranchBacklogSummary] = []
     for branch_name, b_students in branch_students_map.items():
-        b_marks = branch_marks_map.get(branch_name, [])
         total_students = len(b_students)
         total_backlogs = sum(s.total_backlogs for s in b_students)
         avg_backlogs = round(total_backlogs / total_students, 2) if total_students > 0 else 0.0
         students_with_backlogs = sum(1 for s in b_students if s.total_backlogs > 0)
         clean_pass = sum(1 for s in b_students if s.total_backlogs == 0)
 
-        # Branch subject stats
-        b_subj_counts: dict = {}
-        for m in b_marks:
-            code = m.subject_code
-            if code not in b_subj_counts:
-                b_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
-            b_subj_counts[code]["total"] += 1
-            if m.status in ("F", "A"):
-                b_subj_counts[code]["fail"] += 1
-            elif m.status == "P":
-                b_subj_counts[code]["pass"] += 1
+        # Branch subject stats based on effective student attempts
+        b_subj_counts: Dict[str, Dict[str, int]] = {}
+        for s in b_students:
+            effective = student_effective_map.get(s.usn, {})
+            for code, m in effective.items():
+                if code not in b_subj_counts:
+                    b_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
+                b_subj_counts[code]["total"] += 1
+                if is_failed_status(m.status):
+                    b_subj_counts[code]["fail"] += 1
+                elif is_passed_status(m.status):
+                    b_subj_counts[code]["pass"] += 1
 
         b_deadliest: List[SubjectBacklogStat] = []
         for code, stats in b_subj_counts.items():
@@ -3641,13 +3704,21 @@ def get_backlog_analytics(db: Session = Depends(get_db)):
             top_failed_subjects=b_deadliest[:5],
         ))
 
-    branch_summaries.sort(key=lambda b: b.total_backlogs, reverse=True)
+    branch_summaries.sort(key=lambda b: (b.total_backlogs, b.students_with_backlogs), reverse=True)
 
+    deadliest_list = overall_deadliest[:limit_subjects] if limit_subjects else overall_deadliest
     return BacklogAnalytics(
         total_failed_papers=total_failed_papers,
-        overall_deadliest_subjects=overall_deadliest[:15],
+        overall_deadliest_subjects=deadliest_list,
         branches=branch_summaries,
     )
+
+
+@app.get("/api/analytics/backlogs", response_model=BacklogAnalytics)
+def get_backlog_analytics(db: Session = Depends(get_db)):
+    """Computes branch-wise and subject-wise backlog mortality analytics for public view."""
+    students = db.query(Student).filter((Student.is_hidden == False) | (Student.is_hidden == None)).all()
+    return compute_backlog_analytics(students, db, limit_subjects=15)
 
 
 # -------------------------------------------------------------
@@ -3663,109 +3734,8 @@ def get_faculty_analytics(
     Returns branch-wise and subject-wise pass/fail data including ALL students
     (even those hidden by privacy settings). Calculates exact failure rankings.
     """
-    # Faculty access bypasses all privacy filters: query ALL students including hidden
     students = db.query(Student).all()
-    marks = db.query(Mark).all()
-    subjects = {s.code: s.name for s in db.query(Subject).all()}
-    student_branch_map = {s.usn: s.branch for s in students}
-
-    total_failed_papers = sum(1 for m in marks if m.status in ("F", "A"))
-
-    # 1. Overall subject statistics across ALL branches
-    overall_subj_counts: dict = {}
-    for m in marks:
-        code = m.subject_code
-        if code not in overall_subj_counts:
-            overall_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
-        overall_subj_counts[code]["total"] += 1
-        if m.status in ("F", "A"):
-            overall_subj_counts[code]["fail"] += 1
-        elif m.status == "P":
-            overall_subj_counts[code]["pass"] += 1
-
-    overall_deadliest: List[SubjectBacklogStat] = []
-    for code, stats in overall_subj_counts.items():
-        if stats["fail"] > 0:
-            rate = round((stats["fail"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
-            overall_deadliest.append(SubjectBacklogStat(
-                subject_code=code,
-                subject_name=subjects.get(code, code),
-                branch="ALL",
-                total_students=stats["total"],
-                fail_count=stats["fail"],
-                pass_count=stats["pass"],
-                fail_rate=rate,
-            ))
-    overall_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
-
-    # 2. Branch-wise statistics
-    branch_students_map: dict = {}
-    for s in students:
-        b = s.branch or "OTHER"
-        if b not in branch_students_map:
-            branch_students_map[b] = []
-        branch_students_map[b].append(s)
-
-    branch_marks_map: dict = {}
-    for m in marks:
-        b = student_branch_map.get(m.usn, "OTHER")
-        if b not in branch_marks_map:
-            branch_marks_map[b] = []
-        branch_marks_map[b].append(m)
-
-    branch_summaries: List[BranchBacklogSummary] = []
-    for branch_name, b_students in branch_students_map.items():
-        b_marks = branch_marks_map.get(branch_name, [])
-        total_students = len(b_students)
-        total_backlogs = sum(s.total_backlogs for s in b_students)
-        avg_backlogs = round(total_backlogs / total_students, 2) if total_students > 0 else 0.0
-        students_with_backlogs = sum(1 for s in b_students if s.total_backlogs > 0)
-        clean_pass = sum(1 for s in b_students if s.total_backlogs == 0)
-
-        # Branch subject stats
-        b_subj_counts: dict = {}
-        for m in b_marks:
-            code = m.subject_code
-            if code not in b_subj_counts:
-                b_subj_counts[code] = {"total": 0, "fail": 0, "pass": 0}
-            b_subj_counts[code]["total"] += 1
-            if m.status in ("F", "A"):
-                b_subj_counts[code]["fail"] += 1
-            elif m.status == "P":
-                b_subj_counts[code]["pass"] += 1
-
-        b_deadliest: List[SubjectBacklogStat] = []
-        for code, stats in b_subj_counts.items():
-            if stats["fail"] > 0:
-                rate = round((stats["fail"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
-                b_deadliest.append(SubjectBacklogStat(
-                    subject_code=code,
-                    subject_name=subjects.get(code, code),
-                    branch=branch_name,
-                    total_students=stats["total"],
-                    fail_count=stats["fail"],
-                    pass_count=stats["pass"],
-                    fail_rate=rate,
-                ))
-        b_deadliest.sort(key=lambda s: (s.fail_count, s.fail_rate), reverse=True)
-
-        branch_summaries.append(BranchBacklogSummary(
-            branch=branch_name,
-            total_students=total_students,
-            total_backlogs=total_backlogs,
-            avg_backlogs_per_student=avg_backlogs,
-            students_with_backlogs=students_with_backlogs,
-            clean_pass_students=clean_pass,
-            top_failed_subjects=b_deadliest[:5],
-        ))
-
-    branch_summaries.sort(key=lambda b: b.total_backlogs, reverse=True)
-
-    return BacklogAnalytics(
-        total_failed_papers=total_failed_papers,
-        overall_deadliest_subjects=overall_deadliest,
-        branches=branch_summaries,
-    )
+    return compute_backlog_analytics(students, db, limit_subjects=None)
 
 
 @app.get("/api/faculty/export")
@@ -3784,9 +3754,10 @@ def export_faculty_csv(
     writer.writerow(["USN", "Name", "Branch", "Total Marks", "Percentage", "Pending Subjects"])
 
     for s in students:
-        failed_marks = [m for m in s.marks if m.status in ("F", "A")]
+        effective = get_effective_student_marks(s.marks)
+        failed_marks = [m for m in effective.values() if is_failed_status(m.status)]
         if failed_marks:
-            pending_str = "; ".join(f"{m.subject_code} ({m.subject_name})" for m in failed_marks)
+            pending_str = "; ".join(f"{m.subject_code} ({m.subject_name or m.subject_code})" for m in failed_marks)
         else:
             pending_str = "None (Clean Pass)"
 
@@ -3798,6 +3769,16 @@ def export_faculty_csv(
             f"{s.percentage:.2f}%" if s.percentage is not None else "0.00%",
             pending_str,
         ])
+
+    csv_data = output.getvalue()
+    return StreamingResponse(
+        iter([csv_data]),
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="vtu_results.csv"',
+            "Cache-Control": "no-cache",
+        }
+    )
 
     csv_data = output.getvalue()
     return StreamingResponse(
