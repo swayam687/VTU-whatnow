@@ -40,6 +40,13 @@ import {
   IconTable,
   IconPencil,
 } from "../components/Icons";
+import {
+  LayoutGridIcon,
+  NetworkIcon,
+  ChartColumnIcon,
+  ShieldCheckIcon,
+  DownloadIcon,
+} from "@animateicons/react/lucide";
 import DenseStudentTable from "../components/DenseStudentTable";
 import {
   cacheStudent,
@@ -1327,7 +1334,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("dashboard");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
             currentView === "dashboard"
               ? isObsidian
                 ? "text-cyan-400 font-bold"
@@ -1335,9 +1342,7 @@ export default function Dashboard() {
               : "opacity-70 hover:opacity-100"
           }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-          </svg>
+          <LayoutGridIcon size={20} />
           <span className="text-[10px]">Results</span>
         </button>
 
@@ -1346,7 +1351,7 @@ export default function Dashboard() {
             sfx.playSonarChime();
             setCurrentView("topology");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
             currentView === "topology"
               ? isObsidian
                 ? "text-cyan-400 font-bold"
@@ -1354,10 +1359,7 @@ export default function Dashboard() {
               : "opacity-70 hover:opacity-100"
           }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="12" cy="12" r="3" strokeWidth={2} />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v6m0 6v6M3 12h6m6 0h6" />
-          </svg>
+          <NetworkIcon size={20} />
           <span className="text-[10px]">Graph</span>
         </button>
 
@@ -1366,7 +1368,7 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setCurrentView("backlogs");
           }}
-          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all ${
+          className={`flex flex-col items-center gap-0.5 py-1 px-3 rounded-xl transition-all cursor-pointer ${
             currentView === "backlogs"
               ? isObsidian
                 ? "text-cyan-400 font-bold"
@@ -1374,9 +1376,7 @@ export default function Dashboard() {
               : "opacity-70 hover:opacity-100"
           }`}
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
+          <ChartColumnIcon size={20} />
           <span className="text-[10px]">Backlogs</span>
         </button>
 
@@ -1385,7 +1385,7 @@ export default function Dashboard() {
           onClick={() => sfx.playMechanicalClick()}
           className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-slate-400 hover:text-white"
         >
-          <IconShield className="w-5 h-5 stroke-[2]" />
+          <ShieldCheckIcon size={20} />
           <span className="text-[10px]">Admin</span>
         </Link>
 
@@ -1394,9 +1394,9 @@ export default function Dashboard() {
             sfx.playMechanicalClick();
             setIsInstallModalOpen(true);
           }}
-          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-cyan-400"
+          className="flex flex-col items-center gap-0.5 py-1 px-2.5 rounded-xl opacity-70 hover:opacity-100 transition-all text-cyan-400 cursor-pointer"
         >
-          <IconInstallApp className="w-5 h-5 stroke-[2.2]" />
+          <DownloadIcon size={20} />
           <span className="text-[10px]">Get App</span>
         </button>
       </nav>

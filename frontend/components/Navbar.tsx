@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { sfx } from "../lib/sfx";
 import { IconInstallApp, IconKey, IconShield } from "./Icons";
+import { DownloadIcon } from "@animateicons/react/lucide";
 import InstallAppModal from "./InstallAppModal";
 import { AuthSession } from "../lib/api";
 
@@ -179,7 +180,7 @@ export default function Navbar({
                 : "bg-slate-100/80 border-slate-200 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            <IconInstallApp className="w-4 h-4 text-cyan-400 stroke-[2.2]" />
+            <DownloadIcon size={16} className="text-cyan-400" />
             <span className="hidden sm:inline text-[11px] font-medium">Get App</span>
           </button>
 
