@@ -602,6 +602,11 @@ def require_admin(x_admin_key: str = Header(default="", alias="X-Admin-Key")):
         )
 
 
+def is_admin_token(x_admin_key: Optional[str]) -> bool:
+    """Safely verifies admin authorization token in constant-time to prevent timing attacks."""
+    return bool(x_admin_key and secrets.compare_digest(x_admin_key, settings.ADMIN_PASSWORD))
+
+
 @app.post("/api/admin/verify")
 @limiter.limit("5/minute")
 def verify_admin(req: AdminVerifyRequest, request: Request):
@@ -2306,7 +2311,7 @@ def get_students(
     db: Session = Depends(get_db)
 ):
     current_usn = verify_session_token(x_student_token, db)
-    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_admin = is_admin_token(x_admin_key)
 
     # Check faculty authentication
     fac_token = extract_token_from_header(authorization, x_faculty_token)
@@ -2759,7 +2764,7 @@ def get_secure_stats(
         raise HTTPException(status_code=404, detail=f"Student {clean_usn} not found.")
 
     current_usn = verify_session_token(x_student_token, db)
-    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_admin = is_admin_token(x_admin_key)
     fac_token = extract_token_from_header(authorization, x_faculty_token)
     current_faculty = verify_faculty_jwt(fac_token, db) if fac_token else None
     is_faculty = bool(current_faculty)
@@ -3138,7 +3143,7 @@ def get_student(
     if not student:
         raise HTTPException(status_code=404, detail="Student not found.")
     current_usn = verify_session_token(x_student_token, db)
-    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_admin = is_admin_token(x_admin_key)
     faculty = get_optional_faculty(authorization, x_faculty_token, db)
     is_faculty = bool(faculty is not None)
     is_owner = bool(current_usn and current_usn.strip().upper() == clean_usn)
@@ -3253,26 +3258,49 @@ def get_admin_insights(
     students = query.order_by(desc(Student.insights_verified), desc(Student.insights_verified_at)).limit(2000).all()
 
     seven_days_ago = datetime.utcnow() - timedelta(days=7)
+    student_usns = [s.usn for s in students if s.usn]
+
+    # Pre-aggregate view and comparison counts in bulk to eliminate N+1 query loop
+    real_views_map: Dict[str, int] = {}
+    real_comparisons_map: Dict[str, int] = {}
+    if student_usns:
+        try:
+            for i in range(0, len(student_usns), 500):
+                chunk = student_usns[i:i + 500]
+                view_rows = (
+                    db.query(StudentViewLog.usn, func.count(StudentViewLog.id))
+                    .filter(StudentViewLog.usn.in_(chunk), StudentViewLog.viewed_at >= seven_days_ago)
+                    .group_by(StudentViewLog.usn)
+                    .all()
+                )
+                for u, count in view_rows:
+                    real_views_map[u] = count
+
+                c1_rows = (
+                    db.query(ComparisonLog.student1_usn, func.count(ComparisonLog.id))
+                    .filter(ComparisonLog.student1_usn.in_(chunk), ComparisonLog.compared_at >= seven_days_ago)
+                    .group_by(ComparisonLog.student1_usn)
+                    .all()
+                )
+                for u, count in c1_rows:
+                    real_comparisons_map[u] = real_comparisons_map.get(u, 0) + count
+
+                c2_rows = (
+                    db.query(ComparisonLog.student2_usn, func.count(ComparisonLog.id))
+                    .filter(ComparisonLog.student2_usn.in_(chunk), ComparisonLog.compared_at >= seven_days_ago)
+                    .group_by(ComparisonLog.student2_usn)
+                    .all()
+                )
+                for u, count in c2_rows:
+                    real_comparisons_map[u] = real_comparisons_map.get(u, 0) + count
+        except Exception:
+            pass
 
     items = []
     for s in students:
         base_views, base_comparisons = compute_baseline_weekly_activity(s.usn, s.percentage)
-
-        try:
-            real_views = db.query(StudentViewLog).filter(
-                StudentViewLog.usn == s.usn,
-                StudentViewLog.viewed_at >= seven_days_ago
-            ).count()
-        except Exception:
-            real_views = 0
-
-        try:
-            real_comparisons = db.query(ComparisonLog).filter(
-                or_(ComparisonLog.student1_usn == s.usn, ComparisonLog.student2_usn == s.usn),
-                ComparisonLog.compared_at >= seven_days_ago
-            ).count()
-        except Exception:
-            real_comparisons = 0
+        real_views = real_views_map.get(s.usn, 0)
+        real_comparisons = real_comparisons_map.get(s.usn, 0)
 
         total_v = max(0, base_views + real_views + (s.custom_views_offset or 0))
         total_c = max(0, base_comparisons + real_comparisons + (s.custom_comparisons_offset or 0))
@@ -3345,7 +3373,7 @@ def get_student_privacy(
 ):
     clean_usn = usn.strip().upper()
     current_usn = verify_session_token(x_student_token, db)
-    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_admin = is_admin_token(x_admin_key)
     if not is_admin and (not current_usn or current_usn.strip().upper() != clean_usn):
         raise HTTPException(status_code=403, detail="Unauthorized: You can only view privacy settings for your own verified account.")
     student = db.query(Student).filter(Student.usn == clean_usn).first()
@@ -3367,7 +3395,7 @@ def update_student_privacy(
 ):
     clean_usn = usn.strip().upper()
     current_usn = verify_session_token(x_student_token, db)
-    is_admin = bool(x_admin_key and x_admin_key == settings.ADMIN_PASSWORD)
+    is_admin = is_admin_token(x_admin_key)
     if not is_admin and (not current_usn or current_usn.strip().upper() != clean_usn):
         raise HTTPException(status_code=403, detail="Unauthorized: You can only update privacy settings for your own verified account.")
     student = db.query(Student).filter(Student.usn == clean_usn).first()
@@ -3412,7 +3440,11 @@ def update_student_socials(usn: str, data: StudentUpdate, db: Session = Depends(
         student.linkedin_url = sanitize_url(raw_linkedin)
     
     db.commit()
-    return {"message": "Social profiles updated successfully.", "student": student}
+    db.refresh(student)
+    return {
+        "message": "Social profiles updated successfully.",
+        "student": sanitize_student_record(student, viewer_usn=None, is_admin=True)
+    }
 
 
 @app.post("/api/admin/students/{usn}/marks", dependencies=[Depends(require_admin)])
@@ -3606,10 +3638,15 @@ def compute_backlog_analytics(
     falsely reported as active backlogs.
     """
     subjects = {s.code: s.name for s in db.query(Subject).all()}
-    student_usns = [s.usn for s in students]
+    student_usns = [s.usn for s in students if s.usn]
 
-    # Pre-fetch all marks for the target students only
-    marks = db.query(Mark).filter(Mark.usn.in_(student_usns)).all() if student_usns else []
+    # Pre-fetch all marks for target students in safe batches of 500 to prevent SQLite variable limits
+    marks: List[Mark] = []
+    if student_usns:
+        batch_size = 500
+        for i in range(0, len(student_usns), batch_size):
+            chunk = student_usns[i:i + batch_size]
+            marks.extend(db.query(Mark).filter(Mark.usn.in_(chunk)).all())
 
     marks_by_usn: Dict[str, List[Mark]] = {}
     for m in marks:
@@ -3769,16 +3806,6 @@ def export_faculty_csv(
             f"{s.percentage:.2f}%" if s.percentage is not None else "0.00%",
             pending_str,
         ])
-
-    csv_data = output.getvalue()
-    return StreamingResponse(
-        iter([csv_data]),
-        media_type="text/csv",
-        headers={
-            "Content-Disposition": 'attachment; filename="vtu_results.csv"',
-            "Cache-Control": "no-cache",
-        }
-    )
 
     csv_data = output.getvalue()
     return StreamingResponse(

@@ -11,7 +11,12 @@ export function getApiBase(): string {
   return DEFAULT_API_URL;
 }
 
-const API_BASE = getApiBase();
+// Proxies API_BASE dynamically so mobile and LAN devices resolve window.location.hostname at runtime
+const API_BASE: string = {
+  toString: () => getApiBase(),
+  valueOf: () => getApiBase(),
+  [Symbol.toPrimitive]: () => getApiBase(),
+} as unknown as string;
 
 export interface Mark {
   id: number;

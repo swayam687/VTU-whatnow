@@ -10,11 +10,11 @@ from .config import settings
 from .models import Student, Faculty
 from .database import get_db
 
-# Cryptographically secure JWT secret: loads SECRET_KEY from settings/env or generates 32-byte secret on startup
+# Cryptographically secure JWT secret: loads SECRET_KEY from settings/env or derives deterministic fallback from admin password
 FACULTY_JWT_SECRET = (
     settings.SECRET_KEY.strip()
     if getattr(settings, "SECRET_KEY", None) and settings.SECRET_KEY.strip()
-    else os.environ.get("SECRET_KEY", "").strip() or secrets.token_hex(32)
+    else os.environ.get("SECRET_KEY", "").strip() or hashlib.sha256(f"{settings.ADMIN_PASSWORD}:vtuwhatnow-jwt-salt".encode("utf-8")).hexdigest()
 )
 FACULTY_JWT_ALGORITHM = "HS256"
 
@@ -40,7 +40,7 @@ def verify_password(password: str, stored_hash: Optional[str]) -> bool:
             salt.encode("utf-8"),
             100000
         )
-        return computed.hex() == key_hex
+        return secrets.compare_digest(computed.hex(), key_hex)
     except Exception:
         return False
 

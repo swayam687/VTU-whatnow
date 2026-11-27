@@ -295,19 +295,17 @@ export default function StudentDetailModal({
     const pollInterval = setInterval(() => {
       fetchStudentInsights(cleanUsn)
         .then((latest) => {
-          setInsights((current) => {
-            if (!current) return latest;
-            // If view count or comparison count increased since last verified, auto-blur immediately
-            if (
-              (latest.views_this_week > lastVerifiedViews && lastVerifiedViews > 0) ||
-              (latest.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0)
-            ) {
-              setFromViewsCount(lastVerifiedViews);
-              setFromComparisonsCount(lastVerifiedComparisons);
-              setInsightsUnlocked(false);
-            }
-            return latest;
-          });
+          if (!latest) return;
+          // If view count or comparison count increased since last verified, auto-blur immediately
+          if (
+            (latest.views_this_week > lastVerifiedViews && lastVerifiedViews > 0) ||
+            (latest.comparisons_this_week > lastVerifiedComparisons && lastVerifiedComparisons > 0)
+          ) {
+            setFromViewsCount(lastVerifiedViews);
+            setFromComparisonsCount(lastVerifiedComparisons);
+            setInsightsUnlocked(false);
+          }
+          setInsights(latest);
         })
         .catch(() => {});
     }, 8000);

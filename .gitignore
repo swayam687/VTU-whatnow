@@ -30,8 +30,6 @@ id_ed25519
 *.db
 *.db-shm
 *.db-wal
-# Allow pre-seeded database to be deployed to Render
-!backend/vtuwhatnow.db
 
 # Node & Next.js
 node_modules/

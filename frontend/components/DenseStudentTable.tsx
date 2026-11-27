@@ -69,8 +69,10 @@ export default function DenseStudentTable({
         case "rank":
         default:
           // Merit rank: students with 0 active backlogs always take priority
-          if (a.total_backlogs !== b.total_backlogs) {
-            return a.total_backlogs - b.total_backlogs;
+          const aClean = a.total_backlogs === 0;
+          const bClean = b.total_backlogs === 0;
+          if (aClean !== bClean) {
+            return aClean ? -1 : 1;
           }
           if (a.percentage !== b.percentage) {
             return sortOrder === "asc" ? a.percentage - b.percentage : b.percentage - a.percentage;
