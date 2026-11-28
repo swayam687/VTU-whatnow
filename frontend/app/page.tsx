@@ -378,21 +378,6 @@ export default function Dashboard() {
     return () => clearTimeout(timer);
   }, [search, studentSession, activeBranch]);
 
-  const displayStudents = useMemo(() => {
-    if (!search.trim()) return students;
-    if (filteredStudents.length > 0) return filteredStudents;
-    return serverSearchResults;
-  }, [search, students, filteredStudents, serverSearchResults]);
-
-  // Dynamic branch list combining core departments and any active scraped branches (e.g. MECH, CIVIL, AIML)
-  const availableBranches = useMemo(() => {
-    const defaultBranches = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
-    const extraBranches = Object.keys(branchStats).filter(
-      (b) => b && !defaultBranches.includes(b) && (branchStats[b]?.total_students || 0) > 0
-    );
-    return [...defaultBranches, ...extraBranches.sort()];
-  }, [branchStats]);
-
   // Precompute academic merit & overall ranks across ALL students in current view (before search filtering)
   const { meritRankMap, overallRankMap } = useMemo(() => {
     const sorted = [...students].sort((a, b) => {
@@ -418,6 +403,29 @@ export default function Dashboard() {
 
     return { meritRankMap: meritMap, overallRankMap: overallMap };
   }, [students]);
+
+  const displayStudents = useMemo(() => {
+    if (search.trim()) {
+      return filteredStudents.length > 0 ? filteredStudents : serverSearchResults;
+    }
+    if (sortBy === "percentage") {
+      return [...students].sort((a, b) => {
+        const rankA = overallRankMap.get(a.usn) ?? 999999;
+        const rankB = overallRankMap.get(b.usn) ?? 999999;
+        return rankA - rankB;
+      });
+    }
+    return students;
+  }, [search, students, filteredStudents, serverSearchResults, sortBy, overallRankMap]);
+
+  // Dynamic branch list combining core departments and any active scraped branches (e.g. MECH, CIVIL, AIML)
+  const availableBranches = useMemo(() => {
+    const defaultBranches = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
+    const extraBranches = Object.keys(branchStats).filter(
+      (b) => b && !defaultBranches.includes(b) && (branchStats[b]?.total_students || 0) > 0
+    );
+    return [...defaultBranches, ...extraBranches.sort()];
+  }, [branchStats]);
 
   // Aggregate metrics for hero counter cards
   const heroStats = useMemo(() => {

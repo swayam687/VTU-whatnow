@@ -33,7 +33,7 @@ from fastapi import FastAPI, Depends, HTTPException, Query, Header, Request, Res
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy import text, desc, func, distinct, inspect
+from sqlalchemy import text, desc, func, distinct, inspect, case
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -2368,7 +2368,7 @@ def get_students(
         # Standard VTU academic merit ranking: candidates with 0 active backlogs rank first,
         # ordered deterministically by percentage, total marks, CGPA, and USN.
         query = query.order_by(
-            Student.total_backlogs.asc(),
+            case((Student.total_backlogs == 0, 0), else_=1).asc(),
             Student.percentage.desc(),
             Student.total_marks.desc(),
             Student.cgpa.desc(),
@@ -3631,7 +3631,7 @@ def get_leaderboard(
     if not toppers:
         toppers = (
             query.order_by(
-                Student.total_backlogs.asc(),
+                case((Student.total_backlogs == 0, 0), else_=1).asc(),
                 Student.percentage.desc(),
                 Student.total_marks.desc(),
                 Student.cgpa.desc(),
