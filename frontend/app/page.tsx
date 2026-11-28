@@ -416,7 +416,7 @@ export default function Dashboard() {
       }
     });
 
-    return { meritRankMap: meritMap, overallRankMap };
+    return { meritRankMap: meritMap, overallRankMap: overallMap };
   }, [students]);
 
   // Aggregate metrics for hero counter cards
