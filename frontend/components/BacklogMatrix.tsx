@@ -31,7 +31,7 @@ export default function BacklogMatrix({
       .then((res) => setData(res))
       .catch((err) => console.error("Failed to fetch backlog analytics", err))
       .finally(() => setLoading(false));
-  }, []);
+  }, [students]);
 
   const activeSubjectList: SubjectBacklogStat[] = React.useMemo(() => {
     if (!data) return [];
