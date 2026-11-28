@@ -363,6 +363,62 @@ export default function Dashboard() {
     );
   }, [students, search]);
 
+  // Unauthenticated server-side search fallback: Allows visitors to search ANY crowdsourced student
+  const [serverSearchResults, setServerSearchResults] = useState<Student[]>([]);
+  useEffect(() => {
+    if (studentSession || !search.trim() || search.trim().length < 3) {
+      setServerSearchResults([]);
+      return;
+    }
+    const timer = setTimeout(() => {
+      fetchStudents({ search: search.trim(), branch: activeBranch })
+        .then((res) => setServerSearchResults(res))
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [search, studentSession, activeBranch]);
+
+  const displayStudents = useMemo(() => {
+    if (!search.trim()) return students;
+    if (filteredStudents.length > 0) return filteredStudents;
+    return serverSearchResults;
+  }, [search, students, filteredStudents, serverSearchResults]);
+
+  // Dynamic branch list combining core departments and any active scraped branches (e.g. MECH, CIVIL, AIML)
+  const availableBranches = useMemo(() => {
+    const defaultBranches = ["ALL", "CSE", "DS", "CY", "ISE", "AIML", "ECE"];
+    const extraBranches = Object.keys(branchStats).filter(
+      (b) => b && !defaultBranches.includes(b) && (branchStats[b]?.total_students || 0) > 0
+    );
+    return [...defaultBranches, ...extraBranches.sort()];
+  }, [branchStats]);
+
+  // Precompute academic merit & overall ranks across ALL students in current view (before search filtering)
+  const { meritRankMap, overallRankMap } = useMemo(() => {
+    const sorted = [...students].sort((a, b) => {
+      const aClean = a.total_backlogs === 0;
+      const bClean = b.total_backlogs === 0;
+      if (aClean !== bClean) return aClean ? -1 : 1;
+      if (a.percentage !== b.percentage) return b.percentage - a.percentage;
+      if (a.total_marks !== b.total_marks) return b.total_marks - a.total_marks;
+      return a.usn.localeCompare(b.usn);
+    });
+
+    let meritCounter = 0;
+    const meritMap = new Map<string, number>();
+    const overallMap = new Map<string, number>();
+
+    sorted.forEach((s, idx) => {
+      overallMap.set(s.usn, idx + 1);
+      if (s.total_backlogs === 0) {
+        meritCounter++;
+        meritMap.set(s.usn, meritCounter);
+      }
+    });
+
+    return { meritRankMap: meritMap, overallRankMap };
+  }, [students]);
+
   // Aggregate metrics for hero counter cards
   const heroStats = useMemo(() => {
     // Total students and average from branch stats
@@ -864,7 +920,7 @@ export default function Dashboard() {
                 <span className="text-[11px] opacity-40">Filter by branch</span>
               </div>
               <BranchTabs
-                branches={ALL_BRANCHES}
+                branches={availableBranches}
                 activeBranch={activeBranch}
                 onSelect={setActiveBranch}
                 branchStats={branchStats}
@@ -1066,7 +1122,7 @@ export default function Dashboard() {
                     ))}
                   </div>
                 </div>
-              ) : filteredStudents.length === 0 ? (
+              ) : displayStudents.length === 0 ? (
                 <div
                   className={`text-center py-14 rounded-2xl border ${
                     isObsidian
@@ -1089,11 +1145,11 @@ export default function Dashboard() {
                   className="w-full"
                 >
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-3.5 w-full">
-                    {filteredStudents.map((s, idx) => (
+                    {displayStudents.map((s) => (
                       <StudentCard
                         key={s.usn}
                         student={s}
-                        rank={sortBy === "percentage" && !search && s.total_backlogs === 0 ? idx + 1 : undefined}
+                        rank={meritRankMap.get(s.usn) ?? overallRankMap.get(s.usn)}
                         isSelectedForCompare={compareUsns.includes(s.usn)}
                         onToggleCompare={() => handleToggleCompare(s.usn)}
                         onOpenDetail={(e) => { handleOpenDetail(s.usn, e); }}
@@ -1150,12 +1206,14 @@ export default function Dashboard() {
                   className="space-y-3"
                 >
                   <DenseStudentTable
-                    students={filteredStudents}
+                    students={displayStudents}
                     compareUsns={compareUsns}
                     onToggleCompare={handleToggleCompare}
                     onOpenDetail={handleOpenDetail}
                     myUsn={myUsn}
                     isObsidian={isObsidian}
+                    externalMeritRankMap={meritRankMap}
+                    externalOverallRankMap={overallRankMap}
                   />
 
                   {/* Public Locked Teaser Card */}
@@ -1331,6 +1389,8 @@ export default function Dashboard() {
             hasNext={Boolean(nextUsn)}
             currentIndex={currentIndex >= 0 ? currentIndex + 1 : undefined}
             totalStudents={students.length > 0 ? students.length : undefined}
+            rank={selectedUsn ? meritRankMap.get(selectedUsn) : undefined}
+            overallRank={selectedUsn ? overallRankMap.get(selectedUsn) : undefined}
           />
         );
       })()}

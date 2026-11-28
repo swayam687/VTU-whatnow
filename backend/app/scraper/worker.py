@@ -38,6 +38,12 @@ BRANCH_MAP = {
     "IS": "ISE",
     "CI": "AIML",
     "AI": "AIML",
+    "AD": "AIML",
+    "AM": "AIML",
+    "CB": "CSBS",
+    "CG": "CSE",
+    "RI": "ROBOTICS",
+    "BT": "BIO",
     "IE": "ECE",
     "EC": "ECE",
     "EE": "EEE",
@@ -402,6 +408,7 @@ class ScraperWorker:
             if not student:
                 student = Student(usn=usn)
                 student.name = scraped_name or usn
+                student.is_hidden = False
                 db.add(student)
             elif scraped_name and scraped_name != usn:
                 # Update existing student's name if new semester portal has corrected/official spelling
@@ -410,6 +417,8 @@ class ScraperWorker:
                 student.name = scraped_name or usn
             student.branch = branch
             student.batch = batch
+            if student.is_hidden is None:
+                student.is_hidden = False
 
             for m in parsed["marks"]:
                 code = m["subject_code"].strip().upper()
@@ -512,9 +521,13 @@ class ScraperWorker:
                     pr.admin_notes = f"Automatically resolved via scraper run on semester {semester}."
 
             db.commit()
+            return True
         except Exception as e:
             db.rollback()
             job_manager.log(f"Database error saving {usn}: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
         finally:
             db.close()
 

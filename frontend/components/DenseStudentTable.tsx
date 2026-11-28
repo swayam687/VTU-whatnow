@@ -16,6 +16,8 @@ interface DenseStudentTableProps {
   onOpenDetail: (usn: string, e?: React.MouseEvent) => void;
   myUsn?: string;
   isObsidian?: boolean;
+  externalMeritRankMap?: Map<string, number>;
+  externalOverallRankMap?: Map<string, number>;
 }
 
 export default function DenseStudentTable({
@@ -25,6 +27,8 @@ export default function DenseStudentTable({
   onOpenDetail,
   myUsn = "",
   isObsidian = false,
+  externalMeritRankMap,
+  externalOverallRankMap,
 }: DenseStudentTableProps) {
   const [sortField, setSortField] = useState<SortField>("percentage");
   const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
@@ -89,17 +93,23 @@ export default function DenseStudentTable({
     });
   }, [students, sortField, sortOrder]);
 
-  const meritRankMap = React.useMemo(() => {
+  const internalRankMaps = React.useMemo(() => {
     let meritRankCounter = 0;
-    const map = new Map<string, number>();
-    for (const s of sortedStudents) {
+    const meritMap = new Map<string, number>();
+    const overallMap = new Map<string, number>();
+    for (let i = 0; i < sortedStudents.length; i++) {
+      const s = sortedStudents[i];
+      overallMap.set(s.usn, i + 1);
       if (s.total_backlogs === 0) {
         meritRankCounter++;
-        map.set(s.usn, meritRankCounter);
+        meritMap.set(s.usn, meritRankCounter);
       }
     }
-    return map;
+    return { meritMap, overallMap };
   }, [sortedStudents]);
+
+  const effectiveMeritRankMap = externalMeritRankMap || internalRankMaps.meritMap;
+  const effectiveOverallRankMap = externalOverallRankMap || internalRankMaps.overallMap;
 
   const renderSortIndicator = (field: SortField) => {
     if (sortField !== field) return null;
@@ -215,7 +225,8 @@ export default function DenseStudentTable({
               const isSelected = compareUsns.includes(s.usn);
               const isMyProfile = myUsn && s.usn.toUpperCase() === myUsn.toUpperCase();
               const hasBacklogs = s.total_backlogs > 0;
-              const rankNumber = meritRankMap.get(s.usn);
+              const rankNumber = effectiveMeritRankMap.get(s.usn);
+              const overallRankNumber = effectiveOverallRankMap.get(s.usn);
 
               return (
                   <tr
@@ -254,10 +265,17 @@ export default function DenseStudentTable({
                         <span className="text-slate-400 text-xs font-semibold">
                           {rankNumber}
                         </span>
+                      ) : overallRankNumber !== undefined ? (
+                        <span
+                          className="text-amber-500/80 text-xs font-semibold font-mono"
+                          title={`Overall standing #${overallRankNumber} (${s.total_backlogs} re-attempt${s.total_backlogs > 1 ? "s" : ""})`}
+                        >
+                          #{overallRankNumber}*
+                        </span>
                       ) : (
                         <span
                           className="text-slate-400/60 dark:text-slate-600 text-xs font-semibold select-none"
-                          title="Ineligible for merit rank due to pending backlogs"
+                          title="Rank not yet assigned"
                         >
                           —
                         </span>

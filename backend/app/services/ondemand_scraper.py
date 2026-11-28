@@ -925,11 +925,15 @@ class OnDemandScraperManager:
             # -------------------------------------------------------------
             parsed = parse_vtu_html(content)
             if parsed["marks"]:
-                if not parsed["student"].get("usn"):
-                    parsed["student"]["usn"] = session.usn
+                target_extracted_usn = (parsed["student"].get("usn") or session.usn).strip().upper()
+                parsed["student"]["usn"] = target_extracted_usn
 
                 # Save extracted marksheet into database
-                scraper_worker._save_result(parsed, session.semester)
+                saved = scraper_worker._save_result(parsed, session.semester)
+                if saved:
+                    logger.info(f"[CROWDSOURCE] Successfully persisted marks for target {target_extracted_usn} (semester {session.semester})")
+                else:
+                    logger.error(f"[CROWDSOURCE] Failed to persist marks for target {target_extracted_usn}")
 
                 # Advance ScrapeTarget index to the NEXT USN in the queue!
                 if session.target_id:

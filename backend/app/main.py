@@ -838,6 +838,22 @@ async def submit_login_gate_captcha(
             message=res.get("message", "Incorrect captcha code. Please try again."),
         )
 
+    # Audit log crowdsourced captcha completion
+    target_usn = res.get("target_usn")
+    if target_usn and target_usn.strip().upper() != clean_usn:
+        try:
+            c_log = UserCaptchaLog(
+                user_usn=clean_usn,
+                target_usn=target_usn.strip().upper(),
+                vtu_link=res.get("portal_url") or "",
+                action="login_gate",
+                ip_address=client_ip,
+            )
+            db.add(c_log)
+            db.commit()
+        except Exception:
+            pass
+
     return LoginGateSubmitResponse(
         ok=True,
         require_captcha=False,

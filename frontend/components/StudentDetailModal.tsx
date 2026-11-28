@@ -184,6 +184,8 @@ interface StudentDetailModalProps {
   hasNext?: boolean;
   currentIndex?: number;
   totalStudents?: number;
+  rank?: number;
+  overallRank?: number;
 }
 
 export default function StudentDetailModal({
@@ -211,6 +213,8 @@ export default function StudentDetailModal({
   hasNext = false,
   currentIndex,
   totalStudents,
+  rank,
+  overallRank,
 }: StudentDetailModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
@@ -748,6 +752,21 @@ export default function StudentDetailModal({
                     </span>
                     <span className="shrink-0 text-xs font-mono opacity-40">•</span>
                     <span className="shrink-0 text-xs font-semibold opacity-75">{student?.branch || "ENG"}</span>
+                    {(rank !== undefined || overallRank !== undefined) && (
+                      <>
+                        <span className="shrink-0 text-xs font-mono opacity-40">•</span>
+                        <span className={`shrink-0 inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2 py-0.5 rounded-md border ${
+                          (rank === 1 || overallRank === 1)
+                            ? "bg-amber-500/20 text-amber-400 border-amber-500/30"
+                            : "bg-blue-500/10 text-blue-400 border-blue-500/20"
+                        }`}>
+                          <span>Rank #{rank ?? overallRank}</span>
+                          {rank === undefined && overallRank !== undefined && student && student.total_backlogs > 0 && (
+                            <span className="text-[9px] text-amber-400 font-normal opacity-80" title={`${student.total_backlogs} re-attempt(s)`}>*</span>
+                          )}
+                        </span>
+                      </>
+                    )}
 
                     {isMyVerifiedProfile && (
                       <div className="flex items-center gap-1.5 flex-wrap">
