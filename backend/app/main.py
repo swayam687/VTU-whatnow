@@ -1727,9 +1727,9 @@ def _prune_stale_audit_logs(db: Session, max_days: int = 2):
         cutoff = datetime.utcnow() - timedelta(days=max_days)
         db.query(LoginLog).filter(LoginLog.login_at < cutoff).delete(synchronize_session=False)
         db.query(ComparisonLog).filter(ComparisonLog.compared_at < cutoff).delete(synchronize_session=False)
-        db.query(UserCaptchaLog).filter(UserCaptchaLog.created_at < cutoff).delete(synchronize_session=False)
-        db.query(FacultyLoginLog).filter(FacultyLoginLog.login_at < cutoff).delete(synchronize_session=False)
-        db.query(FacultyComparisonLog).filter(FacultyComparisonLog.compared_at < cutoff).delete(synchronize_session=False)
+        db.query(UserCaptchaLog).filter(UserCaptchaLog.solved_at < cutoff).delete(synchronize_session=False)
+        db.query(FacultyLoginLog).filter(FacultyLoginLog.timestamp < cutoff).delete(synchronize_session=False)
+        db.query(FacultyComparisonLog).filter(FacultyComparisonLog.timestamp < cutoff).delete(synchronize_session=False)
         db.commit()
     except Exception as e:
         print(f"⚠️ Notice during stale audit logs cleanup: {e}")
@@ -1741,7 +1741,7 @@ def get_admin_login_logs(db: Session = Depends(get_db)):
     logs = db.query(LoginLog).order_by(desc(LoginLog.login_at)).limit(150).all()
     total_logins = db.query(LoginLog).count()
 
-    unique_count = db.query(distinct(LoginLog.usn)).count()
+    unique_count = db.query(func.count(distinct(LoginLog.usn))).scalar() or 0
 
     frequency = (
         db.query(
