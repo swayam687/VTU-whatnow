@@ -1,5 +1,6 @@
 import asyncio
 import base64
+import logging
 import os
 import sys
 import time
@@ -9,6 +10,8 @@ import threading
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional, Tuple
+
+logger = logging.getLogger("ondemand_scraper")
 
 class ProactorLoopThread:
     """
@@ -931,8 +934,10 @@ class OnDemandScraperManager:
                 # Save extracted marksheet into database
                 saved = scraper_worker._save_result(parsed, session.semester)
                 if saved:
+                    print(f"[CROWDSOURCE] Successfully persisted marks for target {target_extracted_usn} (semester {session.semester})", flush=True)
                     logger.info(f"[CROWDSOURCE] Successfully persisted marks for target {target_extracted_usn} (semester {session.semester})")
                 else:
+                    print(f"[CROWDSOURCE] Failed to persist marks for target {target_extracted_usn}", flush=True)
                     logger.error(f"[CROWDSOURCE] Failed to persist marks for target {target_extracted_usn}")
 
                 # Advance ScrapeTarget index to the NEXT USN in the queue!
